@@ -1817,12 +1817,21 @@ static void pick_nbnxn_resources(const t_commrec     *cr,
 
     /* Enable GPU mode when GPUs are available or no GPU emulation is requested.
      */
+#ifdef GMX_USE_OPENCL
+    if (gpu_opt->nocl_dev_use > 0 && !(*bEmulateGPU))
+#else
     if (gpu_opt->ncuda_dev_use > 0 && !(*bEmulateGPU))
+#endif
     {
         /* Each PP node will use the intra-node id-th device from the
          * list of detected/selected GPUs. */
-        if (!init_gpu(cr->rank_pp_intranode, gpu_err_str,
+#ifdef GMX_USE_OPENCL
+        if (!init_ocl_gpu(cr->rank_pp_intranode, gpu_err_str,
                       &hwinfo->gpu_info, gpu_opt))
+#else
+        if (!init_cuda_gpu(cr->rank_pp_intranode, gpu_err_str,
+                      &hwinfo->gpu_info, gpu_opt))
+#endif
         {
             /* At this point the init should never fail as we made sure that
              * we have all the GPUs we need. If it still does, we'll bail. */

@@ -282,7 +282,6 @@ static void nbs_cycle_stop(nbnxn_cycle_t *cc)
     cc->count++;
 }
 
-
 #ifdef __cplusplus
 }
 #endif

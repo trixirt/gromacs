@@ -1112,8 +1112,13 @@ int mdrunner(gmx_hw_opt_t *hw_opt,
         if (inputrec->cutoff_scheme == ecutsVERLET)
         {
             /* Here the master rank decides if all ranks will use GPUs */
+#ifdef GMX_USE_OPENCL
+            bUseGPU = (hwinfo->gpu_info.nocl_dev_compatible > 0 ||
+                       getenv("GMX_EMULATE_GPU") != NULL);
+#else
             bUseGPU = (hwinfo->gpu_info.ncuda_dev_compatible > 0 ||
                        getenv("GMX_EMULATE_GPU") != NULL);
+#endif           
 
             /* TODO add GPU kernels for this and replace this check by:
              * (bUseGPU && (ir->vdwtype == evdwPME &&

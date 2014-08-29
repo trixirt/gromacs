@@ -99,12 +99,20 @@ static void sprint_gpus(char *sbuf, const gmx_gpu_info_t *gpu_info)
     int      i, ndev;
     char     stmp[STRLEN];
 
+#ifdef GMX_USE_OPENCL
+    ndev = gpu_info->nocl_dev;
+#else
     ndev = gpu_info->ncuda_dev;
+#endif
 
     sbuf[0] = '\0';
     for (i = 0; i < ndev; i++)
     {
-        get_gpu_device_info_string(stmp, gpu_info, i);
+#ifdef GMX_USE_OPENCL
+        get_ocl_gpu_device_info_string(stmp, gpu_info, i);
+#else
+        get_cuda_gpu_device_info_string(stmp, gpu_info, i);
+#endif        
         strcat(sbuf, "  ");
         strcat(sbuf, stmp);
         if (i < ndev - 1)
@@ -127,7 +135,11 @@ static void print_gpu_detection_stats(FILE                 *fplog,
         return;
     }
 
+#ifdef GMX_USE_OPENCL
+    ngpu = gpu_info->nocl_dev;
+#else
     ngpu = gpu_info->ncuda_dev;
+#endif
 
 #if defined GMX_MPI && !defined GMX_THREAD_MPI
     /* We only print the detection on one, of possibly multiple, nodes */
@@ -171,6 +183,23 @@ static std::string makeGpuIdsString(const Container &ids)
     return output;
 }
 
+template <typename Container>
+static std::string makeGpuNamesString(const Container &ids)
+{
+    std::string output;
+
+    if (0 != ids.size())
+    {
+        typename Container::const_iterator it = ids.begin();
+        output += gmx::formatString("%s", *it);
+        for (++it; it != ids.end(); ++it)
+        {
+            output += gmx::formatString(",%s", *it);
+        }
+    }
+    return output;
+}
+
 /*! \brief Helper function for reporting GPU usage information
  * in the mdrun log file
  *
@@ -184,8 +213,13 @@ makeGpuUsageReport(const gmx_gpu_info_t *gpu_info,
                    const gmx_gpu_opt_t  *gpu_opt,
                    size_t                numPpRanks)
 {
+#ifdef GMX_USE_OPENCL
+    int ngpu_use  = gpu_opt->nocl_dev_use;
+    int ngpu_comp = gpu_info->nocl_dev_compatible;
+#else
     int ngpu_use  = gpu_opt->ncuda_dev_use;
     int ngpu_comp = gpu_info->ncuda_dev_compatible;
+#endif    
 
     /* Issue a note if GPUs are available but not used */
     if (ngpu_comp > 0 && ngpu_use < 1)
@@ -198,12 +232,27 @@ makeGpuUsageReport(const gmx_gpu_info_t *gpu_info,
     std::string output;
 
     {
+        
+#ifdef GMX_USE_OPENCL
+        std::vector<char*> gpuNamesInUse;
+#else
         std::vector<int> gpuIdsInUse;
+#endif
         for (int i = 0; i < ngpu_use; i++)
         {
+#ifdef GMX_USE_OPENCL
+            //gpuIdsInUse.push_back(i);
+            gpuNamesInUse.push_back(gpu_info->ocl_dev[i].device_name);
+#else
             gpuIdsInUse.push_back(get_gpu_device_id(gpu_info, gpu_opt, i));
+#endif
         }
+
+#ifdef GMX_USE_OPENCL
+        std::string gpuIdsString = makeGpuNamesString(gpuNamesInUse);
+#else
         std::string gpuIdsString = makeGpuIdsString(gpuIdsInUse);
+#endif
         int         numGpusInUse = gmx_count_gpu_dev_unique(gpu_info, gpu_opt);
         bool        bPluralGpus  = numGpusInUse > 1;
 
@@ -306,7 +355,11 @@ void gmx_check_hw_runconf_consistency(FILE                *fplog,
     /* NOTE: this print is only for and on one physical node */
     print_gpu_detection_stats(fplog, &hwinfo->gpu_info, cr);
 
+#ifdef GMX_USE_OPENCL
+    if (hwinfo->gpu_info.nocl_dev_compatible > 0)
+#else
     if (hwinfo->gpu_info.ncuda_dev_compatible > 0)
+#endif
     {
         std::string gpuUseageReport;
         try
@@ -510,16 +563,28 @@ static int gmx_count_gpu_dev_unique(const gmx_gpu_info_t *gpu_info,
     assert(gpu_info);
     assert(gpu_opt);
 
+#ifdef GMX_USE_OPENCL
+    ngpu        = gpu_info->nocl_dev;
+#else
     ngpu        = gpu_info->ncuda_dev;
+#endif
     uniq_count  = 0;
 
     snew(uniq_ids, ngpu);
 
     /* Each element in uniq_ids will be set to 0 or 1. The n-th element set
      * to 1 indicates that the respective GPU was selected to be used. */
+#ifdef GMX_USE_OPENCL
+    for (i = 0; i < gpu_opt->nocl_dev_use; i++)
+#else
     for (i = 0; i < gpu_opt->ncuda_dev_use; i++)
+#endif
     {
+#ifdef GMX_USE_OPENCL
+        uniq_ids[i] = 1;
+#else
         uniq_ids[get_gpu_device_id(gpu_info, gpu_opt, i)] = 1;
+#endif
     }
     /* Count the devices used. */
     for (i = 0; i < ngpu; i++)
@@ -625,7 +690,14 @@ static void gmx_detect_gpus(FILE *fplog, const t_commrec *cr)
     {
         char detection_error[STRLEN] = "", sbuf[STRLEN];
 
-        if (detect_cuda_gpus(&hwinfo_g->gpu_info, detection_error) != 0)
+        int detect_gpu_ret;
+
+#ifdef GMX_USE_OPENCL
+        detect_gpu_ret = detect_ocl_gpus(&hwinfo_g->gpu_info, detection_error);
+#else
+        detect_gpu_ret = detect_cuda_gpus(&hwinfo_g->gpu_info, detection_error);
+#endif
+        if (detect_gpu_ret != 0)
         {
             if (detection_error[0] != '\0')
             {
@@ -698,6 +770,11 @@ gmx_hw_info_t *gmx_detect_hardware(FILE *fplog, const t_commrec *cr,
         hwinfo_g->gpu_info.ncuda_dev            = 0;
         hwinfo_g->gpu_info.cuda_dev             = NULL;
         hwinfo_g->gpu_info.ncuda_dev_compatible = 0;
+#ifdef GMX_USE_OPENCL
+        hwinfo_g->gpu_info.nocl_dev         = 0;
+        hwinfo_g->gpu_info.ocl_dev          = NULL;
+        hwinfo_g->gpu_info.nocl_dev_compatible = 0;
+#endif
 
         /* Run the detection if the binary was compiled with GPU support
          * and we requested detection.
@@ -810,9 +887,17 @@ void gmx_select_gpu_ids(FILE *fplog, const t_commrec *cr,
     }
     else
     {
-        pick_compatible_gpus(&hwinfo_g->gpu_info, gpu_opt);
+#ifdef GMX_USE_OPENCL
+        pick_compatible_ocl_gpus(&hwinfo_g->gpu_info, gpu_opt);
+#else
+        pick_compatible_cuda_gpus(&hwinfo_g->gpu_info, gpu_opt);
+#endif
 
+#ifdef GMX_USE_OPENCL
+        if (gpu_opt->nocl_dev_use > cr->nrank_pp_intranode)
+#else
         if (gpu_opt->ncuda_dev_use > cr->nrank_pp_intranode)
+#endif
         {
             /* We picked more GPUs than we can use: limit the number.
              * We print detailed messages about this later in
@@ -825,7 +910,11 @@ void gmx_select_gpu_ids(FILE *fplog, const t_commrec *cr,
     }
 
     /* If the user asked for a GPU, check whether we have a GPU */
+#ifdef GMX_USE_OPENCL
+    if (bForceUseGPU && gpu_info->nocl_dev_compatible == 0)
+#else
     if (bForceUseGPU && gpu_info->ncuda_dev_compatible == 0)
+#endif
     {
         gmx_fatal(FARGS, "GPU acceleration requested, but no compatible GPUs were detected.");
     }
@@ -837,7 +926,11 @@ static void limit_num_gpus_used(gmx_gpu_opt_t *gpu_opt, int count)
 
     assert(gpu_opt);
 
+#ifdef GMX_USE_OPENCL
+    ndev_use = gpu_opt->nocl_dev_use;
+#else
     ndev_use = gpu_opt->ncuda_dev_use;
+#endif
 
     if (count > ndev_use)
     {
@@ -854,7 +947,11 @@ static void limit_num_gpus_used(gmx_gpu_opt_t *gpu_opt, int count)
     }
 
     /* TODO: improve this implementation: either sort GPUs or remove the weakest here */
+#ifdef GMX_USE_OPENCL
+    gpu_opt->nocl_dev_use = count;
+#else
     gpu_opt->ncuda_dev_use = count;
+#endif
 }
 
 void gmx_hardware_info_free(gmx_hw_info_t *hwinfo)
@@ -884,7 +981,11 @@ void gmx_hardware_info_free(gmx_hw_info_t *hwinfo)
     if (n_hwinfo == 0)
     {
         gmx_cpuid_done(hwinfo_g->cpuid_info);
-        free_gpu_info(&hwinfo_g->gpu_info);
+#ifdef GMX_USE_OPENCL
+        free_ocl_gpu_info(&hwinfo_g->gpu_info);
+#else
+        free_cuda_gpu_info(&hwinfo_g->gpu_info);
+#endif
         sfree(hwinfo_g);
     }
 
