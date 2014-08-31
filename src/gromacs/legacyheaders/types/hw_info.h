@@ -47,6 +47,14 @@ extern "C" {
 } /* fixes auto-indentation problems */
 #endif
 
+#define GMX_USE_OPENCL
+#include <CL/opencl.h>
+#include <CL/cl.h>
+#include <CL/cl_platform.h>
+#include <CL/cl_ext.h>
+#include <CL/cl_gl.h>
+
+
 /* Possible results of the GPU detection/check.
  *
  * The egpuInsane value means that during the sanity checks an error
@@ -63,14 +71,38 @@ static const char * const gpu_detect_res_str[] =
     "compatible", "inexistent", "incompatible", "insane"
 };
 
+#ifdef GMX_USE_OPENCL
+typedef struct
+{
+    cl_platform_id      ocl_platform_id;
+    cl_device_id        ocl_device_id;
+} ocl_gpu_id_t, *ocl_gpu_id_ptr_t;
+
+typedef struct
+{
+    ocl_gpu_id_t        ocl_gpu_id;
+    char                device_name[256];
+    char                device_version[256];
+    char                device_vendor[256];
+    int                 compute_units;
+    int                 stat;
+} ocl_gpu_info_t, *ocl_gpu_info_ptr_t;
+#endif
+
 /* GPU device information -- for now with only CUDA devices.
  * The gmx_hardware_detect module initializes it. */
 typedef struct
 {
-    gmx_bool             bDetectGPUs;          /* Did we try to detect GPUs? */
+	gmx_bool             bDetectGPUs;          /* Did we try to detect GPUs? */
     int                  ncuda_dev;            /* total number of devices detected */
     cuda_dev_info_ptr_t  cuda_dev;             /* devices detected in the system (per node) */
     int                  ncuda_dev_compatible; /* number of compatible GPUs */
+
+#ifdef GMX_USE_OPENCL			
+	int                  nocl_dev;
+	ocl_gpu_info_ptr_t	 ocl_dev;	
+	int                  nocl_dev_compatible;
+#endif
 } gmx_gpu_info_t;
 
 /* Hardware information structure with CPU and GPU information.
@@ -103,6 +135,11 @@ typedef struct
 
     int       ncuda_dev_use; /* number of device (IDs) selected to be used */
     int      *cuda_dev_use;  /* device index list providing GPU to PP rank mapping, GPUs can be listed multiple times when ranks share them */
+
+#ifdef GMX_USE_OPENCL
+    int                 nocl_dev_use;
+    int                 *ocl_dev_use;
+#endif
 } gmx_gpu_opt_t;
 
 /* Threading and GPU options, can be set automatically or by the user */

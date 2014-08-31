@@ -183,7 +183,7 @@ static int do_sanity_checks(int dev_id, cudaDeviceProp *dev_prop)
  * \param[in] gpu_opt       options for using the GPUs in gpu_info
  * \returns                 true if no error occurs during initialization.
  */
-gmx_bool init_gpu(int mygpu, char *result_str,
+gmx_bool init_cuda_gpu(int mygpu, char *result_str,
                   const gmx_gpu_info_t *gpu_info,
                   const gmx_gpu_opt_t *gpu_opt)
 {
@@ -398,7 +398,7 @@ int detect_cuda_gpus(gmx_gpu_info_t *gpu_info, char *err_str)
  * \param[in]     gpu_info    pointer to structure holding GPU information
  * \param[in,out] gpu_opt     pointer to structure holding GPU options
  */
-void pick_compatible_gpus(const gmx_gpu_info_t *gpu_info,
+void pick_compatible_cuda_gpus(const gmx_gpu_info_t *gpu_info,
                           gmx_gpu_opt_t        *gpu_opt)
 {
     int  i, ncompat;
@@ -479,7 +479,7 @@ gmx_bool check_selected_cuda_gpus(int                  *checkres,
  *
  * \param[in]    gpu_info    pointer to structure holding GPU information
  */
-void free_gpu_info(const gmx_gpu_info_t *gpu_info)
+void free_cuda_gpu_info(const gmx_gpu_info_t *gpu_info)
 {
     if (gpu_info == NULL)
     {
@@ -499,7 +499,7 @@ void free_gpu_info(const gmx_gpu_info_t *gpu_info)
  * \param[in]   gpu_info    pointer to structure holding GPU information
  * \param[in]   index       an index *directly* into the array of available GPUs
  */
-void get_gpu_device_info_string(char *s, const gmx_gpu_info_t *gpu_info, int index)
+void get_cuda_gpu_device_info_string(char *s, const gmx_gpu_info_t *gpu_info, int index)
 {
     assert(s);
     assert(gpu_info);
