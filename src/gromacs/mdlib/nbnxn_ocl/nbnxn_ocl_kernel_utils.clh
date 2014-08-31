@@ -35,12 +35,10 @@
  
 // Test bench for vectype and kernel_utils
 
-//#include "../../gmxlib/opencl_tools/vectype_ops.clh"
-// Test modifications
-#include "vectype_ops.clh"
+#include "../../gmxlib/ocl_tools/vectype_ops.clh"
 
 #define __IN_OPENCL_KERNEL__
-#include "nbnxn_opencl_types.h"
+#include "nbnxn_ocl_types.h"
 #define NBNXN_GPU_CLUSTER_SIZE         8
 #define NBNXN_GPU_JGROUP_SIZE       4
 #define NBNXN_AVOID_SING_R2_INC  1.0e-12f
