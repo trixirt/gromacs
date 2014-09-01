@@ -41,19 +41,20 @@
 #define M_FLOAT_1_SQRTPI 0.564189583547756f
 #include "gromacs/utility/real.h"
 
-
 #include "types/interaction_const.h"
-
 
 /* Fixing headers: Mixed host/device structure.. Typedef things to avoid other includes that can cause
  problems to device code */
+#ifdef __IN_OPENCL_KERNEL__
 typedef float3  rvec;
 typedef bool    gmx_bool;
+#endif
 
 
 /* Fixing headers: Mixed host/device structure.. Header had to be modified to avoid irrelevant types in
  * device code, as tMPI_atomic_t.*/
-#include "nbnxn_pairlist.h"
+//#include "nbnxn_pairlist.h"
+#include "../nbnxn_pairlist.h"
 
 /* Fixing headers: not needed anymore, host structure nbnxn_opencl not included anymore in device code... 
  * Dependency was wallclock_gpu_t */
@@ -80,9 +81,9 @@ extern "C" {
  *  nbnxn_cuda.cu by the nb_*_kfunc_ptr function pointer table
  *  should match the order of enumerated types below.
  */
-enum eelCu {
-    eelCuCUT, eelCuRF, eelCuEWALD_TAB, eelCuEWALD_TAB_TWIN, eelCuEWALD_ANA, eelCuEWALD_ANA_TWIN, eelCuNR
-};
+//enum eelCu {
+//    eelCuCUT, eelCuRF, eelCuEWALD_TAB, eelCuEWALD_TAB_TWIN, eelCuEWALD_ANA, eelCuEWALD_ANA_TWIN, eelCuNR
+//};
 
 /*! \brief VdW CUDA kernel flavors.
  *
@@ -93,9 +94,9 @@ enum eelCu {
  * nbnxn_cuda.cu by the nb_*_kfunc_ptr function pointer table
  * should match the order of enumerated types below.
  */
-enum evdwCu {
-    evdwCuCUT, evdwCuFSWITCH, evdwCuPSWITCH, evdwCuEWALDGEOM, evdwCuEWALDLB, evdwCuNR
-};
+//enum evdwCu {
+//    evdwCuCUT, evdwCuFSWITCH, evdwCuPSWITCH, evdwCuEWALDGEOM, evdwCuEWALDLB, evdwCuNR
+//};
 
 /* All structs prefixed with "cu_" hold data used in GPU calculations and
  * are passed to the kernels, except cu_timers_t. */
@@ -114,12 +115,12 @@ enum evdwCu {
  *  The energies/shift forces get downloaded here first, before getting added
  *  to the CPU-side aggregate values.
  */
-typedef struct nb_staging
-{
-    float   *e_lj;      /**< LJ energy            */
-    float   *e_el;      /**< electrostatic energy */
-    float3  *fshift;    /**< shift forces         */
-}nb_staging_t;
+//typedef struct nb_staging
+//{
+//    float   *e_lj;      /**< LJ energy            */
+//    float   *e_el;      /**< electrostatic energy */
+//    float3  *fshift;    /**< shift forces         */
+//}nb_staging_t;
 
 /** \internal
  * \brief Nonbonded atom data - both inputs and outputs.
@@ -236,7 +237,7 @@ typedef struct cl_timers
  */
 struct nbnxn_opencl
 {
-    opencl_dev_info_t *dev_info;       /**< CUDA device information                              */
+    ocl_gpu_info_t *dev_info;        /**< CUDA device information                              */    
     bool             bUseTwoStreams; /**< true if doing both local/non-local NB work on GPU    */
     bool             bUseStreamSync; /**< true if the standard cudaStreamSynchronize is used
                                           and not memory polling-based waiting                 */

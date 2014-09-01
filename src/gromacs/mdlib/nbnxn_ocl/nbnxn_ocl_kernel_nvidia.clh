@@ -34,13 +34,15 @@
  */
 
 //Test
-#include "nbnxn_opencl_kernel_utils.clh"
+//#include "nbnxn_opencl_kernel_utils.clh"
+#include "nbnxn_ocl_kernel_utils.clh"
 
 /* #include "gromacs/math/utilities.h" */
 /* Fixing headers: Attempting to include host system headers inside device code. 
  * Dependencies: real, M_FLOAT_1_SQRTPI. moved to opencl_types*/
 
 #include "gromacs/pbcutil/ishift.h"
+
 /* Note that floating-point constants in CUDA code should be suffixed
  * with f (e.g. 0.5f), to stop the compiler producing intermediate
  * code that is in double precision.

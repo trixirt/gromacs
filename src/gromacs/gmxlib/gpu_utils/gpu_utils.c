@@ -85,7 +85,7 @@ int detect_ocl_gpus(gmx_gpu_info_t *gpu_info, char *err_str)
                 if (1 > ocl_device_count)
                     break;
                     
-                for (int j = 0; j < ocl_device_count; j++)
+                for (unsigned int j = 0; j < ocl_device_count; j++)
                 {
                     gpu_info->ocl_dev[device_index].ocl_gpu_id.ocl_platform_id = ocl_platform_ids[i];
                     gpu_info->ocl_dev[device_index].ocl_gpu_id.ocl_device_id = ocl_device_ids[j];
@@ -224,7 +224,10 @@ void get_ocl_gpu_device_info_string(char gmx_unused *s, const gmx_gpu_info_t gmx
     }
 }
 
-#define OCL_FILE_PATH "C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\mdlib\\nbnxn_ocl\\nbnxn_ocl_kernels.cl"
+//#define OCL_FILE_PATH "C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\mdlib\\nbnxn_ocl\\nbnxn_ocl_kernels.cl"
+//#define OCL_FILE_PATH "C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\gmxlib\\ocl_tools\\vectype_ops.clh"
+#define OCL_FILE_PATH "C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\mdlib\\nbnxn_ocl\\nbnxn_ocl_kernel_nvidia.clh"
+
 
 char* load_ocl_source(const char* filename, size_t* p_source_length)
 {    
@@ -268,51 +271,110 @@ gmx_bool init_ocl_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
     cl_context context;
     cl_program program;
     cl_int cl_error;
+    int retval;
 
     char* ocl_source;
     size_t ocl_source_length;
 
-    ocl_source = load_ocl_source(OCL_FILE_PATH, &ocl_source_length);
-    // TO DO: check for errors
+    assert(gpu_info);
+    assert(result_str);
 
-    selected_ocl_gpu = gpu_info->ocl_dev + gpu_opt->ocl_dev_use[0];
-    platform_id = selected_ocl_gpu->ocl_gpu_id.ocl_platform_id;
-    device_id = selected_ocl_gpu->ocl_gpu_id.ocl_device_id;
+    retval = -1;
+    ocl_source = NULL;
+    ocl_source_length = 0;
+    result_str[0] = 0;
 
-    context_properties[0] = CL_CONTEXT_PLATFORM;
-	context_properties[1] = (cl_context_properties)platform_id;
-	context_properties[2] = 0;
+    while (1)
+    {
+        ocl_source = load_ocl_source(OCL_FILE_PATH, &ocl_source_length);
+        if (!ocl_source)
+        {            
+            sprintf(result_str, "Error loading OpenCL code");
+            break;
+        }        
 
-    context = clCreateContext(context_properties, 1, &device_id, NULL, NULL, &cl_error);
-    // TO DO: check for errors
+        //gpuid = gpu_info->cuda_dev[gpu_opt->cuda_dev_use[mygpu]].id;
+        selected_ocl_gpu = gpu_info->ocl_dev + gpu_opt->ocl_dev_use[mygpu];
+        platform_id = selected_ocl_gpu->ocl_gpu_id.ocl_platform_id;
+        device_id = selected_ocl_gpu->ocl_gpu_id.ocl_device_id;
 
-    program = clCreateProgramWithSource(context, 1, (const char**)(&ocl_source), &ocl_source_length, &cl_error);
-    // TO DO: check for errors
+        context_properties[0] = CL_CONTEXT_PLATFORM;
+	    context_properties[1] = (cl_context_properties)platform_id;
+	    context_properties[2] = 0;
 
-	// Build the program
-	{		
-		size_t build_log_size = 0;
+        context = clCreateContext(context_properties, 1, &device_id, NULL, NULL, &cl_error);
+        CALLOCLFUNC_LOGERROR(cl_error, result_str, retval)
+        if (0 != retval)
+            break;
 
-		cl_error = clBuildProgram(program, 0, NULL, "-cl-fast-relaxed-math", NULL, NULL);
+        program = clCreateProgramWithSource(context, 1, (const char**)(&ocl_source), &ocl_source_length, &cl_error);
+        CALLOCLFUNC_LOGERROR(cl_error, result_str, retval)
+        if (0 != retval)
+            break;
 
-		// Get log string size
-		cl_error = clGetProgramBuildInfo(program, device_id, CL_PROGRAM_BUILD_LOG, 0, NULL, &build_log_size);
+	    // Build the program
+	    {		
+		    size_t build_log_size = 0;
 
-		if (build_log_size)
-		{
-            char *build_log = NULL;
+		    //cl_error = clBuildProgram(program, 0, NULL, "-cl-fast-relaxed-math", NULL, NULL);
+            //cl_error = clBuildProgram(program, 0, NULL, "-I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\mdlib\\nbnxn_ocl\\ -I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\pbcutil\\ -I C:\\Anca\\SC\\gromacs\\gromacs\\src -I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\legacyheaders -I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\mdlib", NULL, NULL);        
+            cl_error = clBuildProgram(program, 0, NULL, "-I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\mdlib\\nbnxn_ocl\\ -I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\pbcutil\\ -I C:\\Anca\\SC\\gromacs\\gromacs\\src\\ -I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\legacyheaders\\ -I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\mdlib\\", NULL, NULL);        
+            CALLOCLFUNC_LOGERROR(cl_error, result_str, retval)
+            if (0 != retval)
+                break;
 
-			// Allocate memory to fit the build log - it can be very large in case of errors
-			build_log = (char*)malloc(build_log_size);
-			if (build_log)
-			{
-				clGetProgramBuildInfo(program, device_id, CL_PROGRAM_BUILD_LOG, build_log_size, build_log, NULL);
+		    // Get log string size
+		    cl_error = clGetProgramBuildInfo(program, device_id, CL_PROGRAM_BUILD_LOG, 0, NULL, &build_log_size);
+            CALLOCLFUNC_LOGERROR(cl_error, result_str, retval)
+            if (0 != retval)
+                break;
 
-				// Free buildLog buffer
-				free(build_log);
-			}
-		}
-	}
+		    if (build_log_size)
+		    {
+                char *build_log = NULL;
 
-    return 0;
+			    // Allocate memory to fit the build log - it can be very large in case of errors
+			    build_log = (char*)malloc(build_log_size);
+			    if (build_log)
+			    {
+				    cl_error = clGetProgramBuildInfo(program, device_id, CL_PROGRAM_BUILD_LOG, build_log_size, build_log, NULL);
+
+				    // Free buildLog buffer
+				    free(build_log);
+			    }
+		    }
+	    }
+
+        retval = 0;
+        break;
+    }
+
+    if (0 == retval)
+        selected_ocl_gpu->context = context;
+
+    return (0 == retval);
+}
+
+
+/*! \brief Returns the device ID of the GPU with a given index into the array of used GPUs.
+ *
+ * Getter function which, given an index into the array of GPUs in use
+ * (cuda_dev_use) -- typically a tMPI/MPI rank --, returns the device ID of the
+ * respective CUDA GPU.
+ *
+ * \param[in]    gpu_info   pointer to structure holding GPU information
+ * \param[in]    gpu_opt    pointer to structure holding GPU options
+ * \param[in]    idx        index into the array of used GPUs
+ * \returns                 device ID of the requested GPU
+ */
+ocl_gpu_id_t get_ocl_gpu_device_id(const gmx_gpu_info_t *gpu_info,
+                      const gmx_gpu_opt_t  *gpu_opt,
+                      int                   idx)
+{
+    assert(gpu_info);
+    assert(gpu_opt);
+    assert(idx >= 0 && idx < gpu_opt->ncuda_dev_use);
+
+    return gpu_info->ocl_dev[gpu_opt->ocl_dev_use[idx]].ocl_gpu_id;
+    //return gpu_info->cuda_dev[gpu_opt->cuda_dev_use[idx]].id;
 }

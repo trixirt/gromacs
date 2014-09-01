@@ -86,6 +86,8 @@ typedef struct
     char                device_vendor[256];
     int                 compute_units;
     int                 stat;
+
+    cl_context          context;
 } ocl_gpu_info_t, *ocl_gpu_info_ptr_t;
 #endif
 

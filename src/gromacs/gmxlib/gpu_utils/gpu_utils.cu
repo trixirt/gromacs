@@ -542,7 +542,7 @@ void get_cuda_gpu_device_info_string(char *s, const gmx_gpu_info_t *gpu_info, in
  * \param[in]    idx        index into the array of used GPUs
  * \returns                 device ID of the requested GPU
  */
-int get_gpu_device_id(const gmx_gpu_info_t *gpu_info,
+int get_cuda_gpu_device_id(const gmx_gpu_info_t *gpu_info,
                       const gmx_gpu_opt_t  *gpu_opt,
                       int                   idx)
 {

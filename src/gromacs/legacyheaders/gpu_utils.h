@@ -102,7 +102,12 @@ FUNC_QUALIFIER
 int get_current_gpu_device_id(void) FUNC_TERM_INT
 
 FUNC_QUALIFIER
-int get_gpu_device_id(const gmx_gpu_info_t gmx_unused *gpu_info,
+int get_cuda_gpu_device_id(const gmx_gpu_info_t gmx_unused *gpu_info,
+                      const gmx_gpu_opt_t gmx_unused  *gpu_opt,
+                      int gmx_unused                   index) FUNC_TERM_INT
+
+FUNC_QUALIFIER
+ocl_gpu_id_t get_ocl_gpu_device_id(const gmx_gpu_info_t gmx_unused *gpu_info,
                       const gmx_gpu_opt_t gmx_unused  *gpu_opt,
                       int gmx_unused                   index) FUNC_TERM_INT
 

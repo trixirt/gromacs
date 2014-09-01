@@ -39,6 +39,7 @@
 #include "types/simple.h"
 #include "types/interaction_const.h"
 #include "types/nbnxn_cuda_types_ext.h"
+#include "types/nbnxn_ocl_types_ext.h"
 #include "types/hw_info.h"
 
 #ifdef GMX_GPU
@@ -70,6 +71,11 @@ void nbnxn_cuda_init(FILE gmx_unused                 *fplog,
 /** Initializes simulation constant data. */
 FUNC_QUALIFIER
 void nbnxn_cuda_init_const(nbnxn_cuda_ptr_t               gmx_unused         cu_nb,
+                           const interaction_const_t      gmx_unused        *ic,
+                           const struct nonbonded_verlet_group_t gmx_unused *nbv_group) FUNC_TERM
+
+FUNC_QUALIFIER
+void nbnxn_ocl_init_const(nbnxn_opencl_ptr_t               gmx_unused         cu_nb,
                            const interaction_const_t      gmx_unused        *ic,
                            const struct nonbonded_verlet_group_t gmx_unused *nbv_group) FUNC_TERM
 

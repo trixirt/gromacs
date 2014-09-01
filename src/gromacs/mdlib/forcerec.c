@@ -77,6 +77,7 @@
 #include "types/nbnxn_cuda_types_ext.h"
 #include "gpu_utils.h"
 #include "gromacs/mdlib/nbnxn_cuda/nbnxn_cuda_data_mgmt.h"
+#include "gromacs/mdlib/nbnxn_ocl/nbnxn_ocl_data_mgmt.h"
 #include "pmalloc_cuda.h"
 #include "nb_verlet.h"
 
@@ -1837,7 +1838,7 @@ static void pick_nbnxn_resources(const t_commrec     *cr,
              * we have all the GPUs we need. If it still does, we'll bail. */
             gmx_fatal(FARGS, "On rank %d failed to initialize GPU #%d: %s",
                       cr->nodeid,
-                      get_gpu_device_id(&hwinfo->gpu_info, gpu_opt,
+                      get_cuda_gpu_device_id(&hwinfo->gpu_info, gpu_opt,
                                         cr->rank_pp_intranode),
                       gpu_err_str);
         }
@@ -2113,7 +2114,11 @@ init_interaction_const(FILE                       *fp,
 
     if (fr->nbv != NULL && fr->nbv->bUseGPU)
     {
+#ifdef GMX_USE_OPENCL
+        nbnxn_ocl_init_const(fr->nbv->ocl_nbv, ic, fr->nbv->grp);
+#else
         nbnxn_cuda_init_const(fr->nbv->cu_nbv, ic, fr->nbv->grp);
+#endif
 
         /* With tMPI + GPUs some ranks may be sharing GPU(s) and therefore
          * also sharing texture references. To keep the code simple, we don't
@@ -2206,10 +2211,17 @@ static void init_nb_verlet(FILE                *fp,
     {
         /* init the NxN GPU data; the last argument tells whether we'll have
          * both local and non-local NB calculation on GPU */
+#ifdef GMX_USE_OPENCL
+        nbnxn_ocl_init(fp, &nbv->cu_nbv,
+                        &fr->hwinfo->gpu_info, fr->gpu_opt,
+                        cr->rank_pp_intranode,
+                        (nbv->ngrp > 1) && !bHybridGPURun);
+#else
         nbnxn_cuda_init(fp, &nbv->cu_nbv,
                         &fr->hwinfo->gpu_info, fr->gpu_opt,
                         cr->rank_pp_intranode,
                         (nbv->ngrp > 1) && !bHybridGPURun);
+#endif
 
         if ((env = getenv("GMX_NB_MIN_CI")) != NULL)
         {
