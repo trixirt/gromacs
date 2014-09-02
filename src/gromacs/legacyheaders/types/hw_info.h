@@ -47,6 +47,7 @@ extern "C" {
 } /* fixes auto-indentation problems */
 #endif
 
+#define HAS_CC_3_0_OR_LATER 1
 #define GMX_USE_OPENCL
 #include <CL/opencl.h>
 #include <CL/cl.h>
@@ -88,6 +89,7 @@ typedef struct
     int                 stat;
 
     cl_context          context;
+    cl_command_queue    command_queue;
 } ocl_gpu_info_t, *ocl_gpu_info_ptr_t;
 #endif
 

@@ -271,6 +271,7 @@ gmx_bool init_ocl_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
     cl_context context;
     cl_program program;
     cl_int cl_error;
+    cl_command_queue command_queue;
     int retval;
 
     char* ocl_source;
@@ -308,6 +309,11 @@ gmx_bool init_ocl_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
             break;
 
         program = clCreateProgramWithSource(context, 1, (const char**)(&ocl_source), &ocl_source_length, &cl_error);
+        CALLOCLFUNC_LOGERROR(cl_error, result_str, retval)
+        if (0 != retval)
+            break;
+
+        command_queue = clCreateCommandQueue(context, device_id, 0, &cl_error);
         CALLOCLFUNC_LOGERROR(cl_error, result_str, retval)
         if (0 != retval)
             break;
@@ -350,7 +356,10 @@ gmx_bool init_ocl_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
     }
 
     if (0 == retval)
+    {
         selected_ocl_gpu->context = context;
+        selected_ocl_gpu->command_queue = command_queue;
+    }
 
     return (0 == retval);
 }

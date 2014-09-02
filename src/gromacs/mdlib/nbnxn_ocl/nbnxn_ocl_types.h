@@ -179,15 +179,20 @@ typedef struct cl_nbparam
     switch_consts_t vdw_switch;       /**< VdW switch constants                     */
 
     /* LJ non-bonded parameters - accessed through texture memory */
-    float                 *nbfp;             /**< nonbonded parameter table with C6/C12 pairs per atom type-pair, 2*ntype^2 elements */
+    //float                 *nbfp;             /**< nonbonded parameter table with C6/C12 pairs per atom type-pair, 2*ntype^2 elements */
+    cl_mem                  nbfp;
     //openclTextureObject_t  nbfp_climg2d;      /**< texture object bound to nbfp                                                       */
-    float                 *nbfp_comb;        /**< nonbonded parameter table per atom type, 2*ntype elements                          */
+    cl_mem                  nbfp_climg2d;      /**< texture object bound to nbfp                                                       */
+    //float                 *nbfp_comb;        /**< nonbonded parameter table per atom type, 2*ntype elements                          */
+    cl_mem                 nbfp_comb;        /**< nonbonded parameter table per atom type, 2*ntype elements                          */
     //openclTextureObject_t  nbfp_comb_climg2d; /**< texture object bound to nbfp_texobj                                                */
+    cl_mem                  nbfp_comb_climg2d; /**< texture object bound to nbfp_texobj                                                */
 
     /* Ewald Coulomb force table data - accessed through texture memory */
     int                    coulomb_tab_size;   /**< table size (s.t. it fits in texture cache) */
     float                  coulomb_tab_scale;  /**< table scale/spacing                        */
-    float                 *coulomb_tab;        /**< pointer to the table in the device memory  */
+    //float                 *coulomb_tab;        /**< pointer to the table in the device memory  */
+    cl_mem                  coulomb_tab;
     //openclTextureObject_t  coulomb_tab_climg2d; /**< texture object bound to coulomb_tab        */
 }cl_nbparam_t;
 

@@ -116,37 +116,45 @@ static void nbnxn_cuda_clear_e_fshift(nbnxn_cuda_ptr_t cu_nb);
     and the table GPU array. If called with an already allocated table,
     it just re-uploads the table.
  */
-static void init_ewald_coulomb_force_table(cu_nbparam_t          *nbp,
-                                           const cuda_dev_info_t *dev_info)
+static void init_ewald_coulomb_force_table(//cu_nbparam_t          *nbp,
+                                           //const cuda_dev_info_t *dev_info
+                                           cl_nbparam_t             *nbp,                                           
+                                           const ocl_gpu_info_t *dev_info)
 {
-////    float       *ftmp, *coul_tab;
-////    int          tabsize;
-////    double       tabscale;
-////    cudaError_t  stat;
-////
-////    tabsize     = GPU_EWALD_COULOMB_FORCE_TABLE_SIZE;
-////    /* Subtract 2 iso 1 to avoid access out of range due to rounding */
-////    tabscale    = (tabsize - 2) / sqrt(nbp->rcoulomb_sq);
-////
-////    pmalloc((void**)&ftmp, tabsize*sizeof(*ftmp));
-////
-////    table_spline3_fill_ewald_lr(ftmp, NULL, NULL, tabsize,
-////                                1/tabscale, nbp->ewald_beta, v_q_ewald_lr);
-////
-////    /* If the table pointer == NULL the table is generated the first time =>
-////       the array pointer will be saved to nbparam and the texture is bound.
-////     */
-////    coul_tab = nbp->coulomb_tab;
-////    if (coul_tab == NULL)
-////    {
-////        stat = cudaMalloc((void **)&coul_tab, tabsize*sizeof(*coul_tab));
-////        CU_RET_ERR(stat, "cudaMalloc failed on coul_tab");
-////
-////        nbp->coulomb_tab = coul_tab;
-////
+    float       *ftmp;//, *coul_tab;
+    cl_mem coul_tab;
+    int          tabsize;
+    double       tabscale;
+    cudaError_t  stat;
+
+    cl_int cl_error;
+
+    tabsize     = GPU_EWALD_COULOMB_FORCE_TABLE_SIZE;
+    /* Subtract 2 iso 1 to avoid access out of range due to rounding */
+    tabscale    = (tabsize - 2) / sqrt(nbp->rcoulomb_sq);
+
+    pmalloc((void**)&ftmp, tabsize*sizeof(*ftmp));
+
+    table_spline3_fill_ewald_lr(ftmp, NULL, NULL, tabsize,
+                                1/tabscale, nbp->ewald_beta, v_q_ewald_lr);
+
+    /* If the table pointer == NULL the table is generated the first time =>
+       the array pointer will be saved to nbparam and the texture is bound.
+     */
+    coul_tab = nbp->coulomb_tab;
+    if (coul_tab == NULL)
+    {
+        //stat = cudaMalloc((void **)&coul_tab, tabsize*sizeof(*coul_tab));
+        //CU_RET_ERR(stat, "cudaMalloc failed on coul_tab");
+        coul_tab = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, tabsize * sizeof(float), NULL, &cl_error);
+        // TO DO: handle errors, check clCreateBuffer flags
+            
+        nbp->coulomb_tab = coul_tab;
+
 ////#ifdef TEXOBJ_SUPPORTED
 ////        /* Only device CC >= 3.0 (Kepler and later) support texture objects */
-////        if (dev_info->prop.major >= 3)
+////        //if (dev_info->prop.major >= 3)
+////        if (HAS_CC_3_0_OR_LATER)
 ////        {
 ////            cudaResourceDesc rd;
 ////            memset(&rd, 0, sizeof(rd));
@@ -171,7 +179,7 @@ static void init_ewald_coulomb_force_table(cu_nbparam_t          *nbp,
 ////                                   coul_tab, &cd, tabsize*sizeof(*coul_tab));
 ////            CU_RET_ERR(stat, "cudaBindTexture on coulomb_tab_texref failed");
 ////        }
-////    }
+    }
 ////
 ////    cu_copy_H2D(coul_tab, ftmp, tabsize*sizeof(*coul_tab));
 ////
@@ -184,7 +192,7 @@ static void init_ewald_coulomb_force_table(cu_nbparam_t          *nbp,
 
 /*! Initializes the atomdata structure first time, it only gets filled at
     pair-search. */
-static void init_atomdata_first(ocl_gpu_info_t *dev_info, /*cu_atomdata_t*/cl_atomdata_t *ad, int ntypes)
+static void init_atomdata_first(/*cu_atomdata_t*/cl_atomdata_t *ad, int ntypes, ocl_gpu_info_t *dev_info)
 {
     cudaError_t stat;
     cl_int cl_error;
@@ -195,22 +203,22 @@ static void init_atomdata_first(ocl_gpu_info_t *dev_info, /*cu_atomdata_t*/cl_at
     //CU_RET_ERR(stat, "cudaMalloc failed on ad->shift_vec");
     ad->shift_vec = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, SHIFTS * sizeof(float3), NULL, &cl_error);
     ad->bShiftVecUploaded = false;
-    // TO DO: error handling
+    // TO DO: handle errors, check clCreateBuffer flags
 
     //stat = cudaMalloc((void**)&ad->fshift, SHIFTS*sizeof(*ad->fshift));
     //CU_RET_ERR(stat, "cudaMalloc failed on ad->fshift");
     ad->fshift = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, SHIFTS * sizeof(float3), NULL, &cl_error);
-    // TO DO: error handling
+    // TO DO: handle errors, check clCreateBuffer flags
 
     //stat = cudaMalloc((void**)&ad->e_lj, sizeof(*ad->e_lj));
     //CU_RET_ERR(stat, "cudaMalloc failed on ad->e_lj");
     ad->e_lj = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, sizeof(float), NULL, &cl_error);
-    // TO DO: error handling
+    // TO DO: handle errors, check clCreateBuffer flags
 
     //stat = cudaMalloc((void**)&ad->e_el, sizeof(*ad->e_el));
     //CU_RET_ERR(stat, "cudaMalloc failed on ad->e_el");
     ad->e_el = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, sizeof(float), NULL, &cl_error);
-    // TO DO: error handling
+    // TO DO: handle errors, check clCreateBuffer flags
 
     /* initialize to NULL poiters to data that is not allocated here and will
        need reallocation in nbnxn_cuda_init_atomdata */
@@ -225,7 +233,8 @@ static void init_atomdata_first(ocl_gpu_info_t *dev_info, /*cu_atomdata_t*/cl_at
 /*! Selects the Ewald kernel type, analytical on SM 3.0 and later, tabulated on
     earlier GPUs, single or twin cut-off. */
 static int pick_ewald_kernel_type(bool                   bTwinCut,
-                                  const cuda_dev_info_t *dev_info)
+                                 // const cuda_dev_info_t *dev_info
+                                 const ocl_gpu_info_t *dev_info)
 {
     bool bUseAnalyticalEwald, bForceAnalyticalEwald, bForceTabulatedEwald;
     int  kernel_type;
@@ -242,7 +251,8 @@ static int pick_ewald_kernel_type(bool                   bTwinCut,
     }
 
     /* By default, on SM 3.0 and later use analytical Ewald, on earlier tabulated. */
-    if ((dev_info->prop.major >= 3 || bForceAnalyticalEwald) && !bForceTabulatedEwald)
+    //if ((dev_info->prop.major >= 3 || bForceAnalyticalEwald) && !bForceTabulatedEwald)
+    if ((HAS_CC_3_0_OR_LATER || bForceAnalyticalEwald) && !bForceTabulatedEwald)    
     {
         bUseAnalyticalEwald = true;
 
@@ -276,7 +286,8 @@ static int pick_ewald_kernel_type(bool                   bTwinCut,
 }
 
 /*! Copies all parameters related to the cut-off from ic to nbp */
-static void set_cutoff_parameters(cu_nbparam_t              *nbp,
+static void set_cutoff_parameters(//cu_nbparam_t              *nbp,
+                                  cl_nbparam_t              *nbp,
                                   const interaction_const_t *ic)
 {
     nbp->ewald_beta       = ic->ewaldcoeff_q;
@@ -303,91 +314,132 @@ static void init_nbparam(/*cu_nbparam_t*/cl_nbparam_t  *nbp,
                          const nbnxn_atomdata_t    *nbat,
                          const /*cuda_dev_info_t*/ocl_gpu_info_t     *dev_info)
 {
-////    cudaError_t stat;
-////    int         ntypes, nnbfp, nnbfp_comb;
-////
-////    ntypes  = nbat->ntype;
-////
-////    set_cutoff_parameters(nbp, ic);
-////
-////    if (ic->vdwtype == evdwCUT)
-////    {
-////        switch (ic->vdw_modifier)
-////        {
-////            case eintmodNONE:
-////            case eintmodPOTSHIFT:
-////                nbp->vdwtype = evdwCuCUT;
-////                break;
-////            case eintmodFORCESWITCH:
-////                nbp->vdwtype = evdwCuFSWITCH;
-////                break;
-////            case eintmodPOTSWITCH:
-////                nbp->vdwtype = evdwCuPSWITCH;
-////                break;
-////            default:
-////                gmx_incons("The requested VdW interaction modifier is not implemented in the CUDA GPU accelerated kernels!");
-////                break;
-////        }
-////    }
-////    else if (ic->vdwtype == evdwPME)
-////    {
-////        if (ic->ljpme_comb_rule == ljcrGEOM)
-////        {
-////            assert(nbat->comb_rule == ljcrGEOM);
-////            nbp->vdwtype = evdwCuEWALDGEOM;
-////        }
-////        else
-////        {
-////            assert(nbat->comb_rule == ljcrLB);
-////            nbp->vdwtype = evdwCuEWALDLB;
-////        }
-////    }
-////    else
-////    {
-////        gmx_incons("The requested VdW type is not implemented in the CUDA GPU accelerated kernels!");
-////    }
-////
-////    if (ic->eeltype == eelCUT)
-////    {
-////        nbp->eeltype = eelCuCUT;
-////    }
-////    else if (EEL_RF(ic->eeltype))
-////    {
-////        nbp->eeltype = eelCuRF;
-////    }
-////    else if ((EEL_PME(ic->eeltype) || ic->eeltype == eelEWALD))
-////    {
-////        /* Initially rcoulomb == rvdw, so it's surely not twin cut-off. */
-////        nbp->eeltype = pick_ewald_kernel_type(false, dev_info);
-////    }
-////    else
-////    {
-////        /* Shouldn't happen, as this is checked when choosing Verlet-scheme */
-////        gmx_incons("The requested electrostatics type is not implemented in the CUDA GPU accelerated kernels!");
-////    }
-////
-////    /* generate table for PME */
-////    nbp->coulomb_tab = NULL;
-////    if (nbp->eeltype == eelCuEWALD_TAB || nbp->eeltype == eelCuEWALD_TAB_TWIN)
-////    {
-////        init_ewald_coulomb_force_table(nbp, dev_info);
-////    }
-////
-////    nnbfp      = 2*ntypes*ntypes;
-////    nnbfp_comb = 2*ntypes;
-////
-////    stat  = cudaMalloc((void **)&nbp->nbfp, nnbfp*sizeof(*nbp->nbfp));
-////    CU_RET_ERR(stat, "cudaMalloc failed on nbp->nbfp");
-////    cu_copy_H2D(nbp->nbfp, nbat->nbfp, nnbfp*sizeof(*nbp->nbfp));
-////
-////
-////    if (ic->vdwtype == evdwPME)
-////    {
-////        stat  = cudaMalloc((void **)&nbp->nbfp_comb, nnbfp_comb*sizeof(*nbp->nbfp_comb));
-////        CU_RET_ERR(stat, "cudaMalloc failed on nbp->nbfp_comb");
-////        cu_copy_H2D(nbp->nbfp_comb, nbat->nbfp_comb, nnbfp_comb*sizeof(*nbp->nbfp_comb));
-////    }
-////
+    cudaError_t stat;
+    int         ntypes, nnbfp, nnbfp_comb;
+    cl_int cl_error;
+
+
+    ntypes  = nbat->ntype;
+
+    set_cutoff_parameters(nbp, ic);
+
+    if (ic->vdwtype == evdwCUT)
+    {
+        switch (ic->vdw_modifier)
+        {
+            case eintmodNONE:
+            case eintmodPOTSHIFT:
+                nbp->vdwtype = evdwCuCUT;
+                break;
+            case eintmodFORCESWITCH:
+                nbp->vdwtype = evdwCuFSWITCH;
+                break;
+            case eintmodPOTSWITCH:
+                nbp->vdwtype = evdwCuPSWITCH;
+                break;
+            default:
+                gmx_incons("The requested VdW interaction modifier is not implemented in the CUDA GPU accelerated kernels!");
+                break;
+        }
+    }
+    else if (ic->vdwtype == evdwPME)
+    {
+        if (ic->ljpme_comb_rule == ljcrGEOM)
+        {
+            assert(nbat->comb_rule == ljcrGEOM);
+            nbp->vdwtype = evdwCuEWALDGEOM;
+        }
+        else
+        {
+            assert(nbat->comb_rule == ljcrLB);
+            nbp->vdwtype = evdwCuEWALDLB;
+        }
+    }
+    else
+    {
+        gmx_incons("The requested VdW type is not implemented in the CUDA GPU accelerated kernels!");
+    }
+
+    if (ic->eeltype == eelCUT)
+    {
+        nbp->eeltype = eelCuCUT;
+    }
+    else if (EEL_RF(ic->eeltype))
+    {
+        nbp->eeltype = eelCuRF;
+    }
+    else if ((EEL_PME(ic->eeltype) || ic->eeltype == eelEWALD))
+    {
+        /* Initially rcoulomb == rvdw, so it's surely not twin cut-off. */
+        nbp->eeltype = pick_ewald_kernel_type(false, dev_info);
+    }
+    else
+    {
+        /* Shouldn't happen, as this is checked when choosing Verlet-scheme */
+        gmx_incons("The requested electrostatics type is not implemented in the CUDA GPU accelerated kernels!");
+    }
+
+    /* generate table for PME */
+    nbp->coulomb_tab = NULL;
+    if (nbp->eeltype == eelCuEWALD_TAB || nbp->eeltype == eelCuEWALD_TAB_TWIN)
+    {
+        init_ewald_coulomb_force_table(nbp, dev_info);
+    }
+
+    nnbfp      = 2*ntypes*ntypes;
+    nnbfp_comb = 2*ntypes;
+
+    ////////////////////////////////////////////////////////////
+    // In the CUDA implementation, the code below was creating two buffers and then binding two textures
+    // to the buffers.
+    // With OpenCL we can just create two Image2D objects.
+    ////////////////////////////////////////////////////////////
+
+
+    //stat  = cudaMalloc((void **)&nbp->nbfp, nnbfp*sizeof(*nbp->nbfp));
+    //CU_RET_ERR(stat, "cudaMalloc failed on nbp->nbfp");
+    //cu_copy_H2D(nbp->nbfp, nbat->nbfp, nnbfp*sizeof(*nbp->nbfp));
+
+    ////nbp->nbfp = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, nnbfp * sizeof(float), NULL, &cl_error);
+    ////// TO DO: handle errors, check clCreateBuffer flags
+    ////cl_error = clEnqueueWriteBuffer(dev_info->command_queue, nbp->nbfp, CL_TRUE,
+				////	0, (size_t)(nnbfp * sizeof(float)), (void*)(nbat->nbfp), 0, NULL, NULL);
+    ////// TO DO: handle errors
+
+
+    if (ic->vdwtype == evdwPME)
+    {
+        //stat  = cudaMalloc((void **)&nbp->nbfp_comb, nnbfp_comb*sizeof(*nbp->nbfp_comb));
+        //CU_RET_ERR(stat, "cudaMalloc failed on nbp->nbfp_comb");
+        //cu_copy_H2D(nbp->nbfp_comb, nbat->nbfp_comb, nnbfp_comb*sizeof(*nbp->nbfp_comb));
+
+        
+        ////    nbp->nbfp_comb = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, nnbfp_comb * sizeof(float), NULL, &cl_error);
+        ////    // TO DO: handle errors, check clCreateBuffer flags
+        ////    cl_error = clEnqueueWriteBuffer(dev_info->command_queue, nbp->nbfp_comb, CL_TRUE,
+				    ////0, (size_t)(nnbfp_comb * sizeof(float)), (void*)(nbat->nbfp_comb), 0, NULL, NULL);
+        ////    // TO DO: handle errors
+    }
+
+    {
+        cl_image_format array_format;
+
+        array_format.image_channel_data_type = CL_FLOAT;
+        array_format.image_channel_order = CL_R;
+
+        nbp->nbfp_climg2d = clCreateImage2D(dev_info->context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+            &array_format, nnbfp, 1, 0, nbat->nbfp, &cl_error);
+        // TO DO: handle errors
+
+
+        if (ic->vdwtype == evdwPME)
+        {
+            nbp->nbfp_comb_climg2d = clCreateImage2D(dev_info->context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+                &array_format, nnbfp_comb, 1, 0, nbat->nbfp_comb, &cl_error);
+            // TO DO: handle errors
+        }
+    }
+
 ////#ifdef TEXOBJ_SUPPORTED
 ////    /* Only device CC >= 3.0 (Kepler and later) support texture objects */
 ////    if (dev_info->prop.major >= 3)
@@ -766,8 +818,10 @@ void nbnxn_ocl_init_const(nbnxn_opencl_ptr_t                ocl_nb,
 {
     // TO DO: add proper code
     ////init_atomdata_first(cu_nb->atdat, nbv_group[0].nbat->ntype);
-    init_atomdata_first(ocl_nb->dev_info, ocl_nb->atdat, nbv_group[0].nbat->ntype);
+    init_atomdata_first(ocl_nb->atdat, nbv_group[0].nbat->ntype, ocl_nb->dev_info);
+
     ////init_nbparam(cu_nb->nbparam, ic, nbv_group[0].nbat, cu_nb->dev_info);
+    init_nbparam(ocl_nb->nbparam, ic, nbv_group[0].nbat, ocl_nb->dev_info);
 
     /////* clear energy and shift force outputs */
     ////nbnxn_cuda_clear_e_fshift(cu_nb);
