@@ -134,15 +134,20 @@ typedef struct cl_atomdata
     float4  *xq;                /**< atom coordinates + charges, size natoms      */
     float3  *f;                 /**< force output array, size natoms              */
 
-    float   *e_lj;              /**< LJ energy output, size 1                     */
-    float   *e_el;              /**< Electrostatics energy input, size 1          */
+    //float   *e_lj;              /**< LJ energy output, size 1                     */
+    cl_mem e_lj;
+    //float   *e_el;              /**< Electrostatics energy input, size 1          */
+    cl_mem e_el;
 
-    float3  *fshift;            /**< shift forces                                 */
+
+    //float3  *fshift;            /**< shift forces                                 */
+    cl_mem fshift;
 
     int      ntypes;            /**< number of atom types                         */
     int     *atom_types;        /**< atom type indices, size natoms               */
 
-    float3  *shift_vec;         /**< shifts                                       */
+    //float3  *shift_vec;         /**< shifts                                       */
+    cl_mem shift_vec;
     bool     bShiftVecUploaded; /**< true if the shift vector has been uploaded   */
 } cl_atomdata_t;
 

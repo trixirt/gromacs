@@ -184,22 +184,33 @@ static void init_ewald_coulomb_force_table(cu_nbparam_t          *nbp,
 
 /*! Initializes the atomdata structure first time, it only gets filled at
     pair-search. */
-static void init_atomdata_first(/*cu_atomdata_t*/cl_atomdata_t *ad, int ntypes)
+static void init_atomdata_first(ocl_gpu_info_t *dev_info, /*cu_atomdata_t*/cl_atomdata_t *ad, int ntypes)
 {
     cudaError_t stat;
+    cl_int cl_error;
 
     ad->ntypes  = ntypes;
-    stat        = cudaMalloc((void**)&ad->shift_vec, SHIFTS*sizeof(*ad->shift_vec));
-    CU_RET_ERR(stat, "cudaMalloc failed on ad->shift_vec");
+
+    //stat        = cudaMalloc((void**)&ad->shift_vec, SHIFTS*sizeof(*ad->shift_vec));
+    //CU_RET_ERR(stat, "cudaMalloc failed on ad->shift_vec");
+    ad->shift_vec = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, SHIFTS * sizeof(float3), NULL, &cl_error);
     ad->bShiftVecUploaded = false;
+    // TO DO: error handling
 
-    stat = cudaMalloc((void**)&ad->fshift, SHIFTS*sizeof(*ad->fshift));
-    CU_RET_ERR(stat, "cudaMalloc failed on ad->fshift");
+    //stat = cudaMalloc((void**)&ad->fshift, SHIFTS*sizeof(*ad->fshift));
+    //CU_RET_ERR(stat, "cudaMalloc failed on ad->fshift");
+    ad->fshift = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, SHIFTS * sizeof(float3), NULL, &cl_error);
+    // TO DO: error handling
 
-    stat = cudaMalloc((void**)&ad->e_lj, sizeof(*ad->e_lj));
-    CU_RET_ERR(stat, "cudaMalloc failed on ad->e_lj");
-    stat = cudaMalloc((void**)&ad->e_el, sizeof(*ad->e_el));
-    CU_RET_ERR(stat, "cudaMalloc failed on ad->e_el");
+    //stat = cudaMalloc((void**)&ad->e_lj, sizeof(*ad->e_lj));
+    //CU_RET_ERR(stat, "cudaMalloc failed on ad->e_lj");
+    ad->e_lj = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, sizeof(float), NULL, &cl_error);
+    // TO DO: error handling
+
+    //stat = cudaMalloc((void**)&ad->e_el, sizeof(*ad->e_el));
+    //CU_RET_ERR(stat, "cudaMalloc failed on ad->e_el");
+    ad->e_el = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, sizeof(float), NULL, &cl_error);
+    // TO DO: error handling
 
     /* initialize to NULL poiters to data that is not allocated here and will
        need reallocation in nbnxn_cuda_init_atomdata */
@@ -749,12 +760,13 @@ void nbnxn_ocl_init(FILE                 *fplog,
     }
 }
 
-void nbnxn_ocl_init_const(nbnxn_opencl_ptr_t                cu_nb,
+void nbnxn_ocl_init_const(nbnxn_opencl_ptr_t                ocl_nb,
                            const interaction_const_t      *ic,
                            const nonbonded_verlet_group_t *nbv_group)
 {
     // TO DO: add proper code
     ////init_atomdata_first(cu_nb->atdat, nbv_group[0].nbat->ntype);
+    init_atomdata_first(ocl_nb->dev_info, ocl_nb->atdat, nbv_group[0].nbat->ntype);
     ////init_nbparam(cu_nb->nbparam, ic, nbv_group[0].nbat, cu_nb->dev_info);
 
     /////* clear energy and shift force outputs */

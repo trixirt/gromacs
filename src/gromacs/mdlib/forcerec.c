@@ -177,8 +177,8 @@ static real *make_ljpme_c6grid(const gmx_ffparams_t *idef, t_forcerec *fr)
             if (fr->ljpme_combination_rule == eljpmeLB
                 && !gmx_numzero(c6) && !gmx_numzero(c12i) && !gmx_numzero(c12j))
             {
-                sigmai = pow(c12i / c6i, 1.0/6.0);
-                sigmaj = pow(c12j / c6j, 1.0/6.0);
+                sigmai = pow(c12i / c6i, (real)(1.0/6.0));
+                sigmaj = pow(c12j / c6j, (real)(1.0/6.0));
                 epsi   = c6i * c6i / c12i;
                 epsj   = c6j * c6j / c12j;
                 c6     = sqrt(epsi * epsj) * pow(0.5*(sigmai+sigmaj), 6);
@@ -214,8 +214,8 @@ static real *mk_nbfp_combination_rule(const gmx_ffparams_t *idef, int comb_rule)
             if (comb_rule == eCOMB_ARITHMETIC
                 && !gmx_numzero(c6) && !gmx_numzero(c12))
             {
-                sigmai = pow(c12i / c6i, 1.0/6.0);
-                sigmaj = pow(c12j / c6j, 1.0/6.0);
+                sigmai = pow(c12i / c6i, (real)(1.0/6.0));
+                sigmaj = pow(c12j / c6j, (real)(1.0/6.0));
                 epsi   = c6i * c6i / c12i;
                 epsj   = c6j * c6j / c12j;
                 c6     = sqrt(epsi * epsj) * pow(0.5*(sigmai+sigmaj), 6);
@@ -2016,14 +2016,14 @@ init_interaction_const(FILE                       *fp,
     {
         case eintmodPOTSHIFT:
             /* Only shift the potential, don't touch the force */
-            ic->dispersion_shift.cpot = -pow(ic->rvdw, -6.0);
-            ic->repulsion_shift.cpot  = -pow(ic->rvdw, -12.0);
+            ic->dispersion_shift.cpot = -pow(ic->rvdw, (real)(-6.0));
+            ic->repulsion_shift.cpot  = -pow(ic->rvdw, (real)(-12.0));
             if (EVDW_PME(ic->vdwtype))
             {
                 real crc2;
 
                 crc2            = sqr(ic->ewaldcoeff_lj*ic->rvdw);
-                ic->sh_lj_ewald = (exp(-crc2)*(1 + crc2 + 0.5*crc2*crc2) - 1)*pow(ic->rvdw, -6.0);
+                ic->sh_lj_ewald = (exp(-crc2)*(1 + crc2 + 0.5*crc2*crc2) - 1)*pow(ic->rvdw, (real)(-6.0));
             }
             break;
         case eintmodFORCESWITCH:
@@ -2212,7 +2212,7 @@ static void init_nb_verlet(FILE                *fp,
         /* init the NxN GPU data; the last argument tells whether we'll have
          * both local and non-local NB calculation on GPU */
 #ifdef GMX_USE_OPENCL
-        nbnxn_ocl_init(fp, &nbv->cu_nbv,
+        nbnxn_ocl_init(fp, &nbv->ocl_nbv,
                         &fr->hwinfo->gpu_info, fr->gpu_opt,
                         cr->rank_pp_intranode,
                         (nbv->ngrp > 1) && !bHybridGPURun);
