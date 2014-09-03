@@ -131,8 +131,10 @@ typedef struct cl_atomdata
     int      natoms_local;      /**< number of local atoms                        */
     int      nalloc;            /**< allocation size for the atom data (xq, f)    */
 
-    float4  *xq;                /**< atom coordinates + charges, size natoms      */
-    float3  *f;                 /**< force output array, size natoms              */
+    //float4  *xq;                /**< atom coordinates + charges, size natoms      */
+    cl_mem xq;                /**< atom coordinates + charges, size natoms      */
+    //float3  *f;                 /**< force output array, size natoms              */
+    cl_mem f;                 /**< force output array, size natoms              */
 
     //float   *e_lj;              /**< LJ energy output, size 1                     */
     cl_mem e_lj;
@@ -144,7 +146,8 @@ typedef struct cl_atomdata
     cl_mem fshift;
 
     int      ntypes;            /**< number of atom types                         */
-    int     *atom_types;        /**< atom type indices, size natoms               */
+    //int     *atom_types;        /**< atom type indices, size natoms               */
+    cl_mem atom_types;        /**< atom type indices, size natoms               */
 
     //float3  *shift_vec;         /**< shifts                                       */
     cl_mem shift_vec;
@@ -206,13 +209,16 @@ typedef struct cl_plist
 
     int              nsci;        /**< size of sci, # of i clusters in the list     */
     int              sci_nalloc;  /**< allocation size of sci                       */
-    nbnxn_sci_t     *sci;         /**< list of i-cluster ("super-clusters")         */
+    //nbnxn_sci_t     *sci;         /**< list of i-cluster ("super-clusters")         */
+    cl_mem sci;         /**< list of i-cluster ("super-clusters")         */
 
     int              ncj4;        /**< total # of 4*j clusters                      */
     int              cj4_nalloc;  /**< allocation size of cj4                       */
-    nbnxn_cj4_t     *cj4;         /**< 4*j cluster list, contains j cluster number
+    //nbnxn_cj4_t     *cj4;         /**< 4*j cluster list, contains j cluster number
+    cl_mem     cj4;         /**< 4*j cluster list, contains j cluster number
                                        and index into the i cluster list            */
-    nbnxn_excl_t    *excl;        /**< atom interaction bits                        */
+    //nbnxn_excl_t    *excl;        /**< atom interaction bits                        */
+    cl_mem excl;        /**< atom interaction bits                        */
     int              nexcl;       /**< count for excl                               */
     int              excl_nalloc; /**< allocation size of excl                      */
 
@@ -230,14 +236,19 @@ typedef struct cl_plist
  */
 typedef struct cl_timers
 {
-    cl_event start_atdat;     /**< start event for atom data transfer (every PS step)             */
-    cl_event stop_atdat;      /**< stop event for atom data transfer (every PS step)              */
+    cl_event atdat;
+    cl_ulong start_atdat;     /**< start event for atom data transfer (every PS step)             */
+    cl_ulong stop_atdat;      /**< stop event for atom data transfer (every PS step)              */
+
     cl_event start_nb_h2d[2]; /**< start events for x/q H2D transfers (l/nl, every step)          */
     cl_event stop_nb_h2d[2];  /**< stop events for x/q H2D transfers (l/nl, every step)           */
+
     cl_event start_nb_d2h[2]; /**< start events for f D2H transfer (l/nl, every step)             */
     cl_event stop_nb_d2h[2];  /**< stop events for f D2H transfer (l/nl, every step)              */
+    
     cl_event start_pl_h2d[2]; /**< start events for pair-list H2D transfers (l/nl, every PS step) */
     cl_event stop_pl_h2d[2];  /**< start events for pair-list H2D transfers (l/nl, every PS step) */
+    
     cl_event start_nb_k[2];   /**< start event for non-bonded kernels (l/nl, every step)          */
     cl_event stop_nb_k[2];    /**< stop event non-bonded kernels (l/nl, every step)               */
 }cl_timers_t;

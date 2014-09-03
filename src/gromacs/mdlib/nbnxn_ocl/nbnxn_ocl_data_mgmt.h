@@ -74,27 +74,27 @@ void nbnxn_ocl_init(FILE gmx_unused                 *fplog,
 //////                           const interaction_const_t      gmx_unused        *ic,
 //////                           const struct nonbonded_verlet_group_t gmx_unused *nbv_group) FUNC_TERM
 //////
-///////** Initializes pair-list data for GPU, called at every pair search step. */
-//////FUNC_QUALIFIER
-//////void nbnxn_cuda_init_pairlist(nbnxn_cuda_ptr_t       gmx_unused         cu_nb,
-//////                              const struct nbnxn_pairlist_t gmx_unused *h_nblist,
-//////                              int                    gmx_unused         iloc) FUNC_TERM
-//////
-///////** Initializes atom-data on the GPU, called at every pair search step. */
-//////FUNC_QUALIFIER
-//////void nbnxn_cuda_init_atomdata(const nbnxn_cuda_ptr_t       gmx_unused   cu_nb,
-//////                              const struct nbnxn_atomdata_t gmx_unused *atomdata) FUNC_TERM
-//////
+/** Initializes pair-list data for GPU, called at every pair search step. */
+FUNC_QUALIFIER
+void nbnxn_ocl_init_pairlist(nbnxn_opencl_ptr_t       gmx_unused         cu_nb,
+                              const struct nbnxn_pairlist_t gmx_unused *h_nblist,
+                              int                    gmx_unused         iloc) FUNC_TERM
+
+/** Initializes atom-data on the GPU, called at every pair search step. */
+FUNC_QUALIFIER
+void nbnxn_ocl_init_atomdata(const nbnxn_opencl_ptr_t       gmx_unused   cu_nb,
+                              const struct nbnxn_atomdata_t gmx_unused *atomdata) FUNC_TERM
+
 ///////*! \brief Update parameters during PP-PME load balancing. */
 //////FUNC_QUALIFIER
 //////void nbnxn_cuda_pme_loadbal_update_param(const struct nonbonded_verlet_t gmx_unused *nbv,
 //////                                         const interaction_const_t gmx_unused       *ic) FUNC_TERM
 //////
-///////** Uploads shift vector to the GPU if the box is dynamic (otherwise just returns). */
-//////FUNC_QUALIFIER
-//////void nbnxn_cuda_upload_shiftvec(nbnxn_cuda_ptr_t       gmx_unused         cu_nb,
-//////                                const struct nbnxn_atomdata_t gmx_unused *nbatom) FUNC_TERM
-//////
+/** Uploads shift vector to the GPU if the box is dynamic (otherwise just returns). */
+FUNC_QUALIFIER
+void nbnxn_ocl_upload_shiftvec(nbnxn_opencl_ptr_t       gmx_unused         cu_nb,
+                                const struct nbnxn_atomdata_t gmx_unused *nbatom) FUNC_TERM
+
 ///////** Clears GPU outputs: nonbonded force, shift force and energy. */
 //////FUNC_QUALIFIER
 //////void nbnxn_cuda_clear_outputs(nbnxn_cuda_ptr_t gmx_unused cu_nb,
@@ -131,6 +131,20 @@ void nbnxn_ocl_init(FILE gmx_unused                 *fplog,
 //////}
 //////#endif
 //////
+
+
+/** Calculates the minimum size of proximity lists to improve SM load balance
+ *  with CUDA non-bonded kernels. */
+FUNC_QUALIFIER
+int nbnxn_ocl_min_ci_balanced(nbnxn_opencl_ptr_t gmx_unused ocl_nb)
+#ifdef GMX_GPU
+;
+#else
+{
+    return -1;
+}
+#endif
+
 ///////** Returns if analytical Ewald CUDA kernels are used. */
 //////FUNC_QUALIFIER
 //////gmx_bool nbnxn_cuda_is_kernel_ewald_analytical(const nbnxn_cuda_ptr_t gmx_unused cu_nb)

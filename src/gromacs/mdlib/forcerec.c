@@ -2241,7 +2241,11 @@ static void init_nb_verlet(FILE                *fp,
         }
         else
         {
+#ifdef GMX_USE_OPENCL
+            nbv->min_ci_balanced = nbnxn_ocl_min_ci_balanced(nbv->ocl_nbv);
+#else
             nbv->min_ci_balanced = nbnxn_cuda_min_ci_balanced(nbv->cu_nbv);
+#endif
             if (debug)
             {
                 fprintf(debug, "Neighbor-list balancing parameter: %d (auto-adjusted to the number of GPU multi-processors)\n",

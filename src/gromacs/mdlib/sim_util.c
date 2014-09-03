@@ -80,6 +80,7 @@
 
 #include "gromacs/legacyheaders/types/commrec.h"
 #include "gromacs/mdlib/nbnxn_cuda/nbnxn_cuda_data_mgmt.h"
+#include "gromacs/mdlib/nbnxn_ocl/nbnxn_ocl_data_mgmt.h"
 #include "gromacs/pbcutil/ishift.h"
 #include "gromacs/pbcutil/mshift.h"
 #include "gromacs/timing/wallcycle.h"
@@ -1006,12 +1007,20 @@ void do_force_cutsVERLET(FILE *fplog, t_commrec *cr,
         if (bNS)
         {
             wallcycle_start_nocount(wcycle, ewcLAUNCH_GPU_NB);
+#ifdef GMX_USE_OPENCL
+            nbnxn_ocl_init_atomdata(nbv->ocl_nbv, nbv->grp[eintLocal].nbat);
+#else
             nbnxn_cuda_init_atomdata(nbv->cu_nbv, nbv->grp[eintLocal].nbat);
+#endif
             wallcycle_stop(wcycle, ewcLAUNCH_GPU_NB);
         }
 
         wallcycle_start_nocount(wcycle, ewcLAUNCH_GPU_NB);
+#ifdef GMX_USE_OPENCL
+        nbnxn_ocl_upload_shiftvec(nbv->ocl_nbv, nbv->grp[eintLocal].nbat);
+#else
         nbnxn_cuda_upload_shiftvec(nbv->cu_nbv, nbv->grp[eintLocal].nbat);
+#endif
         wallcycle_stop(wcycle, ewcLAUNCH_GPU_NB);
     }
 
@@ -1033,9 +1042,15 @@ void do_force_cutsVERLET(FILE *fplog, t_commrec *cr,
         if (bUseGPU)
         {
             /* initialize local pair-list on the GPU */
+#ifdef GMX_USE_OPENCL
+            nbnxn_ocl_init_pairlist(nbv->ocl_nbv,
+                                     nbv->grp[eintLocal].nbl_lists.nbl[0],
+                                     eintLocal);
+#else
             nbnxn_cuda_init_pairlist(nbv->cu_nbv,
                                      nbv->grp[eintLocal].nbl_lists.nbl[0],
                                      eintLocal);
+#endif
         }
         wallcycle_stop(wcycle, ewcNS);
     }
