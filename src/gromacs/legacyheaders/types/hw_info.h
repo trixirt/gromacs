@@ -90,6 +90,8 @@ typedef struct
 
     cl_context          context;
     cl_command_queue    command_queue;
+    cl_uint             num_kernels;
+    cl_kernel           *kernels;
 } ocl_gpu_info_t, *ocl_gpu_info_ptr_t;
 #endif
 

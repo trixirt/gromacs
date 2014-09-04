@@ -105,7 +105,7 @@ extern "C" {
 //typedef struct cl_atomdata  cl_atomdata_t;
 //typedef struct cl_nbparam   cl_nbparam_t;
 //typedef struct cl_timers    cl_timers_t;
-//typedef struct nb_staging   nb_staging_t;
+//typedef struct cl_nb_staging   cl_nb_staging_t;
 /*! \endcond */
 
 
@@ -115,12 +115,14 @@ extern "C" {
  *  The energies/shift forces get downloaded here first, before getting added
  *  to the CPU-side aggregate values.
  */
-//typedef struct nb_staging
-//{
-//    float   *e_lj;      /**< LJ energy            */
-//    float   *e_el;      /**< electrostatic energy */
-//    float3  *fshift;    /**< shift forces         */
-//}nb_staging_t;
+typedef struct cl_nb_staging
+{
+    float   *e_lj;      /**< LJ energy            */
+    float   *e_el;      /**< electrostatic energy */
+    // TO DO: see how this field is used and fix its data type
+    //float3  *fshift;    /**< shift forces         */
+    float *fshift;
+}cl_nb_staging_t;
 
 /** \internal
  * \brief Nonbonded atom data - both inputs and outputs.
@@ -195,7 +197,7 @@ typedef struct cl_nbparam
     int                    coulomb_tab_size;   /**< table size (s.t. it fits in texture cache) */
     float                  coulomb_tab_scale;  /**< table scale/spacing                        */
     //float                 *coulomb_tab;        /**< pointer to the table in the device memory  */
-    cl_mem                  coulomb_tab;
+    cl_mem                  coulomb_tab_climg2d;
     //openclTextureObject_t  coulomb_tab_climg2d; /**< texture object bound to coulomb_tab        */
 }cl_nbparam_t;
 
@@ -265,7 +267,7 @@ struct nbnxn_opencl
     cl_atomdata_t   *atdat;          /**< atom data                                            */
     cl_nbparam_t    *nbparam;        /**< parameters required for the non-bonded calc.         */
     cl_plist_t      *plist[2];       /**< pair-list data structures (local and non-local)      */
-    nb_staging_t     nbst;           /**< staging area where fshift/energies get downloaded    */
+    cl_nb_staging_t     nbst;           /**< staging area where fshift/energies get downloaded    */
 
     cl_command_queue     stream[2];      /**< local and non-local GPU streams                      */
 

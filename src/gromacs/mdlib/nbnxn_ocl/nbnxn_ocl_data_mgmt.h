@@ -156,6 +156,9 @@ int nbnxn_ocl_min_ci_balanced(nbnxn_opencl_ptr_t gmx_unused ocl_nb)
 //////}
 //////#endif
 
+FUNC_QUALIFIER
+int ocl_copy_H2D_async(cl_mem d_dest, void * h_src, size_t offset, size_t bytes, cl_command_queue command_queue, cl_event *copy_event);
+
 #ifdef __cplusplus
 }
 #endif

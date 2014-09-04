@@ -97,6 +97,7 @@
 #include "gmx_omp_nthreads.h"
 
 #include "nbnxn_cuda/nbnxn_cuda.h"
+#include "nbnxn_ocl/nbnxn_ocl.h"
 
 #include "nb_verlet.h"
 
@@ -617,7 +618,11 @@ static void do_nb_verlet(t_forcerec *fr,
             break;
 
         case nbnxnk8x8x8_CUDA:
+#ifdef GMX_USE_OPENCL
+            nbnxn_ocl_launch_kernel(fr->nbv->ocl_nbv, nbvg->nbat, flags, ilocality);
+#else
             nbnxn_cuda_launch_kernel(fr->nbv->cu_nbv, nbvg->nbat, flags, ilocality);
+#endif
             break;
 
         case nbnxnk8x8x8_PlainC:

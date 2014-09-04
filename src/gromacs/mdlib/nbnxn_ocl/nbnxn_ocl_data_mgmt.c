@@ -111,7 +111,7 @@ static void md_print_warn(FILE       *fplog,
 /* Fw. decl. */
 static void nbnxn_cuda_clear_e_fshift(nbnxn_cuda_ptr_t cu_nb);
 
-static int ocl_copy_H2D_generic(cl_mem d_dest, void* h_src, size_t bytes,
+static int ocl_copy_H2D_generic(cl_mem d_dest, void* h_src, size_t offset, size_t bytes,
                                bool bAsync/* = false*/, cl_command_queue command_queue,
                                cl_event *copy_event)
 {
@@ -127,28 +127,28 @@ static int ocl_copy_H2D_generic(cl_mem d_dest, void* h_src, size_t bytes,
     {
         //stat = cudaMemcpyAsync(d_dest, h_src, bytes, cudaMemcpyHostToDevice, s);
         //CU_RET_ERR(stat, "HtoD cudaMemcpyAsync failed");
-        cl_error = clEnqueueWriteBuffer(command_queue, d_dest, CL_FALSE, 0, bytes, h_src, 0, NULL, copy_event);
+        cl_error = clEnqueueWriteBuffer(command_queue, d_dest, CL_FALSE, offset, bytes, h_src, 0, NULL, copy_event);
         // TO DO: handle errors
     }
     else
     {
         //stat = cudaMemcpy(d_dest, h_src, bytes, cudaMemcpyHostToDevice);
         //CU_RET_ERR(stat, "HtoD cudaMemcpy failed");
-        cl_error = clEnqueueWriteBuffer(command_queue, d_dest, CL_TRUE, 0, bytes, h_src, 0, NULL, copy_event);
+        cl_error = clEnqueueWriteBuffer(command_queue, d_dest, CL_TRUE, offset, bytes, h_src, 0, NULL, copy_event);
         // TO DO: handle errors
     }
 
     return 0;
 }
 
-int ocl_copy_H2D_async(cl_mem d_dest, void * h_src, size_t bytes, cl_command_queue command_queue, cl_event *copy_event)
+int ocl_copy_H2D_async(cl_mem d_dest, void * h_src, size_t offset, size_t bytes, cl_command_queue command_queue, cl_event *copy_event)
 {
-    return ocl_copy_H2D_generic(d_dest, h_src, bytes, true, command_queue, copy_event);
+    return ocl_copy_H2D_generic(d_dest, h_src, offset, bytes, true, command_queue, copy_event);
 }
 
-int ocl_copy_H2D(cl_mem d_dest, void * h_src, size_t bytes, cl_command_queue command_queue)
+int ocl_copy_H2D(cl_mem d_dest, void * h_src, size_t offset, size_t bytes, cl_command_queue command_queue)
 {
-    return ocl_copy_H2D_generic(d_dest, h_src, bytes, false, command_queue, NULL);
+    return ocl_copy_H2D_generic(d_dest, h_src, offset, bytes, false, command_queue, NULL);
 }
 
 /*!
@@ -228,11 +228,11 @@ void ocl_realloc_buffered(cl_mem *d_dest, void *h_src,
     {
         if (bAsync)
         {
-            ocl_copy_H2D_async(*d_dest, h_src, *curr_size * type_size, s, NULL);
+            ocl_copy_H2D_async(*d_dest, h_src, 0, *curr_size * type_size, s, NULL);
         }
         else
         {
-            ocl_copy_H2D(*d_dest, h_src,  *curr_size * type_size, s);
+            ocl_copy_H2D(*d_dest, h_src,  0, *curr_size * type_size, s);
         }
     }
 }
@@ -266,15 +266,24 @@ static void init_ewald_coulomb_force_table(//cu_nbparam_t          *nbp,
     /* If the table pointer == NULL the table is generated the first time =>
        the array pointer will be saved to nbparam and the texture is bound.
      */
-    coul_tab = nbp->coulomb_tab;
+    coul_tab = nbp->coulomb_tab_climg2d;
     if (coul_tab == NULL)
     {
         //stat = cudaMalloc((void **)&coul_tab, tabsize*sizeof(*coul_tab));
         //CU_RET_ERR(stat, "cudaMalloc failed on coul_tab");
-        coul_tab = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, tabsize * sizeof(float), NULL, &cl_error);
+        //coul_tab = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, tabsize * sizeof(float), NULL, &cl_error);
         // TO DO: handle errors, check clCreateBuffer flags
-            
-        nbp->coulomb_tab = coul_tab;
+        
+        cl_image_format array_format;
+
+        array_format.image_channel_data_type = CL_FLOAT;
+        array_format.image_channel_order = CL_R;
+
+        coul_tab = clCreateImage2D(dev_info->context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+            &array_format, tabsize*sizeof(float), 1, 0, ftmp, &cl_error);
+        // TO DO: handle errors
+
+        nbp->coulomb_tab_climg2d = coul_tab;
 
 ////#ifdef TEXOBJ_SUPPORTED
 ////        /* Only device CC >= 3.0 (Kepler and later) support texture objects */
@@ -505,7 +514,7 @@ static void init_nbparam(/*cu_nbparam_t*/cl_nbparam_t  *nbp,
     }
 
     /* generate table for PME */
-    nbp->coulomb_tab = NULL;
+    nbp->coulomb_tab_climg2d = NULL;
     if (nbp->eeltype == eelCuEWALD_TAB || nbp->eeltype == eelCuEWALD_TAB_TWIN)
     {
         init_ewald_coulomb_force_table(nbp, dev_info);
@@ -1042,7 +1051,7 @@ void nbnxn_ocl_upload_shiftvec(nbnxn_opencl_ptr_t        ocl_nb,
     /* only if we have a dynamic box */
     if (nbatom->bDynamicBox || !adat->bShiftVecUploaded)
     {
-        ocl_copy_H2D_async(adat->shift_vec, nbatom->shift_vec,
+        ocl_copy_H2D_async(adat->shift_vec, nbatom->shift_vec, 0,
                           SHIFTS * sizeof(float3), ls, NULL);
         adat->bShiftVecUploaded = true;
     }
@@ -1177,7 +1186,7 @@ void nbnxn_ocl_init_atomdata(nbnxn_opencl_ptr_t        ocl_nb,
         nbnxn_ocl_clear_f(ocl_nb, nalloc);
     }
 
-    ocl_copy_H2D_async(d_atdat->atom_types, nbat->type,
+    ocl_copy_H2D_async(d_atdat->atom_types, nbat->type, 0,
                       natoms*sizeof(int), ls, &(timers->atdat));
 
     //cu_copy_H2D_async(d_atdat->atom_types, nbat->type,
