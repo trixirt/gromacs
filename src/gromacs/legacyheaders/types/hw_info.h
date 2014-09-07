@@ -48,13 +48,20 @@ extern "C" {
 #endif
 
 #define HAS_CC_3_0_OR_LATER 1
+
+
+/* For Anca, In Linux now this is now defined in Cmake */
+#ifndef GMX_USE_OPENCL
 #define GMX_USE_OPENCL
+#endif
+
+#ifdef GMX_USE_OPENCL
 #include <CL/opencl.h>
 #include <CL/cl.h>
 #include <CL/cl_platform.h>
 #include <CL/cl_ext.h>
 #include <CL/cl_gl.h>
-
+#endif
 
 /* Possible results of the GPU detection/check.
  *

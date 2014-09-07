@@ -219,3 +219,60 @@ macro(gmx_detect_gpu)
 
     endif (NOT DEFINED GMX_DETECT_GPU_COUNT OR NOT DEFINED GMX_DETECT_GPU_INFO)
 endmacro(gmx_detect_gpu)
+
+macro(gmx_detect_OpenCL_linux)
+    message(STATUS "Looking for working OpenCL configurations in the system via ICD loader")
+    #find_package(OpenCL REQUIRED)
+    
+    #First look for libOpenCL
+    find_library(cl_libopencl "libOpenCL.so")
+    if(cl_libopencl)
+        message(STATUS "libOpenCL ok: " ${cl_libopencl})
+    else()
+        message(FATAL_ERROR "No libOpenCL")
+    endif()    
+    
+    #Now look for icds
+    find_file(GMX_DETECT_OPENCL_LINUX_ICD_AMD "amdocl64.icd" "/etc/OpenCL/vendors")
+    if(GMX_DETECT_OPENCL_LINUX_ICD_AMD)
+        message(STATUS "ICD OK: ${GMX_DETECT_OPENCL_LINUX_ICD_AMD}")
+        list(APPEND GMX_DETECT_OPENCL_LINUX_ICD_LIST "amdocl64.icd")
+        list(APPEND GMX_DETECT_OPENCL_LINUX_ICD_LIST_PRINT "AMD")
+    endif(GMX_DETECT_OPENCL_LINUX_ICD_AMD)    
+    
+    find_file(GMX_OPENCL_ICD_INTEL "intel64.icd" "/etc/OpenCL/vendors")
+    if(GMX_DETECT_OPENCL_LINUX_ICD_INTEL)
+        message(STATUS "ICD OK: ${GMX_DETECT_OPENCL_LINUX_ICD_INTEL}")
+        list(APPEND GMX_DETECT_OPENCL_LINUX_ICD_LIST "intel64.icd")  
+        list(APPEND GMX_DETECT_OPENCL_LINUX_ICD_LIST_PRINT "Intel")        
+    endif(GMX_DETECT_OPENCL_LINUX_ICD_INTEL)     
+    
+    find_file(GMX_DETECT_OPENCL_LINUX_ICD_NVIDIA "nvidia.icd" "/etc/OpenCL/vendors")
+    if(GMX_DETECT_OPENCL_LINUX_ICD_NVIDIA)
+        message(STATUS "ICD OK: ${GMX_DETECT_OPENCL_LINUX_ICD_NVIDIA}")
+        list(APPEND GMX_DETECT_OPENCL_LINUX_ICD_LIST "nvidia.icd")   
+        list(APPEND GMX_DETECT_OPENCL_LINUX_ICD_LIST_PRINT "nVidia")                
+    endif(GMX_DETECT_OPENCL_LINUX_ICD_NVIDIA)     
+    
+    list(LENGTH GMX_DETECT_OPENCL_LINUX_ICD_LIST_PRINT _num_cl_icds_found_)
+    if( _num_cl_icds_found_ )
+        message(STATUS " OpenCL Platforms detected (" ${_num_cl_icds_found_} ") : " ${GMX_DETECT_OPENCL_LINUX_ICD_LIST_PRINT})
+    else()
+        message(FATAL_ERROR "No ICD config found")
+    endif()    
+
+    set(GMX_DETECT_OPENCL_LINUX_AVAILABLE TRUE)
+    set(GMX_DETECT_OPENCL_LINUX_WITH_ICD  TRUE)
+    
+    unset(_num_cl_icds_found_)
+endmacro(gmx_detect_OpenCL_linux)
+
+macro(gmx_detect_OpenCL)
+    if (UNIX AND NOT (APPLE OR CYGWIN))
+        gmx_detect_OpenCL_linux()
+    endif()    
+    if(GMX_DETECT_OPENCL_LINUX_AVAILABLE)
+        set(GMX_DETECT_OPENCL_AVAILABLE TRUE)
+    endif(GMX_DETECT_OPENCL_LINUX_AVAILABLE)
+endmacro(gmx_detect_OpenCL)
+
