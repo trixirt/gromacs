@@ -43,7 +43,7 @@
 #include "types/simple.h"
 #include "types/hw_info.h"
 
-#ifdef GMX_GPU
+#if defined(GMX_GPU) || defined(GMX_USE_OPENCL)
 #define FUNC_TERM_INT ;
 #define FUNC_TERM_SIZE_T ;
 #define FUNC_TERM_VOID ;
