@@ -108,11 +108,7 @@ static void sprint_gpus(char *sbuf, const gmx_gpu_info_t *gpu_info)
     sbuf[0] = '\0';
     for (i = 0; i < ndev; i++)
     {
-#ifdef GMX_USE_OPENCL
-        get_ocl_gpu_device_info_string(stmp, gpu_info, i);
-#else
-        get_cuda_gpu_device_info_string(stmp, gpu_info, i);
-#endif        
+        get_accelerator_device_info_string(stmp, gpu_info, i);  
         strcat(sbuf, "  ");
         strcat(sbuf, stmp);
         if (i < ndev - 1)

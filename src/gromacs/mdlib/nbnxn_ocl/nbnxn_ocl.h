@@ -41,7 +41,7 @@
 #include "types/nbnxn_ocl_types_ext.h"
 #include "types/simple.h"
 
-#ifdef GMX_GPU
+#if defined(GMX_GPU) && defined(GMX_USE_OPENCL)
 #define FUNC_TERM ;
 #else
 #define FUNC_TERM {}
