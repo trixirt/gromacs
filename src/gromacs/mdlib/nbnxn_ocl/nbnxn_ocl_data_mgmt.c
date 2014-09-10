@@ -60,6 +60,9 @@
 #include "gromacs/utility/fatalerror.h"
 #include "gromacs/utility/smalloc.h"
 
+#define pmalloc(...) 
+#pragma message "WARNING pmalloc not implemented"
+
 static cl_bool bUseOpenCLEventBlockingSync = CL_FALSE; /* makes the CPU thread block */
 
 /* This is a heuristically determined parameter for the Fermi architecture for
