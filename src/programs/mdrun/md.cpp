@@ -77,6 +77,7 @@
 #include "types/nlistheuristics.h"
 #include "types/iteratedconstraints.h"
 #include "gromacs/mdlib/nbnxn_cuda/nbnxn_cuda_data_mgmt.h"
+#include "gromacs/mdlib/nbnxn_ocl/nbnxn_ocl_data_mgmt.h"
 
 #include "gromacs/fileio/confio.h"
 #include "gromacs/fileio/mdoutf.h"

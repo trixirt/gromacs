@@ -58,10 +58,10 @@
 #define FUNC_TERM_VOID_OPENCL {} ;
 #define FUNC_QUALIFIER_OPENCL static
 #elif defined(GMX_GPU) && defined(GMX_USE_OPENCL)
-#define FUNC_TERM_INT ;
-#define FUNC_TERM_SIZE_T ;
-#define FUNC_TERM_VOID ;
-#define FUNC_QUALIFIER
+#define FUNC_TERM_INT {return -1; }
+#define FUNC_TERM_SIZE_T {return 0; }
+#define FUNC_TERM_VOID {}
+#define FUNC_QUALIFIER static
 #define FUNC_TERM_INT_OPENCL ;
 #define FUNC_TERM_VOID_OPENCL ;
 #define FUNC_QUALIFIER_OPENCL 
@@ -136,15 +136,6 @@ void get_cuda_gpu_device_info_string(char gmx_unused *s, const gmx_gpu_info_t gm
 
 FUNC_QUALIFIER_OPENCL
 void get_ocl_gpu_device_info_string(char gmx_unused *s, const gmx_gpu_info_t gmx_unused *gpu_info, int gmx_unused index) FUNC_TERM_VOID_OPENCL
-
-void get_accelerator_device_info_string(char gmx_unused *s, const gmx_gpu_info_t gmx_unused *gpu_info, int gmx_unused index) 
-{
-#ifdef GMX_USE_OPENCL
-        get_ocl_gpu_device_info_string(s, gpu_info, index);
-#else
-        get_cuda_gpu_device_info_string(s, gpu_info, index);
-#endif      
-}
 
 FUNC_QUALIFIER
 size_t sizeof_cuda_dev_info(void) FUNC_TERM_SIZE_T

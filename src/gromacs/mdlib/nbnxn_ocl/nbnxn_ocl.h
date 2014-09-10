@@ -66,26 +66,26 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t       gmx_unused  cu_nb,
                               int                    gmx_unused  flags,
                               int                    gmx_unused  iloc) FUNC_TERM
 
-///*! \brief
-// * Launch asynchronously the download of nonbonded forces from the GPU
-// * (and energies/shift forces if required).
-// */
-//void nbnxn_cuda_launch_cpyback(nbnxn_cuda_ptr_t       gmx_unused  cu_nb,
-//                               const nbnxn_atomdata_t gmx_unused *nbatom,
-//                               int                    gmx_unused  flags,
-//                               int                    gmx_unused  aloc) FUNC_TERM
-//
-///*! \brief
-// * Wait for the asynchronously launched nonbonded calculations and data
-// * transfers to finish.
-// */
-//void nbnxn_cuda_wait_gpu(nbnxn_cuda_ptr_t       gmx_unused  cu_nb,
-//                         const nbnxn_atomdata_t gmx_unused *nbatom,
-//                         int                    gmx_unused  flags,
-//                         int                    gmx_unused  aloc,
-//                         real                   gmx_unused *e_lj,
-//                         real                   gmx_unused *e_el,
-//                         rvec                   gmx_unused *fshift) FUNC_TERM
+/*! \brief
+ * Launch asynchronously the download of nonbonded forces from the GPU
+ * (and energies/shift forces if required).
+ */
+void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t       gmx_unused  cu_nb,
+                               const nbnxn_atomdata_t gmx_unused *nbatom,
+                               int                    gmx_unused  flags,
+                               int                    gmx_unused  aloc) FUNC_TERM
+
+/*! \brief
+ * Wait for the asynchronously launched nonbonded calculations and data
+ * transfers to finish.
+ */
+void nbnxn_ocl_wait_gpu(nbnxn_opencl_ptr_t      gmx_unused  cu_nb,
+                         const nbnxn_atomdata_t gmx_unused *nbatom,
+                         int                    gmx_unused  flags,
+                         int                    gmx_unused  aloc,
+                         real                   gmx_unused *e_lj,
+                         real                   gmx_unused *e_el,
+                         rvec                   gmx_unused *fshift) FUNC_TERM
 
 #ifdef __cplusplus
 }

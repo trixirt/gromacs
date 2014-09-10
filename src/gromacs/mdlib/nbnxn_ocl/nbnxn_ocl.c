@@ -56,6 +56,8 @@
 
 //#include "nbnxn_cuda_types.h"
 
+#include <CL/opencl.h>
+
 #include "nbnxn_ocl_types.h"
 //#include "../../gmxlib/cuda_tools/cudautils.cuh"
 //#include "nbnxn_cuda.h"
@@ -126,10 +128,13 @@
 /*********************************/
 
 /* XXX always/never run the energy/pruning kernels -- only for benchmarking purposes */
-static bool always_ener  = (getenv("GMX_GPU_ALWAYS_ENER") != NULL);
-static bool never_ener   = (getenv("GMX_GPU_NEVER_ENER") != NULL);
-static bool always_prune = (getenv("GMX_GPU_ALWAYS_PRUNE") != NULL);
+//static bool always_ener  = (getenv("GMX_GPU_ALWAYS_ENER") != NULL);
+//static bool never_ener   = (getenv("GMX_GPU_NEVER_ENER") != NULL);
+//static bool always_prune = (getenv("GMX_GPU_ALWAYS_PRUNE") != NULL);
 
+#define always_ener 0
+#define never_ener  0
+#define always_prune 0
 
 /* Bit-pattern used for polling-based GPU synchronization. It is used as a float
  * and corresponds to having the exponent set to the maximum (127 -- single
@@ -276,9 +281,9 @@ static unsigned int poll_wait_pattern = (0x7FU << 23);
 /*! Return a pointer to the kernel version to be executed at the current step. */
 static inline cl_kernel select_nbnxn_kernel(ocl_gpu_info_t *dev_info,
                                             int  eeltype,
-                                                       int  evdwtype,
-                                                       bool bDoEne,
-                                                       bool bDoPrune)
+                                            int  evdwtype,
+                                            cl_bool bDoEne,
+                                            cl_bool bDoPrune)
 {
     return dev_info->kernels[0];
 
@@ -398,9 +403,9 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
     cl_timers_t         *t       = ocl_nb->timers;
     cl_command_queue     stream  = ocl_nb->stream[iloc];
 
-    bool                 bCalcEner   = flags & GMX_FORCE_VIRIAL;
-    bool                 bCalcFshift = flags & GMX_FORCE_VIRIAL;
-    bool                 bDoTime     = ocl_nb->bDoTime;
+    cl_bool              bCalcEner   = flags & GMX_FORCE_VIRIAL;
+    cl_bool              bCalcFshift = flags & GMX_FORCE_VIRIAL;
+    cl_bool              bDoTime     = ocl_nb->bDoTime;
 
     /* turn energy calculation always on/off (for debugging/testing only) */
     bCalcEner = (bCalcEner || always_ener) && !never_ener;
@@ -506,7 +511,7 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
                                                                                 // TO DO: check these image2d below - they seem to be NULL here
     cl_error = clSetKernelArg(nb_kernel, 5, sizeof(cl_mem), (void*)(&ocl_nb->nbparam->nbfp_comb_climg2d));
     cl_error = clSetKernelArg(nb_kernel, 6, sizeof(cl_mem), (void*)(&ocl_nb->nbparam->coulomb_tab_climg2d));
-    cl_error = clSetKernelArg(nb_kernel, 7, sizeof(bool), &bCalcFshift);    
+    cl_error = clSetKernelArg(nb_kernel, 7, sizeof(cl_bool), &bCalcFshift);    
                                                                                 // TO DO: fix the calls above.
                                                                                 // clEnqueue currently throws CL_INVALID_KERNEL_ARGS
     cl_error = clEnqueueNDRangeKernel(stream, nb_kernel, 3, NULL, dim_grid, dim_block, 0, NULL, NULL);
@@ -673,9 +678,9 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
 /* Atomic compare-exchange operation on unsigned values. It is used in
  * polling wait for the GPU.
  */
-static inline bool atomic_cas(volatile unsigned int *ptr,
-                              unsigned int           oldval,
-                              unsigned int           newval)
+static inline cl_bool atomic_cas(volatile unsigned int *ptr,
+                                unsigned int           oldval,
+                                unsigned int           newval)
 {
     assert(ptr);
 

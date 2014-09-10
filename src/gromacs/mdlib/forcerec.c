@@ -2270,8 +2270,14 @@ static void init_nb_verlet(FILE                *fp,
     {
         if (nbv->grp[0].kernel_type == nbnxnk8x8x8_CUDA)
         {
+#ifdef GMX_USE_OPENCL
+            //nb_alloc = &pmalloc;
+            //nb_free  = &pfree;
+            #pragma message "WARNING allocator not set and kernel_type cannot be _CUDA"
+#else
             nb_alloc = &pmalloc;
-            nb_free  = &pfree;
+            nb_free  = &pfree;            
+#endif            
         }
         else
         {

@@ -42,7 +42,8 @@
 #include "types/nbnxn_ocl_types_ext.h"
 #include "types/hw_info.h"
 
-#ifdef GMX_GPU
+
+#if defined(GMX_GPU) && defined(GMX_USE_OPENCL)
 #define FUNC_TERM ;
 #define FUNC_QUALIFIER
 #else
@@ -68,12 +69,12 @@ void nbnxn_ocl_init(FILE gmx_unused                 *fplog,
                      /* true of both local and non-local are don on GPU */
                      gmx_bool gmx_unused              bLocalAndNonlocal) FUNC_TERM
 
-///////** Initializes simulation constant data. */
-//////FUNC_QUALIFIER
-//////void nbnxn_cuda_init_const(nbnxn_cuda_ptr_t               gmx_unused         cu_nb,
-//////                           const interaction_const_t      gmx_unused        *ic,
-//////                           const struct nonbonded_verlet_group_t gmx_unused *nbv_group) FUNC_TERM
-//////
+/** Initializes simulation constant data. */
+FUNC_QUALIFIER
+void nbnxn_ocl_init_const(nbnxn_opencl_ptr_t               gmx_unused         cu_nb,
+                           const interaction_const_t      gmx_unused        *ic,
+                           const struct nonbonded_verlet_group_t gmx_unused *nbv_group) FUNC_TERM
+                           
 /** Initializes pair-list data for GPU, called at every pair search step. */
 FUNC_QUALIFIER
 void nbnxn_ocl_init_pairlist(nbnxn_opencl_ptr_t       gmx_unused         cu_nb,

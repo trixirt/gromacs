@@ -39,7 +39,6 @@
 #include "types/simple.h"
 #include "types/interaction_const.h"
 #include "types/nbnxn_cuda_types_ext.h"
-#include "types/nbnxn_ocl_types_ext.h"
 #include "types/hw_info.h"
 
 /* TODO This needs to be fixed
@@ -49,18 +48,9 @@
 #if defined(GMX_GPU) && !defined(GMX_USE_OPENCL)
 #define FUNC_TERM ;
 #define FUNC_QUALIFIER
-#define FUNC_TERM_OPENCL {}
-#define FUNC_QUALIFIER_OPENCL static
-#elif defined (GMX_GPU) && defined(GMX_USE_OPENCL)
-#define FUNC_TERM {}
-#define FUNC_QUALIFIER static
-#define FUNC_TERM_OPENCL ;
-#define FUNC_QUALIFIER_OPENCL 
 #else
 #define FUNC_TERM {}
 #define FUNC_QUALIFIER static
-#define FUNC_TERM_OPENCL {}
-#define FUNC_QUALIFIER_OPENCL static
 #endif
 
 #ifdef __cplusplus
@@ -85,11 +75,6 @@ void nbnxn_cuda_init(FILE gmx_unused                 *fplog,
 /** Initializes simulation constant data. */
 FUNC_QUALIFIER
 void nbnxn_cuda_init_const(nbnxn_cuda_ptr_t               gmx_unused         cu_nb,
-                           const interaction_const_t      gmx_unused        *ic,
-                           const struct nonbonded_verlet_group_t gmx_unused *nbv_group) FUNC_TERM
-
-FUNC_QUALIFIER
-void nbnxn_ocl_init_const(nbnxn_opencl_ptr_t               gmx_unused         cu_nb,
                            const interaction_const_t      gmx_unused        *ic,
                            const struct nonbonded_verlet_group_t gmx_unused *nbv_group) FUNC_TERM
 
@@ -144,11 +129,6 @@ FUNC_QUALIFIER
 int nbnxn_cuda_min_ci_balanced(nbnxn_cuda_ptr_t gmx_unused cu_nb)
 #if defined(GMX_GPU) && !defined(GMX_USE_OPENCL)
 ;
-#elif defined(GMX_GPU) && !defined(GMX_USE_OPENCL)
-#pragma message " Warning nbnxn_cuda_min_ci_balanced needs to be handled in OpenCL"    
-{
-    return -1;
-}
 #else
 {
     return -1;
@@ -160,11 +140,6 @@ FUNC_QUALIFIER
 gmx_bool nbnxn_cuda_is_kernel_ewald_analytical(const nbnxn_cuda_ptr_t gmx_unused cu_nb)
 #if defined(GMX_GPU) && !defined(GMX_USE_OPENCL)
 ;
-#elif defined(GMX_GPU) && !defined(GMX_USE_OPENCL)
-#pragma message " Warning nbnxn_cuda_is_kernel_ewald_analytical needs to be handled in OpenCL"    
-{
-    return -1;
-}
 #else
 {
     return FALSE;

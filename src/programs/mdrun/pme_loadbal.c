@@ -40,6 +40,7 @@
 #include "pme.h"
 #include "domdec.h"
 #include "gromacs/mdlib/nbnxn_cuda/nbnxn_cuda_data_mgmt.h"
+#include "gromacs/mdlib/nbnxn_ocl/nbnxn_ocl_data_mgmt.h"
 #include "force.h"
 #include "macros.h"
 #include "md_logging.h"
