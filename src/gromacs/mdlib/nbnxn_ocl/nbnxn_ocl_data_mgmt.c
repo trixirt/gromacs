@@ -280,7 +280,7 @@ static void init_ewald_coulomb_force_table(//cu_nbparam_t          *nbp,
         array_format.image_channel_order = CL_R;
 
         coul_tab = clCreateImage2D(dev_info->context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-            &array_format, tabsize*sizeof(float), 1, 0, ftmp, &cl_error);
+            &array_format, tabsize, 1, 0, ftmp, &cl_error);
         // TO DO: handle errors
 
         nbp->coulomb_tab_climg2d = coul_tab;
@@ -519,6 +519,20 @@ static void init_nbparam(/*cu_nbparam_t*/cl_nbparam_t  *nbp,
     {
         init_ewald_coulomb_force_table(nbp, dev_info);
     }
+    else
+    // TO DO: improvement needed.
+    // The image2d is created here even if eeltype is not eelCuEWALD_TAB or eelCuEWALD_TAB_TWIN because the OpenCL kernels
+    // don't accept NULL values for image2D parameters.
+    {
+        cl_image_format array_format;
+
+        array_format.image_channel_data_type = CL_FLOAT;
+        array_format.image_channel_order = CL_R;
+
+        nbp->coulomb_tab_climg2d = clCreateImage2D(dev_info->context, CL_MEM_READ_WRITE,
+            &array_format, 1, 1, 0, NULL, &cl_error);
+        // TO DO: handle errors        
+    }
 
     nnbfp      = 2*ntypes*ntypes;
     nnbfp_comb = 2*ntypes;
@@ -570,6 +584,15 @@ static void init_nbparam(/*cu_nbparam_t*/cl_nbparam_t  *nbp,
         {
             nbp->nbfp_comb_climg2d = clCreateImage2D(dev_info->context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
                 &array_format, nnbfp_comb, 1, 0, nbat->nbfp_comb, &cl_error);
+            // TO DO: handle errors
+        }
+        else
+        {
+            // TO DO: improvement needed.
+            // The image2d is created here even if vdwtype is not evdwPME because the OpenCL kernels
+            // don't accept NULL values for image2D parameters.
+            nbp->nbfp_comb_climg2d = clCreateImage2D(dev_info->context, CL_MEM_READ_WRITE,
+                &array_format, 1, 1, 0, NULL, &cl_error);
             // TO DO: handle errors
         }
     }

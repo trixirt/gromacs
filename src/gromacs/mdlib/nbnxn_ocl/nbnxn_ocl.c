@@ -361,6 +361,45 @@ static inline int calc_shmem_required()
     return shmem;
 }
 
+
+static void fillin_ocl_structures(cl_atomdata_t *adat, cl_nbparam_t *nbp, cl_plist_t *plist,
+                                  cl_atomdata_params_t *atomdata_params, cl_nbparam_params_t *nbparams_params, cl_plist_params_t *plist_params)
+{
+    atomdata_params->natoms = adat->natoms;
+    atomdata_params->natoms_local = adat->natoms_local;
+    atomdata_params->ntypes = adat->ntypes;
+    atomdata_params->nalloc = adat->nalloc;
+    atomdata_params->bShiftVecUploaded = adat->bShiftVecUploaded;
+
+    nbparams_params->coulomb_tab_scale = nbp->coulomb_tab_scale;
+    nbparams_params->coulomb_tab_size = nbp->coulomb_tab_size;
+    nbparams_params->c_rf = nbp->c_rf;
+    nbparams_params->dispersion_shift = nbp->dispersion_shift;
+    nbparams_params->eeltype = nbp->eeltype;
+    nbparams_params->epsfac = nbp->epsfac;
+    nbparams_params->ewaldcoeff_lj = nbp->ewaldcoeff_lj;
+    nbparams_params->ewald_beta = nbp->ewald_beta;
+    nbparams_params->rcoulomb_sq = nbp->rcoulomb_sq;
+    nbparams_params->repulsion_shift = nbp->repulsion_shift;
+    nbparams_params->rlist_sq = nbp->rlist_sq;
+    nbparams_params->rvdw_sq = nbp->rvdw_sq;
+    nbparams_params->rvdw_switch = nbp->rvdw_switch;
+    nbparams_params->sh_ewald = nbp->sh_ewald;
+    nbparams_params->sh_lj_ewald = nbp->sh_lj_ewald;
+    nbparams_params->two_k_rf = nbp->two_k_rf;
+    nbparams_params->vdwtype = nbp->vdwtype;
+    nbparams_params->vdw_switch = nbp->vdw_switch;
+
+    plist_params->bDoPrune = plist->bDoPrune;
+    plist_params->cj4_nalloc = plist->cj4_nalloc;
+    plist_params->excl_nalloc = plist->excl_nalloc;
+    plist_params->na_c = plist->na_c;
+    plist_params->ncj4 = plist->ncj4;
+    plist_params->nexcl = plist->nexcl;
+    plist_params->nsci = plist->nsci;
+    plist_params->sci_nalloc = plist->sci_nalloc;
+}
+
 /*! As we execute nonbonded workload in separate streams, before launching
    the kernel we need to make sure that he following operations have completed:
    - atomdata allocation and related H2D transfers (every nstlist step);
@@ -401,6 +440,11 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
     bool                 bCalcEner   = flags & GMX_FORCE_VIRIAL;
     bool                 bCalcFshift = flags & GMX_FORCE_VIRIAL;
     bool                 bDoTime     = ocl_nb->bDoTime;
+    cl_uint                  arg_no;
+
+    cl_atomdata_params_t atomdata_params;    
+    cl_nbparam_params_t nbparams_params;
+    cl_plist_params_t plist_params;
 
     /* turn energy calculation always on/off (for debugging/testing only) */
     bCalcEner = (bCalcEner || always_ener) && !never_ener;
@@ -495,32 +539,33 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
     ////            NCL_PER_SUPERCL, plist->na_c);
     ////}
     
-    // TO DO: fix it
-    // Cannot pass data structures like that. Add one new function parameter for each member of those
-    // structures or change the data structures themselves.
-    //cl_error = clSetKernelArg(nb_kernel, 0, sizeof(cl_mem), (void*)(adat));
-    //cl_error = clSetKernelArg(nb_kernel, 1, sizeof(cl_mem), (void*)(nbp));
-    //cl_error = clSetKernelArg(nb_kernel, 2, sizeof(cl_mem), (void*)(plist));
-    cl_error = clSetKernelArg(nb_kernel, 3, shmem, NULL);
-    cl_error = clSetKernelArg(nb_kernel, 4, sizeof(cl_mem), (void*)(&ocl_nb->nbparam->nbfp_climg2d));
-                                                                                // TO DO: check these image2d below - they seem to be NULL here
-    cl_error = clSetKernelArg(nb_kernel, 5, sizeof(cl_mem), (void*)(&ocl_nb->nbparam->nbfp_comb_climg2d));
-    cl_error = clSetKernelArg(nb_kernel, 6, sizeof(cl_mem), (void*)(&ocl_nb->nbparam->coulomb_tab_climg2d));
-    cl_error = clSetKernelArg(nb_kernel, 7, sizeof(bool), &bCalcFshift);    
-                                                                                // TO DO: fix the calls above.
-                                                                                // clEnqueue currently throws CL_INVALID_KERNEL_ARGS
+    fillin_ocl_structures(adat, nbp, plist, &atomdata_params, &nbparams_params, &plist_params);
+
+    arg_no = 0;    
+    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(atomdata_params), &(atomdata_params));    
+    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(nbparams_params), &(nbparams_params));    
+    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(plist_params), &(plist_params));    
+    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->xq));
+    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->f));
+    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->e_lj));
+    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->e_el));
+    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->fshift));
+    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->atom_types));
+    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->shift_vec));
+    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(nbp->nbfp));
+    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(nbp->nbfp_climg2d));
+    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(nbp->nbfp_comb));
+    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(nbp->nbfp_comb_climg2d));
+    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(nbp->coulomb_tab_climg2d));
+    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(plist->sci));
+    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(plist->cj4));
+    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(int), &bCalcFshift);    
+
+
     cl_error = clEnqueueNDRangeKernel(stream, nb_kernel, 3, NULL, dim_grid, dim_block, 0, NULL, NULL);
 
     cl_error = clFinish(stream);
 
-//(const __global cl_atomdata_t   *atdat,
-// const __global cl_nbparam_t    *nbparam,
-// const __global cl_plist_t      *plist,
-//       __local  float4          *xqib,   /* Pointer to dyn alloc'ed shmem */
-// read_only image2d_t            nbfp_climg2d,       
-// read_only image2d_t            nbfp_comb_climg2d,       
-// read_only image2d_t            coulomb_tab_climg2d,
-// int bCalcFshift)
 
     ////nb_kernel<<< dim_grid, dim_block, shmem, stream>>> (*adat, *nbp, *plist, bCalcFshift);
     ////CU_LAUNCH_ERR("k_calc_nb");
