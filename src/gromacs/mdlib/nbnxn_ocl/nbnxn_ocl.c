@@ -559,7 +559,9 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
     cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(nbp->coulomb_tab_climg2d));
     cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(plist->sci));
     cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(plist->cj4));
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(int), &bCalcFshift);    
+    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(plist->excl));
+    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(int), &bCalcFshift);
+    cl_error = clSetKernelArg(nb_kernel, arg_no++, shmem, NULL);
 
 
     cl_error = clEnqueueNDRangeKernel(stream, nb_kernel, 3, NULL, dim_grid, dim_block, 0, NULL, NULL);
