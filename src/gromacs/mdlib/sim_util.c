@@ -1166,11 +1166,21 @@ void do_force_cutsVERLET(FILE *fplog, t_commrec *cr,
         wallcycle_start_nocount(wcycle, ewcLAUNCH_GPU_NB);
         if (DOMAINDECOMP(cr) && !bDiffKernels)
         {
+#ifdef GMX_USE_OPENCL
+            nbnxn_ocl_launch_cpyback(nbv->ocl_nbv, nbv->grp[eintNonlocal].nbat,
+                                      flags, eatNonlocal);
+#else
             nbnxn_cuda_launch_cpyback(nbv->cu_nbv, nbv->grp[eintNonlocal].nbat,
                                       flags, eatNonlocal);
+#endif
         }
+#ifdef GMX_USE_OPENCL
+        nbnxn_ocl_launch_cpyback(nbv->ocl_nbv, nbv->grp[eintLocal].nbat,
+                                  flags, eatLocal);
+#else
         nbnxn_cuda_launch_cpyback(nbv->cu_nbv, nbv->grp[eintLocal].nbat,
                                   flags, eatLocal);
+#endif
         cycles_force += wallcycle_stop(wcycle, ewcLAUNCH_GPU_NB);
     }
 

@@ -579,143 +579,154 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
     ////}
 }
 
-////void nbnxn_cuda_launch_cpyback(nbnxn_cuda_ptr_t        cu_nb,
-////                               const nbnxn_atomdata_t *nbatom,
-////                               int                     flags,
-////                               int                     aloc)
-////{
-////    cudaError_t stat;
-////    int         adat_begin, adat_len, adat_end; /* local/nonlocal offset and length used for xq and f */
-////    int         iloc = -1;
-////
-////    /* determine interaction locality from atom locality */
-////    if (LOCAL_A(aloc))
-////    {
-////        iloc = eintLocal;
-////    }
-////    else if (NONLOCAL_A(aloc))
-////    {
-////        iloc = eintNonlocal;
-////    }
-////    else
-////    {
-////        char stmp[STRLEN];
-////        sprintf(stmp, "Invalid atom locality passed (%d); valid here is only "
-////                "local (%d) or nonlocal (%d)", aloc, eatLocal, eatNonlocal);
-////        gmx_incons(stmp);
-////    }
-////
-////    cu_atomdata_t   *adat    = cu_nb->atdat;
-////    cu_timers_t     *t       = cu_nb->timers;
-////    bool             bDoTime = cu_nb->bDoTime;
-////    cudaStream_t     stream  = cu_nb->stream[iloc];
-////
-////    bool             bCalcEner   = flags & GMX_FORCE_VIRIAL;
-////    bool             bCalcFshift = flags & GMX_FORCE_VIRIAL;
-////
-////    /* don't launch copy-back if there was no work to do */
-////    if (cu_nb->plist[iloc]->nsci == 0)
-////    {
-////        return;
-////    }
-////
-////    /* calculate the atom data index range based on locality */
-////    if (LOCAL_A(aloc))
-////    {
-////        adat_begin  = 0;
-////        adat_len    = adat->natoms_local;
-////        adat_end    = cu_nb->atdat->natoms_local;
-////    }
-////    else
-////    {
-////        adat_begin  = adat->natoms_local;
-////        adat_len    = adat->natoms - adat->natoms_local;
-////        adat_end    = cu_nb->atdat->natoms;
-////    }
-////
-////    /* beginning of timed D2H section */
-////    if (bDoTime)
-////    {
-////        stat = cudaEventRecord(t->start_nb_d2h[iloc], stream);
-////        CU_RET_ERR(stat, "cudaEventRecord failed");
-////    }
-////
-////    if (!cu_nb->bUseStreamSync)
-////    {
-////        /* For safety reasons set a few (5%) forces to NaN. This way even if the
-////           polling "hack" fails with some future NVIDIA driver we'll get a crash. */
-////        for (int i = adat_begin; i < 3*adat_end + 2; i += adat_len/20)
-////        {
-////#ifdef NAN
-////            nbatom->out[0].f[i] = NAN;
-////#else
-////#  ifdef _MSVC
-////            if (numeric_limits<float>::has_quiet_NaN)
-////            {
-////                nbatom->out[0].f[i] = numeric_limits<float>::quiet_NaN();
-////            }
-////            else
-////#  endif
-////            {
-////                nbatom->out[0].f[i] = GMX_REAL_MAX;
-////            }
-////#endif
-////        }
-////
-////        /* Set the last four bytes of the force array to a bit pattern
-////           which can't be the result of the force calculation:
-////           max exponent (127) and zero mantissa. */
-////        *(unsigned int*)&nbatom->out[0].f[adat_end*3 - 1] = poll_wait_pattern;
-////    }
-////
-////    /* With DD the local D2H transfer can only start after the non-local
-////       has been launched. */
-////    if (iloc == eintLocal && cu_nb->bUseTwoStreams)
-////    {
-////        stat = cudaStreamWaitEvent(stream, cu_nb->nonlocal_done, 0);
-////        CU_RET_ERR(stat, "cudaStreamWaitEvent on nonlocal_done failed");
-////    }
-////
-////    /* DtoH f */
-////    cu_copy_D2H_async(nbatom->out[0].f + adat_begin * 3, adat->f + adat_begin,
-////                      (adat_len)*sizeof(*adat->f), stream);
-////
-////    /* After the non-local D2H is launched the nonlocal_done event can be
-////       recorded which signals that the local D2H can proceed. This event is not
-////       placed after the non-local kernel because we first need the non-local
-////       data back first. */
-////    if (iloc == eintNonlocal)
-////    {
-////        stat = cudaEventRecord(cu_nb->nonlocal_done, stream);
-////        CU_RET_ERR(stat, "cudaEventRecord on nonlocal_done failed");
-////    }
-////
-////    /* only transfer energies in the local stream */
-////    if (LOCAL_I(iloc))
-////    {
-////        /* DtoH fshift */
-////        if (bCalcFshift)
-////        {
-////            cu_copy_D2H_async(cu_nb->nbst.fshift, adat->fshift,
-////                              SHIFTS * sizeof(*cu_nb->nbst.fshift), stream);
-////        }
-////
-////        /* DtoH energies */
-////        if (bCalcEner)
-////        {
-////            cu_copy_D2H_async(cu_nb->nbst.e_lj, adat->e_lj,
-////                              sizeof(*cu_nb->nbst.e_lj), stream);
-////            cu_copy_D2H_async(cu_nb->nbst.e_el, adat->e_el,
-////                              sizeof(*cu_nb->nbst.e_el), stream);
-////        }
-////    }
-////
-////    if (bDoTime)
-////    {
-////        stat = cudaEventRecord(t->stop_nb_d2h[iloc], stream);
-////        CU_RET_ERR(stat, "cudaEventRecord failed");
-////    }
-////}
+void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t        ocl_nb,
+                               const nbnxn_atomdata_t *nbatom,
+                               int                     flags,
+                               int                     aloc)
+{
+    //cudaError_t stat;
+    int         adat_begin, adat_len, adat_end; /* local/nonlocal offset and length used for xq and f */
+    int         iloc = -1;
+
+    /* determine interaction locality from atom locality */
+    if (LOCAL_A(aloc))
+    {
+        iloc = eintLocal;
+    }
+    else if (NONLOCAL_A(aloc))
+    {
+        iloc = eintNonlocal;
+    }
+    else
+    {
+        char stmp[STRLEN];
+        sprintf(stmp, "Invalid atom locality passed (%d); valid here is only "
+                "local (%d) or nonlocal (%d)", aloc, eatLocal, eatNonlocal);
+        
+        // TO DO: fix for OpenCL
+        //gmx_incons(stmp);
+    }
+
+    cl_atomdata_t   *adat    = ocl_nb->atdat;
+    cl_timers_t     *t       = ocl_nb->timers;
+    bool             bDoTime = ocl_nb->bDoTime;
+    //cudaStream_t     stream  = ocl_nb->stream[iloc];
+    cl_command_queue stream  = ocl_nb->stream[iloc];
+
+    bool             bCalcEner   = flags & GMX_FORCE_VIRIAL;
+    bool             bCalcFshift = flags & GMX_FORCE_VIRIAL;
+
+    /* don't launch copy-back if there was no work to do */
+    if (ocl_nb->plist[iloc]->nsci == 0)
+    {
+        return;
+    }
+
+    /* calculate the atom data index range based on locality */
+    if (LOCAL_A(aloc))
+    {
+        adat_begin  = 0;
+        adat_len    = adat->natoms_local;
+        adat_end    = ocl_nb->atdat->natoms_local;
+    }
+    else
+    {
+        adat_begin  = adat->natoms_local;
+        adat_len    = adat->natoms - adat->natoms_local;
+        adat_end    = ocl_nb->atdat->natoms;
+    }
+
+    /* beginning of timed D2H section */
+    if (bDoTime)
+    {
+        // TO DO: implement for OpenCL
+        ////stat = cudaEventRecord(t->start_nb_d2h[iloc], stream);
+        ////CU_RET_ERR(stat, "cudaEventRecord failed");
+    }
+
+    if (!ocl_nb->bUseStreamSync)
+    {
+        /* For safety reasons set a few (5%) forces to NaN. This way even if the
+           polling "hack" fails with some future NVIDIA driver we'll get a crash. */
+        for (int i = adat_begin; i < 3*adat_end + 2; i += adat_len/20)
+        {
+#ifdef NAN
+            nbatom->out[0].f[i] = NAN;
+#else
+#  ifdef _MSVC
+            if (numeric_limits<float>::has_quiet_NaN)
+            {
+                nbatom->out[0].f[i] = numeric_limits<float>::quiet_NaN();
+            }
+            else
+#  endif
+            {
+                nbatom->out[0].f[i] = GMX_REAL_MAX;
+            }
+#endif
+        }
+
+        /* Set the last four bytes of the force array to a bit pattern
+           which can't be the result of the force calculation:
+           max exponent (127) and zero mantissa. */
+        *(unsigned int*)&nbatom->out[0].f[adat_end*3 - 1] = poll_wait_pattern;
+    }
+
+    /* With DD the local D2H transfer can only start after the non-local
+       has been launched. */
+    if (iloc == eintLocal && ocl_nb->bUseTwoStreams)
+    {
+        // TO DO: implement for OpenCL
+        ////stat = cudaStreamWaitEvent(stream, cu_nb->nonlocal_done, 0);
+        ////CU_RET_ERR(stat, "cudaStreamWaitEvent on nonlocal_done failed");
+    }
+
+    /* DtoH f */
+    // TO DO: the last parameter is not always NULL
+    ocl_copy_D2H_async(nbatom->out[0].f + adat_begin * 3, adat->f, adat_begin,
+                      (adat_len)*sizeof(float) * 3, stream, NULL);
+
+    /* After the non-local D2H is launched the nonlocal_done event can be
+       recorded which signals that the local D2H can proceed. This event is not
+       placed after the non-local kernel because we first need the non-local
+       data back first. */
+    if (iloc == eintNonlocal)
+    {
+        // TO DO: implement for OpenCL
+        ////stat = cudaEventRecord(cu_nb->nonlocal_done, stream);
+        ////CU_RET_ERR(stat, "cudaEventRecord on nonlocal_done failed");
+    }
+
+    /* only transfer energies in the local stream */
+    if (LOCAL_I(iloc))
+    {
+        /* DtoH fshift */
+        if (bCalcFshift)
+        {
+            // TO DO: the last parameter is not always NULL
+            ocl_copy_D2H_async(ocl_nb->nbst.fshift, adat->fshift, 0,
+                              SHIFTS * sizeof(float), stream, NULL);
+        }
+
+        /* DtoH energies */
+        if (bCalcEner)
+        {
+            // TO DO: the last parameter is not always NULL
+            ocl_copy_D2H_async(ocl_nb->nbst.e_lj, adat->e_lj, 0,
+                              sizeof(float), stream, NULL);
+            // TO DO: the last parameter is not always NULL
+            ocl_copy_D2H_async(ocl_nb->nbst.e_el, adat->e_el, 0,
+                              sizeof(float), stream, NULL);
+        }
+    }
+
+    if (bDoTime)
+    {
+        // TO DO: implement for OpenCL
+        //stat = cudaEventRecord(t->stop_nb_d2h[iloc], stream);
+        //CU_RET_ERR(stat, "cudaEventRecord failed");
+    }
+}
 
 /* Atomic compare-exchange operation on unsigned values. It is used in
  * polling wait for the GPU.

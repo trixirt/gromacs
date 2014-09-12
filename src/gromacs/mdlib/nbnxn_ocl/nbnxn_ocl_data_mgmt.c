@@ -151,6 +151,36 @@ int ocl_copy_H2D(cl_mem d_dest, void * h_src, size_t offset, size_t bytes, cl_co
     return ocl_copy_H2D_generic(d_dest, h_src, offset, bytes, false, command_queue, NULL);
 }
 
+
+int ocl_copy_D2H_generic(void * h_dest, cl_mem d_src, size_t offset, size_t bytes,
+                         bool bAsync, cl_command_queue command_queue, cl_event *copy_event)
+{
+    cl_int cl_error;
+
+    if (h_dest == NULL || d_src == NULL || bytes == 0)
+    {
+        return -1;
+    }
+
+    if (bAsync)
+    {        
+        cl_error = clEnqueueReadBuffer(command_queue, d_src, CL_FALSE, offset, bytes, h_dest, 0, NULL, copy_event);
+        // TO DO: handle errors
+    }
+    else
+    {        
+        cl_error = clEnqueueReadBuffer(command_queue, d_src, CL_TRUE, offset, bytes, h_dest, 0, NULL, copy_event);
+        // TO DO: handle errors
+    }
+
+    return 0;
+}
+
+int ocl_copy_D2H_async(void * h_dest, cl_mem d_src, size_t offset, size_t bytes, cl_command_queue command_queue, cl_event *copy_event)
+{
+    return ocl_copy_D2H_generic(h_dest, d_src, offset, bytes, true, command_queue, copy_event);
+}
+
 /*!
  * If the pointers to the size variables are NULL no resetting happens.
  */
