@@ -1166,7 +1166,7 @@ void do_force_cutsVERLET(FILE *fplog, t_commrec *cr,
         wallcycle_start_nocount(wcycle, ewcLAUNCH_GPU_NB);
         if (DOMAINDECOMP(cr) && !bDiffKernels)
         {
-#if defined(GMX_GPU) && !defined(GMX_USE_OPENCL) 
+#if defined(GMX_GPU) && defined(GMX_USE_OPENCL) 
             nbnxn_ocl_launch_cpyback(nbv->ocl_nbv, nbv->grp[eintNonlocal].nbat,
                                       flags, eatNonlocal);
 #else
@@ -1174,7 +1174,7 @@ void do_force_cutsVERLET(FILE *fplog, t_commrec *cr,
                                       flags, eatNonlocal);
 #endif
         }
-#if defined(GMX_GPU) && !defined(GMX_USE_OPENCL) 
+#if defined(GMX_GPU) && defined(GMX_USE_OPENCL) 
         nbnxn_ocl_launch_cpyback(nbv->ocl_nbv, nbv->grp[eintLocal].nbat,
                                   flags, eatLocal);
 #else
