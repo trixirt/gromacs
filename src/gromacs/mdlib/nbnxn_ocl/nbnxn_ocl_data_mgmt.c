@@ -38,7 +38,6 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <stdbool.h>
 
 #include "tables.h"
 #include "typedefs.h"
@@ -55,15 +54,12 @@
 #include "gpu_utils.h"
 
 #include "gromacs/pbcutil/ishift.h"
-//#include "gromacs/utility/common.h"
+#include "gromacs/utility/common.h"
 #include "gromacs/utility/cstringutil.h"
 #include "gromacs/utility/fatalerror.h"
 #include "gromacs/utility/smalloc.h"
 
-#define pmalloc(...) 
-#pragma message "WARNING pmalloc not implemented"
-
-static cl_bool bUseOpenCLEventBlockingSync = CL_FALSE; /* makes the CPU thread block */
+static bool bUseCudaEventBlockingSync = false; /* makes the CPU thread block */
 
 /* This is a heuristically determined parameter for the Fermi architecture for
  * the minimum size of ci lists by multiplying this constant with the # of
@@ -134,12 +130,42 @@ static int ocl_copy_H2D_generic(cl_mem d_dest, void* h_src, size_t offset, size_
 
 int ocl_copy_H2D_async(cl_mem d_dest, void * h_src, size_t offset, size_t bytes, cl_command_queue command_queue, cl_event *copy_event)
 {
-    return ocl_copy_H2D_generic(d_dest, h_src, offset, bytes, CL_TRUE, command_queue, copy_event);
+    return ocl_copy_H2D_generic(d_dest, h_src, offset, bytes, true, command_queue, copy_event);
 }
 
 int ocl_copy_H2D(cl_mem d_dest, void * h_src, size_t offset, size_t bytes, cl_command_queue command_queue)
 {
-    return ocl_copy_H2D_generic(d_dest, h_src, offset, bytes, CL_FALSE, command_queue, NULL);
+    return ocl_copy_H2D_generic(d_dest, h_src, offset, bytes, false, command_queue, NULL);
+}
+
+
+int ocl_copy_D2H_generic(void * h_dest, cl_mem d_src, size_t offset, size_t bytes,
+                         bool bAsync, cl_command_queue command_queue, cl_event *copy_event)
+{
+    cl_int cl_error;
+
+    if (h_dest == NULL || d_src == NULL || bytes == 0)
+    {
+        return -1;
+    }
+
+    if (bAsync)
+    {        
+        cl_error = clEnqueueReadBuffer(command_queue, d_src, CL_FALSE, offset, bytes, h_dest, 0, NULL, copy_event);
+        // TO DO: handle errors
+    }
+    else
+    {        
+        cl_error = clEnqueueReadBuffer(command_queue, d_src, CL_TRUE, offset, bytes, h_dest, 0, NULL, copy_event);
+        // TO DO: handle errors
+    }
+
+    return 0;
+}
+
+int ocl_copy_D2H_async(void * h_dest, cl_mem d_src, size_t offset, size_t bytes, cl_command_queue command_queue, cl_event *copy_event)
+{
+    return ocl_copy_D2H_generic(h_dest, d_src, offset, bytes, true, command_queue, copy_event);
 }
 
 /*!
@@ -182,8 +208,9 @@ void ocl_realloc_buffered(cl_mem *d_dest, void *h_src,
                          int req_size,
                          cl_context context,
                          cl_command_queue s,                         
-                         cl_bool bAsync)
+                         bool bAsync = true)
 {
+    cudaError_t stat;
     cl_int cl_error;
 
     if (d_dest == NULL || req_size < 0)
@@ -240,7 +267,9 @@ static void init_ewald_coulomb_force_table(//cu_nbparam_t          *nbp,
     cl_mem coul_tab;
     int          tabsize;
     double       tabscale;
-    cl_int       cl_error;
+    cudaError_t  stat;
+
+    cl_int cl_error;
 
     tabsize     = GPU_EWALD_COULOMB_FORCE_TABLE_SIZE;
     /* Subtract 2 iso 1 to avoid access out of range due to rounding */
@@ -268,7 +297,7 @@ static void init_ewald_coulomb_force_table(//cu_nbparam_t          *nbp,
         array_format.image_channel_order = CL_R;
 
         coul_tab = clCreateImage2D(dev_info->context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-            &array_format, tabsize*sizeof(float), 1, 0, ftmp, &cl_error);
+            &array_format, tabsize, 1, 0, ftmp, &cl_error);
         // TO DO: handle errors
 
         nbp->coulomb_tab_climg2d = coul_tab;
@@ -322,23 +351,23 @@ static void init_atomdata_first(/*cu_atomdata_t*/cl_atomdata_t *ad, int ntypes, 
 
     //stat        = cudaMalloc((void**)&ad->shift_vec, SHIFTS*sizeof(*ad->shift_vec));
     //CU_RET_ERR(stat, "cudaMalloc failed on ad->shift_vec");
-    ad->shift_vec = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, SHIFTS * sizeof(cl_float3), NULL, &cl_error);
+    ad->shift_vec = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, SHIFTS * sizeof(float3), NULL, &cl_error);
     ad->bShiftVecUploaded = false;
     // TO DO: handle errors, check clCreateBuffer flags
 
     //stat = cudaMalloc((void**)&ad->fshift, SHIFTS*sizeof(*ad->fshift));
     //CU_RET_ERR(stat, "cudaMalloc failed on ad->fshift");
-    ad->fshift = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, SHIFTS * sizeof(cl_float3), NULL, &cl_error);
+    ad->fshift = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, SHIFTS * sizeof(float3), NULL, &cl_error);
     // TO DO: handle errors, check clCreateBuffer flags
 
     //stat = cudaMalloc((void**)&ad->e_lj, sizeof(*ad->e_lj));
     //CU_RET_ERR(stat, "cudaMalloc failed on ad->e_lj");
-    ad->e_lj = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, sizeof(cl_float), NULL, &cl_error);
+    ad->e_lj = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, sizeof(float), NULL, &cl_error);
     // TO DO: handle errors, check clCreateBuffer flags
 
     //stat = cudaMalloc((void**)&ad->e_el, sizeof(*ad->e_el));
     //CU_RET_ERR(stat, "cudaMalloc failed on ad->e_el");
-    ad->e_el = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, sizeof(cl_float), NULL, &cl_error);
+    ad->e_el = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, sizeof(float), NULL, &cl_error);
     // TO DO: handle errors, check clCreateBuffer flags
 
     /* initialize to NULL poiters to data that is not allocated here and will
@@ -396,11 +425,11 @@ static int pick_ewald_kernel_type(bool                   bTwinCut,
        forces it (use it for debugging/benchmarking only). */
     if (!bTwinCut && (getenv("GMX_CUDA_NB_EWALD_TWINCUT") == NULL))
     {
-        kernel_type = bUseAnalyticalEwald ? eelOclEWALD_ANA : eelOclEWALD_TAB;
+        kernel_type = bUseAnalyticalEwald ? eelCuEWALD_ANA : eelCuEWALD_TAB;
     }
     else
     {
-        kernel_type = bUseAnalyticalEwald ? eelOclEWALD_ANA_TWIN : eelOclEWALD_TAB_TWIN;
+        kernel_type = bUseAnalyticalEwald ? eelCuEWALD_ANA_TWIN : eelCuEWALD_TAB_TWIN;
     }
 
     return kernel_type;
@@ -449,13 +478,13 @@ static void init_nbparam(/*cu_nbparam_t*/cl_nbparam_t  *nbp,
         {
             case eintmodNONE:
             case eintmodPOTSHIFT:
-                nbp->vdwtype = evdwOclCUT;
+                nbp->vdwtype = evdwCuCUT;
                 break;
             case eintmodFORCESWITCH:
-                nbp->vdwtype = evdwOclFSWITCH;
+                nbp->vdwtype = evdwCuFSWITCH;
                 break;
             case eintmodPOTSWITCH:
-                nbp->vdwtype = evdwOclPSWITCH;
+                nbp->vdwtype = evdwCuPSWITCH;
                 break;
             default:
                 gmx_incons("The requested VdW interaction modifier is not implemented in the CUDA GPU accelerated kernels!");
@@ -467,12 +496,12 @@ static void init_nbparam(/*cu_nbparam_t*/cl_nbparam_t  *nbp,
         if (ic->ljpme_comb_rule == ljcrGEOM)
         {
             assert(nbat->comb_rule == ljcrGEOM);
-            nbp->vdwtype = evdwOclEWALDGEOM;
+            nbp->vdwtype = evdwCuEWALDGEOM;
         }
         else
         {
             assert(nbat->comb_rule == ljcrLB);
-            nbp->vdwtype = evdwOclEWALDLB;
+            nbp->vdwtype = evdwCuEWALDLB;
         }
     }
     else
@@ -482,11 +511,11 @@ static void init_nbparam(/*cu_nbparam_t*/cl_nbparam_t  *nbp,
 
     if (ic->eeltype == eelCUT)
     {
-        nbp->eeltype = eelOclCUT;
+        nbp->eeltype = eelCuCUT;
     }
     else if (EEL_RF(ic->eeltype))
     {
-        nbp->eeltype = eelOclRF;
+        nbp->eeltype = eelCuRF;
     }
     else if ((EEL_PME(ic->eeltype) || ic->eeltype == eelEWALD))
     {
@@ -501,9 +530,23 @@ static void init_nbparam(/*cu_nbparam_t*/cl_nbparam_t  *nbp,
 
     /* generate table for PME */
     nbp->coulomb_tab_climg2d = NULL;
-    if (nbp->eeltype == eelOclEWALD_TAB || nbp->eeltype == eelOclEWALD_TAB_TWIN)
+    if (nbp->eeltype == eelCuEWALD_TAB || nbp->eeltype == eelCuEWALD_TAB_TWIN)
     {
         init_ewald_coulomb_force_table(nbp, dev_info);
+    }
+    else
+    // TO DO: improvement needed.
+    // The image2d is created here even if eeltype is not eelCuEWALD_TAB or eelCuEWALD_TAB_TWIN because the OpenCL kernels
+    // don't accept NULL values for image2D parameters.
+    {
+        cl_image_format array_format;
+
+        array_format.image_channel_data_type = CL_FLOAT;
+        array_format.image_channel_order = CL_R;
+
+        nbp->coulomb_tab_climg2d = clCreateImage2D(dev_info->context, CL_MEM_READ_WRITE,
+            &array_format, 1, 1, 0, NULL, &cl_error);
+        // TO DO: handle errors        
     }
 
     nnbfp      = 2*ntypes*ntypes;
@@ -556,6 +599,15 @@ static void init_nbparam(/*cu_nbparam_t*/cl_nbparam_t  *nbp,
         {
             nbp->nbfp_comb_climg2d = clCreateImage2D(dev_info->context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
                 &array_format, nnbfp_comb, 1, 0, nbat->nbfp_comb, &cl_error);
+            // TO DO: handle errors
+        }
+        else
+        {
+            // TO DO: improvement needed.
+            // The image2d is created here even if vdwtype is not evdwPME because the OpenCL kernels
+            // don't accept NULL values for image2D parameters.
+            nbp->nbfp_comb_climg2d = clCreateImage2D(dev_info->context, CL_MEM_READ_WRITE,
+                &array_format, 1, 1, 0, NULL, &cl_error);
             // TO DO: handle errors
         }
     }
@@ -721,7 +773,7 @@ void nbnxn_ocl_init(FILE                 *fplog,
     nbnxn_opencl_ptr_t  nb;
     cl_int            cl_error;    
     char              sbuf[STRLEN];
-    cl_bool           bStreamSync, bNoStreamSync, bTMPIAtomics, bX86, bOldDriver;
+    bool              bStreamSync, bNoStreamSync, bTMPIAtomics, bX86, bOldDriver;
     int               cuda_drv_ver;
     cl_command_queue_properties queue_properties;
 
@@ -1147,17 +1199,17 @@ void nbnxn_ocl_init_atomdata(nbnxn_opencl_ptr_t        ocl_nb,
 
         //stat = cudaMalloc((void **)&d_atdat->f, nalloc*sizeof(*d_atdat->f));
         //CU_RET_ERR(stat, "cudaMalloc failed on d_atdat->f");
-        d_atdat->f = clCreateBuffer(ocl_nb->dev_info->context, CL_MEM_READ_WRITE, nalloc * sizeof(cl_float3), NULL, &cl_error);
+        d_atdat->f = clCreateBuffer(ocl_nb->dev_info->context, CL_MEM_READ_WRITE, nalloc * sizeof(float3), NULL, &cl_error);
         // TO DO: handle errors, check clCreateBuffer flags
 
         //stat = cudaMalloc((void **)&d_atdat->xq, nalloc*sizeof(*d_atdat->xq));
         //CU_RET_ERR(stat, "cudaMalloc failed on d_atdat->xq");
-        d_atdat->xq = clCreateBuffer(ocl_nb->dev_info->context, CL_MEM_READ_WRITE, nalloc * sizeof(cl_float4), NULL, &cl_error);
+        d_atdat->xq = clCreateBuffer(ocl_nb->dev_info->context, CL_MEM_READ_WRITE, nalloc * sizeof(float4), NULL, &cl_error);
         // TO DO: handle errors, check clCreateBuffer flags
 
         //stat = cudaMalloc((void **)&d_atdat->atom_types, nalloc*sizeof(*d_atdat->atom_types));
         //CU_RET_ERR(stat, "cudaMalloc failed on d_atdat->atom_types");
-        d_atdat->atom_types = clCreateBuffer(ocl_nb->dev_info->context, CL_MEM_READ_WRITE, nalloc * sizeof(cl_int), NULL, &cl_error);
+        d_atdat->atom_types = clCreateBuffer(ocl_nb->dev_info->context, CL_MEM_READ_WRITE, nalloc * sizeof(int), NULL, &cl_error);
         // TO DO: handle errors, check clCreateBuffer flags
 
         d_atdat->nalloc = nalloc;
@@ -1183,6 +1235,7 @@ void nbnxn_ocl_init_atomdata(nbnxn_opencl_ptr_t        ocl_nb,
     {
         //stat = cudaEventRecord(timers->stop_atdat, ls);
         //CU_RET_ERR(stat, "cudaEventRecord failed");
+        cl_int cl_error;
 
         cl_error = clGetEventProfilingInfo(timers->atdat, CL_PROFILING_COMMAND_START,
             sizeof(cl_ulong), &(timers->start_atdat), NULL);

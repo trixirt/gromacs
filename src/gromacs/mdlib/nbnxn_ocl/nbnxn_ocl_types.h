@@ -156,6 +156,21 @@ typedef struct cl_atomdata
     cl_bool     bShiftVecUploaded; /**< true if the shift vector has been uploaded   */
 } cl_atomdata_t;
 
+// Data structure shared between the OpenCL device code and OpenCL host code
+// Must not contain OpenCL objects (buffers)
+// TO DO: review, improve
+typedef struct cl_atomdata_params
+{
+    int      natoms;            /**< number of atoms                              */
+    int      natoms_local;      /**< number of local atoms                        */
+    int      nalloc;            /**< allocation size for the atom data (xq, f)    */    
+
+    int      ntypes;            /**< number of atom types                         */
+    
+    /*bool*/int     bShiftVecUploaded; /**< true if the shift vector has been uploaded   */
+} cl_atomdata_params_t;
+
+
 /** \internal
  * \brief Parameters required for the CUDA nonbonded calculations.
  */
@@ -201,6 +216,38 @@ typedef struct cl_nbparam
     //openclTextureObject_t  coulomb_tab_climg2d; /**< texture object bound to coulomb_tab        */
 }cl_nbparam_t;
 
+// Data structure shared between the OpenCL device code and OpenCL host code
+// Must not contain OpenCL objects (buffers)
+// TO DO: review, improve
+typedef struct cl_nbparam_params
+{
+
+    int             eeltype;          /**< type of electrostatics, takes values from #eelCu */
+    int             vdwtype;          /**< type of VdW impl., takes values from #evdwCu     */
+
+    float           epsfac;           /**< charge multiplication factor                      */
+    float           c_rf;             /**< Reaction-field/plain cutoff electrostatics const. */
+    float           two_k_rf;         /**< Reaction-field electrostatics constant            */
+    float           ewald_beta;       /**< Ewald/PME parameter                               */
+    float           sh_ewald;         /**< Ewald/PME correction term substracted from the direct-space potential */
+    float           sh_lj_ewald;      /**< LJ-Ewald/PME correction term added to the correction potential        */
+    float           ewaldcoeff_lj;    /**< LJ-Ewald/PME coefficient                          */
+
+    float           rcoulomb_sq;      /**< Coulomb cut-off squared                           */
+
+    float           rvdw_sq;          /**< VdW cut-off squared                               */
+    float           rvdw_switch;      /**< VdW switched cut-off                              */
+    float           rlist_sq;         /**< pair-list cut-off squared                         */
+
+    shift_consts_t  dispersion_shift; /**< VdW shift dispersion constants           */
+    shift_consts_t  repulsion_shift;  /**< VdW shift repulsion constants            */
+    switch_consts_t vdw_switch;       /**< VdW switch constants                     */   
+
+    /* Ewald Coulomb force table data - accessed through texture memory */
+    int                    coulomb_tab_size;   /**< table size (s.t. it fits in texture cache) */
+    float                  coulomb_tab_scale;  /**< table scale/spacing                        */    
+}cl_nbparam_params_t;
+
 
 /** \internal
  * \brief Pair list data.
@@ -227,6 +274,26 @@ typedef struct cl_plist
     cl_bool          bDoPrune;    /**< true if pair-list pruning needs to be
                                        done during the  current step                */
 }cl_plist_t;
+
+// Data structure shared between the OpenCL device code and OpenCL host code
+// Must not contain OpenCL objects (buffers)
+// TO DO: review, improve
+typedef struct cl_plist_params
+{
+    int              na_c;        /**< number of atoms per cluster                  */
+
+    int              nsci;        /**< size of sci, # of i clusters in the list     */
+    int              sci_nalloc;  /**< allocation size of sci                       */   
+
+    int              ncj4;        /**< total # of 4*j clusters                      */
+    int              cj4_nalloc;  /**< allocation size of cj4                       */
+   
+    int              nexcl;       /**< count for excl                               */
+    int              excl_nalloc; /**< allocation size of excl                      */
+
+    /*bool*/int             bDoPrune;    /**< true if pair-list pruning needs to be
+                                       done during the  current step                */
+}cl_plist_params_t;
 
 #ifndef __IN_OPENCL_KERNEL__
 

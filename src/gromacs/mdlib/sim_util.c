@@ -1164,24 +1164,23 @@ void do_force_cutsVERLET(FILE *fplog, t_commrec *cr,
     {
         /* launch D2H copy-back F */
         wallcycle_start_nocount(wcycle, ewcLAUNCH_GPU_NB);
-#if defined(GMX_GPU) && !defined(GMX_USE_OPENCL)        
         if (DOMAINDECOMP(cr) && !bDiffKernels)
         {
+#if defined(GMX_GPU) && !defined(GMX_USE_OPENCL) 
+            nbnxn_ocl_launch_cpyback(nbv->ocl_nbv, nbv->grp[eintNonlocal].nbat,
+                                      flags, eatNonlocal);
+#else
             nbnxn_cuda_launch_cpyback(nbv->cu_nbv, nbv->grp[eintNonlocal].nbat,
                                       flags, eatNonlocal);
+#endif
         }
+#if defined(GMX_GPU) && !defined(GMX_USE_OPENCL) 
+        nbnxn_ocl_launch_cpyback(nbv->ocl_nbv, nbv->grp[eintLocal].nbat,
+                                  flags, eatLocal);
+#else
         nbnxn_cuda_launch_cpyback(nbv->cu_nbv, nbv->grp[eintLocal].nbat,
                                   flags, eatLocal);
-#elif defined(GMX_GPU) && defined(GMX_USE_OPENCL)           
-#pragma message "WARNING Not implemented yet"
-        if (DOMAINDECOMP(cr) && !bDiffKernels)
-        {
-            //nbnxn_ocl_launch_cpyback(nbv->cu_nbv, nbv->grp[eintNonlocal].nbat,
-            //                          flags, eatNonlocal);
-        }
-        //nbnxn_ocl_launch_cpyback(nbv->cu_nbv, nbv->grp[eintLocal].nbat,
-        //                          flags, eatLocal);        
-#endif        
+#endif
         cycles_force += wallcycle_stop(wcycle, ewcLAUNCH_GPU_NB);
     }
 
@@ -2766,11 +2765,11 @@ void finish_run(FILE *fplog, t_commrec *cr,
 #pragma message "WARNING Not implemented yet"      
 #endif        
         wallclock_gpu_t* gputimes = use_GPU(nbv) ?
-            nbnxn_cuda_get_timings(nbv->cu_nbv) : NULL;        
+            nbnxn_cuda_get_timings(nbv->cu_nbv) : NULL;
         wallcycle_print(fplog, cr->nnodes, cr->npmenodes,
                         elapsed_time_over_all_ranks,
                         wcycle, gputimes);
-        
+
         if (EI_DYNAMICS(inputrec->eI))
         {
             delta_t = inputrec->delta_t;
