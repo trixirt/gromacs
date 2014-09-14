@@ -1,3 +1,6 @@
+
+/*! @file */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -228,6 +231,8 @@ void get_ocl_gpu_device_info_string(char gmx_unused *s, const gmx_gpu_info_t gmx
 //#define OCL_FILE_PATH "C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\gmxlib\\ocl_tools\\vectype_ops.clh"
 //#define OCL_FILE_PATH "C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\mdlib\\nbnxn_ocl\\nbnxn_ocl_kernel_nvidia.clh"
 
+/* This path is defined by CMake and it depends on the install prefix option.
+   The opencl kernels are installed in bin/opencl.*/
 #if !defined(OCL_INSTALL_DIR_NAME)
 #pragma error "OCL_INSTALL_DIR_NAME has not been defined"
 #endif
@@ -274,7 +279,7 @@ static const char* get_ocl_build_option(build_options_index_t build_option_id)
         return build_options_list[_invalid_option_];
 }
 
-static const size_t get_ocl_build_option_length(build_options_index_t build_option_id)
+static size_t get_ocl_build_option_length(build_options_index_t build_option_id)
 {
     if(build_option_id<_num_build_options_)
         return strlen(build_options_list[build_option_id]);
@@ -373,7 +378,6 @@ typedef enum{
 
 /* TODO to structure .. */
 static const char*      kernel_filenames[]         = {"nbnxn_ocl_kernel_nvidia.clh"};
-static const size_t     kernel_filenames_lengths[] = {28};
 
 /* TODO comments .. */
 static size_t  get_ocl_kernel_source_file_info(kernel_filename_index_t kernel_src_id)
@@ -383,7 +387,7 @@ static size_t  get_ocl_kernel_source_file_info(kernel_filename_index_t kernel_sr
     else
     {
         /* Note we add 1 for the separator and 1 for the termination null char in the resulting string */
-        return( kernel_filenames_lengths[kernel_src_id] + strlen(OCL_INSTALL_DIR_NAME) + 2);    
+        return( strlen(kernel_filenames[kernel_src_id]) + strlen(OCL_INSTALL_DIR_NAME) + 2);    
     }
 }
 
@@ -425,8 +429,8 @@ static void get_ocl_kernel_source_path(
         
         strncpy(&ocl_kernel_filename[chars_copied], 
                 kernel_filenames[kernel_src_id], 
-                kernel_filenames_lengths[kernel_src_id]);
-        chars_copied += kernel_filenames_lengths[kernel_src_id];
+                strlen(kernel_filenames[kernel_src_id]) );
+        chars_copied += strlen(kernel_filenames[kernel_src_id]);
         
         ocl_kernel_filename[chars_copied++] = '\0';
         
@@ -469,6 +473,80 @@ char* load_ocl_source(const char* filename, size_t* p_source_length)
 
     *p_source_length = source_length;
     return ocl_source;
+}
+
+void handle_ocl_build_log(const char*   build_log,
+                          const char*   build_options_string,
+                          cl_int        build_status,
+                          kernel_filename_index_t kernel_filename_id)
+{
+    bool dumpFile  = false;
+    bool dumpStdErr= false;
+#ifdef DNDEBUG
+    if(build_status != CL_SUCCESS) dumpFile = true;
+#else
+    dumpFile = true;
+    if(build_status != CL_SUCCESS) dumpStdErr = true;
+#endif          
+    
+    if(dumpFile || dumpStdErr)
+    {
+        FILE * build_log_file       = NULL;   
+        const char *fail_header     = "Compilation of source file failed! \n";
+        const char *success_header  = "Compilation of source file was successful! \n";
+        const char *log_header      = "--------------LOG START---------------\n";
+        const char *log_footer      = "---------------LOG END----------------\n"; 
+        char status_suffix[10];
+        char *build_info;
+        
+        build_info = (char*)malloc(32 + strlen(build_options_string) );
+        sprintf(build_info,"-- Used build options: %s\n", build_options_string);
+    
+        if(dumpFile)
+        {
+            strncpy(status_suffix, (build_status==CL_SUCCESS)?"SUCCEEDED":"FAILED",10);        
+    
+            char *log_fname = (char*)malloc(strlen(kernel_filenames[kernel_filename_id]) 
+                                     + strlen(status_suffix) + 2
+                                   );
+            
+            sprintf(log_fname,"%s.%s",kernel_filenames[kernel_filename_id],status_suffix);       
+            build_log_file = fopen(log_fname,"w");       
+            free(log_fname);
+        }
+    
+        size_t complete_message_size = 0;
+        char * complete_message;
+
+    
+        complete_message_size =  (build_status == CL_SUCCESS)?strlen(success_header):strlen(fail_header);
+        complete_message_size += strlen(build_info) + strlen(log_header) + strlen(log_footer);
+        complete_message_size += strlen(build_log);
+        complete_message_size += 1; //null termination
+        complete_message = (char*)malloc(complete_message_size);         
+    
+        sprintf(complete_message,"%s%s%s%s%s",
+            (build_status == CL_SUCCESS)?success_header:fail_header,
+            build_info,
+            log_header,            
+            build_log,
+            log_footer);
+    
+        if(dumpFile)
+        {
+            if(build_log_file)
+                fprintf(build_log_file, "%s" , complete_message);
+
+            fclose(build_log_file);
+        }
+        if(dumpStdErr)
+        {
+            if(build_status != CL_SUCCESS)
+                fprintf(stderr, "%s", complete_message);
+        }     
+        free(complete_message);
+        free(build_info);
+    }
 }
 
 gmx_bool init_ocl_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
@@ -583,7 +661,16 @@ gmx_bool init_ocl_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
                 build_log = (char*)malloc(build_log_size);
                 if (build_log)
                 {
-                    cl_error = clGetProgramBuildInfo(program, device_id, CL_PROGRAM_BUILD_LOG, build_log_size, build_log, NULL);
+                    cl_error = clGetProgramBuildInfo(program, device_id, CL_PROGRAM_BUILD_LOG, build_log_size, build_log, NULL);                    
+                    
+                    if(!cl_error)
+                    {
+                        handle_ocl_build_log(build_log,                                          
+                                             build_options_string,
+                                             build_status,
+                                             _generic_main_kernel_
+                                            );
+                    }
                     
                     // Free buildLog buffer
                     free(build_log);
