@@ -535,7 +535,7 @@ __kernel void test
                                 /* avoid NaN for excluded pairs at r=0 */
                                 r2      += (1.0f - int_bit) * NBNXN_AVOID_SING_R2_INC;
 
-                                //inv_r   = rsqrt(r2);
+                                inv_r   = rsqrt(r2);
                                 inv_r2  = inv_r * inv_r;
                                 inv_r6  = inv_r2 * inv_r2 * inv_r2;
 #if defined EXCLUSION_FORCES
