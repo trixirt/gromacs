@@ -238,71 +238,199 @@ void get_ocl_gpu_device_info_string(char gmx_unused *s, const gmx_gpu_info_t gmx
 #define SEPARATOR '\\'
 #endif 
 
+typedef enum{
+    _invalid_option_          =0,
+    _amd_cpp_                   ,
+    _nvdia_verbose_ptxas_       ,
+    _generic_cl11_        ,
+    _generic_cl12_        ,
+    _generic_fast_relaxed_math_ ,
+    _generic_debug_compilation_ ,
+    _include_install_opencl_dir_,
+    _include_source_opencl_dirs_,
+    _num_build_options_
+} build_options_index_t;
+
+#define BUILD_INC_PATH(PATH) "-I"PATH
+
+static const char* build_options_list[] = {
+    "",
+    "-x clc++",
+    "-cl-nv-verbose",
+    "-cl-std=CL1.1",
+    "-cl-std=CL1.2",
+    "-cl-fast-relaxed-math",
+    "-cl-opt-disable",
+    "-I"OCL_INSTALL_DIR_NAME,
+    "-I../../src/gromacs/gmxlib/ocl_tools -I../../src/gromacs/mdlib/nbnxn_ocl -I../../src/gromacs/pbcutil"
+};
+    
+
+static const char* get_ocl_build_option(build_options_index_t build_option_id)
+{
+    if(build_option_id<_num_build_options_)
+        return build_options_list[build_option_id];
+    else
+        return build_options_list[_invalid_option_];
+}
+
+static const size_t get_ocl_build_option_length(build_options_index_t build_option_id)
+{
+    if(build_option_id<_num_build_options_)
+        return strlen(build_options_list[build_option_id]);
+    else
+        return strlen(build_options_list[_invalid_option_]);
+}
+
+static size_t
+create_ocl_build_options_length(ocl_gpu_info_ptr_t ocl_gpu,
+                         const char * custom_build_options_prepend,
+                         const char * custom_build_options_append)
+{
+    size_t build_options_length = 0;
+    size_t whitespace = 1;
+    
+    if(custom_build_options_prepend)
+        build_options_length += strlen(custom_build_options_prepend)+whitespace;
+    
+    if (!strcmp(ocl_gpu->device_vendor,"Advanced Micro Devices, Inc.") )
+        build_options_length += get_ocl_build_option_length(_amd_cpp_)+whitespace;        
+
+    build_options_length += get_ocl_build_option_length(_include_install_opencl_dir_)+whitespace;
+    build_options_length += get_ocl_build_option_length(_include_source_opencl_dirs_)+whitespace;    
+    
+    if(custom_build_options_append)
+        build_options_length += strlen(custom_build_options_append)+whitespace;    
+    
+    return build_options_length+1;
+}
+
+static void 
+create_ocl_build_options(char * build_options_string,
+                         size_t build_options_length,
+                         ocl_gpu_info_ptr_t ocl_gpu,
+                         const char * custom_build_options_prepend,
+                         const char * custom_build_options_append)
+{
+    //cl_device_type device_type;
+    //clGetDeviceInfo(ocl_gpu->ocl_gpu_id.ocl_device_id, CL_DEVICE_TYPE, sizeof(cl_device_type), &device_type, NULL);  
+    size_t char_added=0;
+    
+    if(custom_build_options_prepend)
+    {
+        strncpy( build_options_string+char_added, 
+                 custom_build_options_prepend, 
+                 strlen(custom_build_options_prepend));
+        
+        char_added += strlen(custom_build_options_prepend);
+        build_options_string[char_added++] =' ';
+    }    
+    
+    if (!strcmp(ocl_gpu->device_vendor,"Advanced Micro Devices, Inc.") )
+    {
+        strncpy( build_options_string+char_added, 
+                 get_ocl_build_option(_amd_cpp_),
+                 get_ocl_build_option_length(_amd_cpp_) );
+        
+        char_added += get_ocl_build_option_length(_amd_cpp_);        
+        build_options_string[char_added++]=' ';
+    }
+    
+    strncpy( build_options_string+char_added,
+             get_ocl_build_option(_include_install_opencl_dir_),
+             get_ocl_build_option_length(_include_install_opencl_dir_)
+    );
+    char_added += get_ocl_build_option_length(_include_install_opencl_dir_);
+    build_options_string[char_added++]=' ';
+    
+    strncpy( build_options_string+char_added,
+             get_ocl_build_option(_include_source_opencl_dirs_),
+             get_ocl_build_option_length(_include_source_opencl_dirs_)
+    );
+    char_added += get_ocl_build_option_length(_include_source_opencl_dirs_);
+    build_options_string[char_added++]=' ';    
+    
+    if(custom_build_options_append)
+    {
+        strncpy( build_options_string+char_added, 
+                 custom_build_options_append, 
+                 strlen(custom_build_options_append) );
+        
+        char_added += strlen(custom_build_options_append);         
+        build_options_string[char_added++]=' ';        
+    }
+    
+    build_options_string[char_added++] = '\0';
+    
+    assert(char_added == build_options_length);
+    
+}
+
 typedef enum{ 
-    _generic_main_kernel_source_ = 0     
-} kernel_source_index_t;
+    _generic_main_kernel_ = 0,
+    _num_kernels_
+} kernel_filename_index_t;
 
 /* TODO to structure .. */
-static const char*      kernel_sources[]         = {"nbnxn_ocl_kernel_nvidia.clh"};
-static const size_t     kernel_sources_lengths[] = {28};
-static const int        n_kernel_sources         = 1;
+static const char*      kernel_filenames[]         = {"nbnxn_ocl_kernel_nvidia.clh"};
+static const size_t     kernel_filenames_lengths[] = {28};
 
 /* TODO comments .. */
-static size_t  get_ocl_kernel_source_path_length(kernel_source_index_t kernel_src)
+static size_t  get_ocl_kernel_source_file_info(kernel_filename_index_t kernel_src_id)
 {
-    char * filepath=NULL;
-    if( (filepath = getenv("OCL_FILE_PATH")) != NULL) return strlen(filepath + 1);
+    char * kernel_filename=NULL;
+    if( (kernel_filename = getenv("OCL_FILE_PATH")) != NULL) return strlen(kernel_filename + 1);
     else
     {
         /* Note we add 1 for the separator and 1 for the termination null char in the resulting string */
-        return( kernel_sources_lengths[kernel_src] + strlen(OCL_INSTALL_DIR_NAME) + 2);    
+        return( kernel_filenames_lengths[kernel_src_id] + strlen(OCL_INSTALL_DIR_NAME) + 2);    
     }
 }
 
 /* TODO comments .. */
 static void get_ocl_kernel_source_path(
-    char * ocl_source_path,
-    kernel_source_index_t kernel_src, 
-    size_t path_length
+    char * ocl_kernel_filename,
+    kernel_filename_index_t kernel_src_id, 
+    size_t kernel_filename_len
 )
 {
-    char *filepath = NULL;   
+    char *filename = NULL;   
 
-    assert(path_length != 0);
-    assert(ocl_source_path != NULL);        
+    assert(kernel_filename_len != 0);
+    assert(ocl_kernel_filename != NULL);        
     
-    if( (filepath = getenv("OCL_FILE_PATH")) != NULL)
+    if( (filename = getenv("OCL_FILE_PATH")) != NULL)
     {
         FILE *file_ok = NULL;        
         
         //Try to open the file to check that it exists
-        file_ok = fopen(filepath,"rb");
+        file_ok = fopen(filename,"rb");
         if( file_ok )
         {
             fclose(file_ok);
-            strncpy(ocl_source_path, filepath, strlen(filepath));
-            ocl_source_path[strlen(filepath)] = '\0';
+            strncpy(ocl_kernel_filename, filename, strlen(filename));
+            ocl_kernel_filename[strlen(filename)] = '\0';
         }else
         {
             printf("Warning, you seem to have misconfigured the OCL_FILE_PATH environent variable: %s\n",
-                filepath);
+                filename);
         }
     }else
     {
         size_t chars_copied = 0;
-        strncpy(ocl_source_path, OCL_INSTALL_DIR_NAME, strlen(OCL_INSTALL_DIR_NAME));  
+        strncpy(ocl_kernel_filename, OCL_INSTALL_DIR_NAME, strlen(OCL_INSTALL_DIR_NAME));  
         chars_copied += strlen(OCL_INSTALL_DIR_NAME);
         
-        ocl_source_path[chars_copied++] = SEPARATOR;
+        ocl_kernel_filename[chars_copied++] = SEPARATOR;
         
-        strncpy(&ocl_source_path[chars_copied], 
-                kernel_sources[kernel_src], 
-                kernel_sources_lengths[kernel_src]);
-        chars_copied += kernel_sources_lengths[kernel_src];
+        strncpy(&ocl_kernel_filename[chars_copied], 
+                kernel_filenames[kernel_src_id], 
+                kernel_filenames_lengths[kernel_src_id]);
+        chars_copied += kernel_filenames_lengths[kernel_src_id];
         
-        ocl_source_path[chars_copied++] = '\0';
+        ocl_kernel_filename[chars_copied++] = '\0';
         
-        assert(chars_copied == path_length);
+        assert(chars_copied == kernel_filename_len);
         
     }
 }
@@ -362,10 +490,10 @@ gmx_bool init_ocl_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
     int retval;
 
     char* ocl_source;
-    char* ocl_source_path;
+    char* kernel_filename;
     
     size_t ocl_source_length;
-    size_t path_length;
+    size_t kernel_filename_len;
 
     assert(gpu_info);
     assert(result_str);
@@ -378,16 +506,16 @@ gmx_bool init_ocl_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
     while (1)
     {
     
-        path_length = get_ocl_kernel_source_path_length(_generic_main_kernel_source_);
-        if(path_length) ocl_source_path = (char*)alloca(path_length);
+        kernel_filename_len = get_ocl_kernel_source_file_info(_generic_main_kernel_);
+        if(kernel_filename_len) kernel_filename = (char*)alloca(kernel_filename_len);
     
-        get_ocl_kernel_source_path(ocl_source_path, _generic_main_kernel_source_, path_length);                       
+        get_ocl_kernel_source_path(kernel_filename, _generic_main_kernel_, kernel_filename_len);                       
         
-        ocl_source = load_ocl_source(ocl_source_path, &ocl_source_length);
+        ocl_source = load_ocl_source(kernel_filename, &kernel_filename_len);
                 
         if (!ocl_source)
         {            
-            sprintf(result_str, "Error loading OpenCL code %s",ocl_source_path);
+            sprintf(result_str, "Error loading OpenCL code %s",kernel_filename);
             break;
         }        
         
@@ -416,17 +544,29 @@ gmx_bool init_ocl_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
             break;
 
         // Build the program
-        {		
+        {
+            
+            // Anca, how to add manually the includes:
+            // const char * custom_build_options_prepend = 
+            //      "-I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\mdlib\\nbnxn_ocl\\ -I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\pbcutil\\ -I C:\\Anca\\SC\\gromacs\\gromacs\\src\\ -I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\legacyheaders\\ -I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\mdlib\\"
+            // 
+            
+            size_t build_options_length = 
+                create_ocl_build_options_length(selected_ocl_gpu,NULL,NULL);
+             
+            char * build_options_string = (char *)alloca(build_options_length);
+            
+            create_ocl_build_options(build_options_string,
+                                     build_options_length,
+                                     selected_ocl_gpu,NULL,NULL);
+          
             size_t build_log_size       = 0;
             cl_int build_status         = CL_SUCCESS;
-            //TODO Extend the compiler to automatically append needed flags
-            //-x clc++ for AMD platform to allow function overloading
-            const char * build_options  = "-Iopencl -x clc++";
             
             //cl_error = clBuildProgram(program, 0, NULL, "-cl-fast-relaxed-math", NULL, NULL);
             //cl_error = clBuildProgram(program, 0, NULL, "-I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\mdlib\\nbnxn_ocl\\ -I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\pbcutil\\ -I C:\\Anca\\SC\\gromacs\\gromacs\\src -I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\legacyheaders -I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\mdlib", NULL, NULL);        
             //cl_error = clBuildProgram(program, 0, NULL, "-I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\mdlib\\nbnxn_ocl\\ -I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\pbcutil\\ -I C:\\Anca\\SC\\gromacs\\gromacs\\src\\ -I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\legacyheaders\\ -I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\mdlib\\", NULL, NULL);        
-            build_status = clBuildProgram(program, 0, NULL, build_options, NULL, NULL);        
+            build_status = clBuildProgram(program, 0, NULL, build_options_string, NULL, NULL);        
             
             // Do not fail now if the compilation fails. Dump the LOG and then fail.
             CALLOCLFUNC_LOGERROR(build_status, result_str, retval);
