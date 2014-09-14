@@ -226,15 +226,97 @@ void get_ocl_gpu_device_info_string(char gmx_unused *s, const gmx_gpu_info_t gmx
 
 //#define OCL_FILE_PATH "C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\mdlib\\nbnxn_ocl\\nbnxn_ocl_kernels.cl"
 //#define OCL_FILE_PATH "C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\gmxlib\\ocl_tools\\vectype_ops.clh"
-#define OCL_FILE_PATH "C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\mdlib\\nbnxn_ocl\\nbnxn_ocl_kernel_nvidia.clh"
+//#define OCL_FILE_PATH "C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\mdlib\\nbnxn_ocl\\nbnxn_ocl_kernel_nvidia.clh"
 
+#if !defined(OCL_INSTALL_DIR_NAME)
+#pragma error "OCL_INSTALL_DIR_NAME has not been defined"
+#endif
+
+#if defined(__linux__) || (defined(__APPLE__)&&defined(__MACH__))
+#define SEPARATOR '/'
+#elif defined(_WIN32)
+#define SEPARATOR '\\'
+#endif 
+
+typedef enum{ 
+    _generic_main_kernel_source_ = 0     
+} kernel_source_index_t;
+
+/* TODO to structure .. */
+static const char*      kernel_sources[]         = {"nbnxn_ocl_kernel_nvidia.clh"};
+static const size_t     kernel_sources_lengths[] = {28};
+static const int        n_kernel_sources         = 1;
+
+/* TODO comments .. */
+static size_t  get_ocl_kernel_source_path_length(kernel_source_index_t kernel_src)
+{
+    if( getenv("OCL_FILE_PATH") != NULL) return 0;
+    else
+    {
+        /* Note we add 1 for the separator and 1 for the termination null char in the resulting string */
+        return( kernel_sources_lengths[kernel_src] + strlen(OCL_INSTALL_DIR_NAME) + 2);    
+    }
+}
+
+/* TODO comments .. */
+static void get_ocl_kernel_source_path(
+    char * ocl_source_path,
+    kernel_source_index_t kernel_src, 
+    size_t path_length
+)
+{
+    char *filepath = NULL;   
+    
+    if( (filepath = getenv("OCL_FILE_PATH")) != NULL)
+    {
+        FILE *file_ok = NULL;
+        
+        assert(path_length == 0);
+        assert(ocl_source_path == NULL);
+        
+        //Try to open the file to check that it exists
+        file_ok = fopen(filepath,"rb");
+        if( file_ok )
+        {
+            fclose(file_ok);
+            ocl_source_path = filepath;
+        }else
+        {
+            printf("Warning, you seem to have misconfigured the OCL_FILE_PATH environent variable: %s\n",
+                filepath);
+        }
+    }else
+    {
+        size_t chars_copied = 0;
+        strncpy(ocl_source_path, OCL_INSTALL_DIR_NAME, strlen(OCL_INSTALL_DIR_NAME));  
+        chars_copied += strlen(OCL_INSTALL_DIR_NAME);
+        
+        ocl_source_path[chars_copied++] = SEPARATOR;
+        
+        strncpy(&ocl_source_path[chars_copied], 
+                kernel_sources[kernel_src], 
+                kernel_sources_lengths[kernel_src]);
+        chars_copied += kernel_sources_lengths[kernel_src];
+        
+        ocl_source_path[chars_copied++] = '\0';
+        
+        assert(chars_copied == path_length);
+        
+    }
+}
+
+#if defined(__linux__) || (defined(__APPLE__)&&defined(__MACH__))
+#undef SEPARATOR
+#elif defined(_WIN32)
+#undef SEPARATOR
+#endif 
 
 char* load_ocl_source(const char* filename, size_t* p_source_length)
 {    
     FILE* filestream = NULL;
     char* ocl_source;
     size_t source_length;
-
+    
     source_length = 0;
     filestream = fopen(filename, "rb");
     if(!filestream) 
@@ -278,7 +360,10 @@ gmx_bool init_ocl_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
     int retval;
 
     char* ocl_source;
+    char* ocl_source_path;
+    
     size_t ocl_source_length;
+    size_t path_length;
 
     assert(gpu_info);
     assert(result_str);
@@ -290,22 +375,29 @@ gmx_bool init_ocl_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
 
     while (1)
     {
-        ocl_source = load_ocl_source(OCL_FILE_PATH, &ocl_source_length);
+    
+        path_length = get_ocl_kernel_source_path_length(_generic_main_kernel_source_);
+        if(path_length) ocl_source_path = (char*)alloca(path_length);
+    
+        get_ocl_kernel_source_path(ocl_source_path, _generic_main_kernel_source_, path_length);                       
+        
+        ocl_source = load_ocl_source(ocl_source_path, &ocl_source_length);
+                
         if (!ocl_source)
         {            
-            sprintf(result_str, "Error loading OpenCL code");
+            sprintf(result_str, "Error loading OpenCL code %s",ocl_source_path);
             break;
         }        
-
+        
         //gpuid = gpu_info->cuda_dev[gpu_opt->cuda_dev_use[mygpu]].id;
         selected_ocl_gpu = gpu_info->ocl_dev + gpu_opt->ocl_dev_use[mygpu];
         platform_id = selected_ocl_gpu->ocl_gpu_id.ocl_platform_id;
         device_id = selected_ocl_gpu->ocl_gpu_id.ocl_device_id;
-
+        
         context_properties[0] = CL_CONTEXT_PLATFORM;
-	    context_properties[1] = (cl_context_properties)platform_id;
-	    context_properties[2] = 0;
-
+        context_properties[1] = (cl_context_properties)platform_id;
+        context_properties[2] = 0;
+        
         context = clCreateContext(context_properties, 1, &device_id, NULL, NULL, &cl_error);
         CALLOCLFUNC_LOGERROR(cl_error, result_str, retval)
         if (0 != retval)
@@ -321,38 +413,43 @@ gmx_bool init_ocl_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
         if (0 != retval)
             break;
 
-	    // Build the program
-	    {		
-		    size_t build_log_size = 0;
-
-		    //cl_error = clBuildProgram(program, 0, NULL, "-cl-fast-relaxed-math", NULL, NULL);
+        // Build the program
+        {		
+            size_t build_log_size       = 0;
+            cl_int build_status         = CL_SUCCESS;
+            //TODO Extend the compiler to automatically append needed flags
+            //-x clc++ for AMD platform to allow function overloading
+            const char * build_options  = "-Iopencl -x clc++";
+            
+            //cl_error = clBuildProgram(program, 0, NULL, "-cl-fast-relaxed-math", NULL, NULL);
             //cl_error = clBuildProgram(program, 0, NULL, "-I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\mdlib\\nbnxn_ocl\\ -I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\pbcutil\\ -I C:\\Anca\\SC\\gromacs\\gromacs\\src -I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\legacyheaders -I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\mdlib", NULL, NULL);        
-            cl_error = clBuildProgram(program, 0, NULL, "-I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\mdlib\\nbnxn_ocl\\ -I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\pbcutil\\ -I C:\\Anca\\SC\\gromacs\\gromacs\\src\\ -I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\legacyheaders\\ -I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\mdlib\\", NULL, NULL);        
-            CALLOCLFUNC_LOGERROR(cl_error, result_str, retval)
-            if (0 != retval)
-                break;
-
-		    // Get log string size
-		    cl_error = clGetProgramBuildInfo(program, device_id, CL_PROGRAM_BUILD_LOG, 0, NULL, &build_log_size);
-            CALLOCLFUNC_LOGERROR(cl_error, result_str, retval)
-            if (0 != retval)
-                break;
-
-		    if (build_log_size)
-		    {
+            //cl_error = clBuildProgram(program, 0, NULL, "-I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\mdlib\\nbnxn_ocl\\ -I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\pbcutil\\ -I C:\\Anca\\SC\\gromacs\\gromacs\\src\\ -I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\legacyheaders\\ -I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\mdlib\\", NULL, NULL);        
+            build_status = clBuildProgram(program, 0, NULL, build_options, NULL, NULL);        
+            
+            // Do not fail now if the compilation fails. Dump the LOG and then fail.
+            CALLOCLFUNC_LOGERROR(build_status, result_str, retval);
+            
+            // Get log string size
+            cl_error = clGetProgramBuildInfo(program, device_id, CL_PROGRAM_BUILD_LOG, 0, NULL, &build_log_size);
+            //CALLOCLFUNC_LOGERROR(cl_error, result_str, retval);
+            
+            if (build_log_size && (cl_error == CL_SUCCESS) )
+            {
                 char *build_log = NULL;
-
-			    // Allocate memory to fit the build log - it can be very large in case of errors
-			    build_log = (char*)malloc(build_log_size);
-			    if (build_log)
-			    {
-				    cl_error = clGetProgramBuildInfo(program, device_id, CL_PROGRAM_BUILD_LOG, build_log_size, build_log, NULL);
-
-				    // Free buildLog buffer
-				    free(build_log);
-			    }
-		    }
-	    }
+                
+                // Allocate memory to fit the build log - it can be very large in case of errors
+                build_log = (char*)malloc(build_log_size);
+                if (build_log)
+                {
+                    cl_error = clGetProgramBuildInfo(program, device_id, CL_PROGRAM_BUILD_LOG, build_log_size, build_log, NULL);
+                    
+                    // Free buildLog buffer
+                    free(build_log);
+                }
+            }
+            if (0 != retval)
+                break;		    
+        }
 
         {
             //cl_kernel k = clCreateKernel(program, "nbnxn_kernel_ElecCut_VdwLJ_F_prune_opencl", &cl_error);
@@ -364,7 +461,7 @@ gmx_bool init_ocl_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
             kernels = (cl_kernel*)malloc(num_kernels * sizeof(cl_kernel));
             cl_error = clCreateKernelsInProgram(program, num_kernels, kernels, NULL);
 
-            for (int i = 0; i < num_kernels; i++)
+            for (cl_uint i = 0; i < num_kernels; i++)
             {                
                 cl_error = clGetKernelInfo(kernels[i], CL_KERNEL_FUNCTION_NAME,
                     sizeof(kernel_name), &kernel_name, NULL);

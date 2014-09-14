@@ -830,6 +830,8 @@ set(LIB_INSTALL_DIR  ${GMX_LIB_INSTALL_DIR})
 set(BIN_INSTALL_DIR  bin)
 set(DATA_INSTALL_DIR share/${GMX_DATA_INSTALL_DIR})
 set(MAN_INSTALL_DIR  share/man)
+set(OCL_INSTALL_DIR_NAME opencl) #Used as define in the source
+set(OCL_INSTALL_DIR  ${BIN_INSTALL_DIR}/${OCL_INSTALL_DIR_NAME})
 set(INCL_INSTALL_DIR include)
 
 # These variables get written into config.h for use in finding the data

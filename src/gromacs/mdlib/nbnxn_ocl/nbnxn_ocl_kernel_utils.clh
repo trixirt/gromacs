@@ -35,7 +35,7 @@
  
 // Test bench for vectype and kernel_utils
 
-#include "../../gmxlib/ocl_tools/vectype_ops.clh"
+#include "vectype_ops.clh"
 
 #define __IN_OPENCL_KERNEL__
 //////////////////////////////////////#include "nbnxn_ocl_types.h"
@@ -514,7 +514,8 @@ float interpolate_coulomb_force_r(
 /*! Final j-force reduction; this generic implementation works with
  *  arbitrary array sizes.
  */
-static inline __device__
+/* AMD OpenCL compiler error "Undeclared function index 1024" if inlined */
+//static inline __device__
 void reduce_force_j_generic(__local float *f_buf, __global float3 *fout,
                             int tidxi, int tidxj, int aidx)
 {

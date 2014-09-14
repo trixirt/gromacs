@@ -33,8 +33,7 @@
 # the research papers on the package. Check out http://www.gromacs.org.
 
 if(GMX_GPU AND GMX_USE_OPENCL)
-    file(GLOB OPENCL_NB_SOURCES *.cpp)
-    set(MDLIB_SOURCES ${MDLIB_SOURCES} ${OPENCL_NB_SOURCES} PARENT_SCOPE)
-    file(GLOB MDLIB_OPENCL_KERNELS *.cl *.clh)
-    set(MDLIB_OPENCL_KERNELS ${MDLIB_OPENCL_KERNELS} PARENT_SCOPE)
-endif()
+    file(GLOB GMXLIB_OPENCL_KERNELS *.cl *.clh)
+    set(GMXLIB_OPENCL_KERNELS ${GMXLIB_OPENCL_KERNELS} PARENT_SCOPE)    
+endif()    
+

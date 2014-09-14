@@ -47,6 +47,8 @@ if(GMX_GPU AND NOT GMX_USE_OPENCL)
     add_subdirectory(gpu_utils)
 elseif(GMX_GPU AND GMX_USE_OPENCL)
     add_subdirectory(gpu_utils)
+    add_subdirectory(ocl_tools)
+    set(GMXLIB_OPENCL_KERNELS ${GMXLIB_OPENCL_KERNELS} PARENT_SCOPE)    
 endif()
 
 set(GMXLIB_SOURCES ${GMXLIB_SOURCES} ${NONBONDED_SOURCES} PARENT_SCOPE)

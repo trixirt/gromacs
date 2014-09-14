@@ -38,6 +38,7 @@ if(GMX_GPU AND NOT GMX_USE_OPENCL)
     add_subdirectory(nbnxn_cuda)
 elseif(GMX_GPU AND GMX_USE_OPENCL)
     add_subdirectory(nbnxn_ocl)
+    set(MDLIB_OPENCL_KERNELS ${MDLIB_OPENCL_KERNELS} PARENT_SCOPE)    
 endif()
 
 set(MDLIB_SOURCES ${MDLIB_SOURCES} PARENT_SCOPE)

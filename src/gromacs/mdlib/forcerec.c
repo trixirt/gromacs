@@ -2273,7 +2273,9 @@ static void init_nb_verlet(FILE                *fp,
 #ifdef GMX_USE_OPENCL
             //nb_alloc = &pmalloc;
             //nb_free  = &pfree;
-            #pragma message "WARNING allocator not set and kernel_type cannot be _CUDA"
+            nb_alloc = NULL;
+            nb_free  = NULL;            
+            #pragma message "WARNING allocator will be set to non-paged allocator"
 #else
             nb_alloc = &pmalloc;
             nb_free  = &pfree;            
