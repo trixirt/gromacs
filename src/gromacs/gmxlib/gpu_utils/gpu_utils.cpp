@@ -250,7 +250,8 @@ static const int        n_kernel_sources         = 1;
 /* TODO comments .. */
 static size_t  get_ocl_kernel_source_path_length(kernel_source_index_t kernel_src)
 {
-    if( getenv("OCL_FILE_PATH") != NULL) return 0;
+    char * filepath=NULL;
+    if( (filepath = getenv("OCL_FILE_PATH")) != NULL) return strlen(filepath + 1);
     else
     {
         /* Note we add 1 for the separator and 1 for the termination null char in the resulting string */
@@ -266,20 +267,21 @@ static void get_ocl_kernel_source_path(
 )
 {
     char *filepath = NULL;   
+
+    assert(path_length != 0);
+    assert(ocl_source_path != NULL);        
     
     if( (filepath = getenv("OCL_FILE_PATH")) != NULL)
     {
-        FILE *file_ok = NULL;
-        
-        assert(path_length == 0);
-        assert(ocl_source_path == NULL);
+        FILE *file_ok = NULL;        
         
         //Try to open the file to check that it exists
         file_ok = fopen(filepath,"rb");
         if( file_ok )
         {
             fclose(file_ok);
-            ocl_source_path = filepath;
+            strncpy(ocl_source_path, filepath, strlen(filepath));
+            ocl_source_path[strlen(filepath)] = '\0';
         }else
         {
             printf("Warning, you seem to have misconfigured the OCL_FILE_PATH environent variable: %s\n",
