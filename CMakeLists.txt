@@ -298,6 +298,7 @@ option(GMX_LOAD_PLUGINS "Compile with plugin support, needed to read VMD support
 mark_as_advanced(GMX_LOAD_PLUGINS)
 
 option(GMX_GPU  "Enable GPU acceleration" ON)
+option(GMX_USE_OPENCL "Enable OpenCL accelerators" OFF)
 option(GMX_OPENMP "Enable OpenMP-based multithreading" ON)
 
 option(GMX_USE_TNG "Use the TNG library for trajectory I/O" ON)

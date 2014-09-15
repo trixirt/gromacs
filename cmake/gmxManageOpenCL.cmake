@@ -56,10 +56,9 @@ endif()
 # detect OpenCL devices in the build host machine
 if (GMX_USE_OPENCL AND NOT GMX_OPENCL_DETECTION_DONE)
     include(gmxDetectGpu)
-    gmx_detect_OpenCL()
+    #gmx_detect_OpenCL()
+	gmx_find_OpenCL()	
 endif()
-
-message(STATUS "gmx_detect_OpenCL set GMX_DETECT_OPENCL_AVAILABLE: " ${GMX_DETECT_OPENCL_AVAILABLE})
 
 #Now configure necessary paths
 if (GMX_USE_OPENCL AND GMX_DETECT_OPENCL_AVAILABLE)
@@ -71,21 +70,16 @@ if (GMX_USE_OPENCL AND GMX_DETECT_OPENCL_AVAILABLE)
     #4: In Gromacs    
     if(GMX_OPENCL_FORCE_LOCAL_HEADERS)
         set(OPENCL_INCLUDE_DIRS ../src)
-    else()    
-        find_path(OPENCL_INCLUDE_DIRS NAMES CL/opencl.h CL/cl.h CL/cl_platform.h CL/cl_ext.h 
-        PATHS ../src /usr/local/cuda/include /opt/AMDAPP/include /opt/intel/opencl*/include
-        ${CUDA_INC_PATH} ${AMDAPPSDKROOT}/include ${INTELOCLSDKROOT}/include
-        )  
-    endif()
+	endif(GMX_OPENCL_FORCE_LOCAL_HEADERS)
     
     if(GMX_OPENCL_FORCE_CL11_API)
         set(OPENCL_DEFINITIONS "-DCL_USE_DEPRECATED_OPENCL_1_1_APIS")
     endif(GMX_OPENCL_FORCE_CL11_API)
     
-    set(OPENCL_DEFINITIONS "${OPENCL_DEFINITIONS} -Wno-comments")
-    
-    find_library(OPENCL_LIBRARIES OpenCL)
-    
+	if(NOT WIN32)
+		set(OPENCL_DEFINITIONS "${OPENCL_DEFINITIONS} -Wno-comments")
+	endif()
+
     message(STATUS "OpenCL lib: " ${OPENCL_LIBRARIES} ", PATH: " ${OPENCL_INCLUDE_DIRS} ", DEFINITIONS: " ${OPENCL_DEFINITIONS})
     set(OPENCL_FOUND TRUE)
     
