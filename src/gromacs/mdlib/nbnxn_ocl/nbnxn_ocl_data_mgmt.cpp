@@ -38,9 +38,7 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
-
-#include <cuda.h>
-#include <cuda_runtime_api.h>
+#include <math.h>
 
 #include "tables.h"
 #include "typedefs.h"
@@ -52,12 +50,8 @@
 #include "gmx_detect_hardware.h"
 
 //#include "nbnxn_cuda_types.h"
-#include "../nbnxn_cuda/nbnxn_cuda_types.h"
 #include "../nbnxn_ocl/nbnxn_ocl_types.h"
-#include "../../gmxlib/cuda_tools/cudautils.cuh"
-#include "gromacs/mdlib/nbnxn_cuda/nbnxn_cuda_data_mgmt.h"
 #include "gromacs/mdlib/nbnxn_ocl/nbnxn_ocl_data_mgmt.h"
-#include "pmalloc_cuda.h"
 #include "gpu_utils.h"
 
 #include "gromacs/pbcutil/ishift.h"
@@ -66,6 +60,9 @@
 #include "gromacs/utility/fatalerror.h"
 #include "gromacs/utility/smalloc.h"
 
+#pragma message "WARNING pmalloc not implemented yet"    
+#define pmalloc(...)
+
 static bool bUseCudaEventBlockingSync = false; /* makes the CPU thread block */
 
 /* This is a heuristically determined parameter for the Fermi architecture for
@@ -73,12 +70,6 @@ static bool bUseCudaEventBlockingSync = false; /* makes the CPU thread block */
  * multiprocessors on the current device.
  */
 static unsigned int gpu_min_ci_balanced_factor = 40;
-
-/* Functions from nbnxn_cuda.cu */
-extern void nbnxn_cuda_set_cacheconfig(cuda_dev_info_t *devinfo);
-//extern const struct texture<float, 1, cudaReadModeElementType> &nbnxn_cuda_get_nbfp_texref();
-//extern const struct texture<float, 1, cudaReadModeElementType> &nbnxn_cuda_get_nbfp_comb_texref();
-//extern const struct texture<float, 1, cudaReadModeElementType> &nbnxn_cuda_get_coulomb_tab_texref();
 
 /* We should actually be using md_print_warn in md_logging.c,
  * but we can't include mpi.h in CUDA code.
@@ -223,7 +214,6 @@ void ocl_realloc_buffered(cl_mem *d_dest, void *h_src,
                          cl_command_queue s,                         
                          bool bAsync = true)
 {
-    cudaError_t stat;
     cl_int cl_error;
 
     if (d_dest == NULL || req_size < 0)
@@ -280,7 +270,6 @@ static void init_ewald_coulomb_force_table(//cu_nbparam_t          *nbp,
     cl_mem coul_tab;
     int          tabsize;
     double       tabscale;
-    cudaError_t  stat;
 
     cl_int cl_error;
 
@@ -358,20 +347,19 @@ static void init_ewald_coulomb_force_table(//cu_nbparam_t          *nbp,
     pair-search. */
 static void init_atomdata_first(/*cu_atomdata_t*/cl_atomdata_t *ad, int ntypes, ocl_gpu_info_t *dev_info)
 {
-    cudaError_t stat;
     cl_int cl_error;
 
     ad->ntypes  = ntypes;
 
     //stat        = cudaMalloc((void**)&ad->shift_vec, SHIFTS*sizeof(*ad->shift_vec));
     //CU_RET_ERR(stat, "cudaMalloc failed on ad->shift_vec");
-    ad->shift_vec = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, SHIFTS * sizeof(float3), NULL, &cl_error);
+    ad->shift_vec = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, SHIFTS * sizeof(cl_float3), NULL, &cl_error);
     ad->bShiftVecUploaded = false;
     // TO DO: handle errors, check clCreateBuffer flags
 
     //stat = cudaMalloc((void**)&ad->fshift, SHIFTS*sizeof(*ad->fshift));
     //CU_RET_ERR(stat, "cudaMalloc failed on ad->fshift");
-    ad->fshift = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, SHIFTS * sizeof(float3), NULL, &cl_error);
+    ad->fshift = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, SHIFTS * sizeof(cl_float3), NULL, &cl_error);
     // TO DO: handle errors, check clCreateBuffer flags
 
     //stat = cudaMalloc((void**)&ad->e_lj, sizeof(*ad->e_lj));
@@ -439,11 +427,11 @@ static int pick_ewald_kernel_type(bool                   bTwinCut,
        forces it (use it for debugging/benchmarking only). */
     if (!bTwinCut && (getenv("GMX_CUDA_NB_EWALD_TWINCUT") == NULL))
     {
-        kernel_type = bUseAnalyticalEwald ? eelCuEWALD_ANA : eelCuEWALD_TAB;
+        kernel_type = bUseAnalyticalEwald ? eelOclEWALD_ANA : eelOclEWALD_TAB;
     }
     else
     {
-        kernel_type = bUseAnalyticalEwald ? eelCuEWALD_ANA_TWIN : eelCuEWALD_TAB_TWIN;
+        kernel_type = bUseAnalyticalEwald ? eelOclEWALD_ANA_TWIN : eelOclEWALD_TAB_TWIN;
     }
 
     return kernel_type;
@@ -478,9 +466,8 @@ static void init_nbparam(/*cu_nbparam_t*/cl_nbparam_t  *nbp,
                          const nbnxn_atomdata_t    *nbat,
                          const /*cuda_dev_info_t*/ocl_gpu_info_t     *dev_info)
 {
-    cudaError_t stat;
     int         ntypes, nnbfp, nnbfp_comb;
-    cl_int cl_error;
+    cl_int      cl_error;
 
 
     ntypes  = nbat->ntype;
@@ -493,13 +480,13 @@ static void init_nbparam(/*cu_nbparam_t*/cl_nbparam_t  *nbp,
         {
             case eintmodNONE:
             case eintmodPOTSHIFT:
-                nbp->vdwtype = evdwCuCUT;
+                nbp->vdwtype = evdwOclCUT;
                 break;
             case eintmodFORCESWITCH:
-                nbp->vdwtype = evdwCuFSWITCH;
+                nbp->vdwtype = evdwOclFSWITCH;
                 break;
             case eintmodPOTSWITCH:
-                nbp->vdwtype = evdwCuPSWITCH;
+                nbp->vdwtype = evdwOclPSWITCH;
                 break;
             default:
                 gmx_incons("The requested VdW interaction modifier is not implemented in the CUDA GPU accelerated kernels!");
@@ -511,12 +498,12 @@ static void init_nbparam(/*cu_nbparam_t*/cl_nbparam_t  *nbp,
         if (ic->ljpme_comb_rule == ljcrGEOM)
         {
             assert(nbat->comb_rule == ljcrGEOM);
-            nbp->vdwtype = evdwCuEWALDGEOM;
+            nbp->vdwtype = evdwOclEWALDGEOM;
         }
         else
         {
             assert(nbat->comb_rule == ljcrLB);
-            nbp->vdwtype = evdwCuEWALDLB;
+            nbp->vdwtype = evdwOclEWALDLB;
         }
     }
     else
@@ -526,11 +513,11 @@ static void init_nbparam(/*cu_nbparam_t*/cl_nbparam_t  *nbp,
 
     if (ic->eeltype == eelCUT)
     {
-        nbp->eeltype = eelCuCUT;
+        nbp->eeltype = eelOclCUT;
     }
     else if (EEL_RF(ic->eeltype))
     {
-        nbp->eeltype = eelCuRF;
+        nbp->eeltype = eelOclRF;
     }
     else if ((EEL_PME(ic->eeltype) || ic->eeltype == eelEWALD))
     {
@@ -545,7 +532,7 @@ static void init_nbparam(/*cu_nbparam_t*/cl_nbparam_t  *nbp,
 
     /* generate table for PME */
     nbp->coulomb_tab_climg2d = NULL;
-    if (nbp->eeltype == eelCuEWALD_TAB || nbp->eeltype == eelCuEWALD_TAB_TWIN)
+    if (nbp->eeltype == eelOclEWALD_TAB || nbp->eeltype == eelOclEWALD_TAB_TWIN)
     {
         init_ewald_coulomb_force_table(nbp, dev_info);
     }
@@ -784,10 +771,9 @@ void nbnxn_ocl_init(FILE                 *fplog,
                      int                   my_gpu_index,
                      gmx_bool              bLocalAndNonlocal)
 {
-    cl_int cl_error;
-    cudaError_t       stat;
     //nbnxn_cuda_ptr_t  nb;
     nbnxn_opencl_ptr_t  nb;
+    cl_int            cl_error;    
     char              sbuf[STRLEN];
     bool              bStreamSync, bNoStreamSync, bTMPIAtomics, bX86, bOldDriver;
     int               cuda_drv_ver;
@@ -909,10 +895,13 @@ void nbnxn_ocl_init(FILE                 *fplog,
         gmx_fatal(FARGS, "Conflicting environment variables: both GMX_CUDA_STREAMSYNC and GMX_NO_CUDA_STREAMSYNC defined");
     }
 
+/*
     stat = cudaDriverGetVersion(&cuda_drv_ver);
     CU_RET_ERR(stat, "cudaDriverGetVersion failed");
 
     bOldDriver = (cuda_drv_ver < 5000);
+*/
+    bOldDriver = CL_FALSE; //??
 
     // TO DO: fix the below code for OpenCL
     //////////if ((nb->dev_info->prop.ECCEnabled == 1) && bOldDriver)
@@ -1027,7 +1016,6 @@ void nbnxn_ocl_init_pairlist(nbnxn_opencl_ptr_t        ocl_nb,
                               int                     iloc)
 {
     char          sbuf[STRLEN];
-    cudaError_t   stat;
     bool          bDoTime    = ocl_nb->bDoTime;
     //cudaStream_t  stream     = cu_nb->stream[iloc];
     cl_command_queue stream     = ocl_nb->stream[iloc];
@@ -1105,12 +1093,13 @@ void nbnxn_ocl_upload_shiftvec(nbnxn_opencl_ptr_t        ocl_nb,
     if (nbatom->bDynamicBox || !adat->bShiftVecUploaded)
     {
         ocl_copy_H2D_async(adat->shift_vec, nbatom->shift_vec, 0,
-                          SHIFTS * sizeof(float3), ls, NULL);
+                          SHIFTS * sizeof(cl_float3), ls, NULL);
         adat->bShiftVecUploaded = true;
     }
 }
 
 /*! Clears the first natoms_clear elements of the GPU nonbonded force output array. */
+/*
 static void nbnxn_cuda_clear_f(nbnxn_cuda_ptr_t cu_nb, int natoms_clear)
 {
     cudaError_t    stat;
@@ -1119,25 +1108,25 @@ static void nbnxn_cuda_clear_f(nbnxn_cuda_ptr_t cu_nb, int natoms_clear)
 
     stat = cudaMemsetAsync(adat->f, 0, natoms_clear * sizeof(*adat->f), ls);
     CU_RET_ERR(stat, "cudaMemsetAsync on f falied");
-}
+}*/
 
 /*! Clears nonbonded shift force output array and energy outputs on the GPU. */
-static void nbnxn_cuda_clear_e_fshift(nbnxn_opencl_ptr_t cu_nb)
-    //nbnxn_cuda_ptr_t cu_nb)
-{
-    cudaError_t    stat;
-    /*cu_atomdata_t*/cl_atomdata_t *adat  = cu_nb->atdat;
-    /*cudaStream_t*/cl_command_queue  ls    = cu_nb->stream[eintLocal];
-
-    // TO DO: Launch kernels to set to 0 the three buffers below
-
-    //stat = cudaMemsetAsync(adat->fshift, 0, SHIFTS * sizeof(*adat->fshift), ls);
-    //CU_RET_ERR(stat, "cudaMemsetAsync on fshift falied");
-    //stat = cudaMemsetAsync(adat->e_lj, 0, sizeof(*adat->e_lj), ls);
-    //CU_RET_ERR(stat, "cudaMemsetAsync on e_lj falied");
-    //stat = cudaMemsetAsync(adat->e_el, 0, sizeof(*adat->e_el), ls);
-    //CU_RET_ERR(stat, "cudaMemsetAsync on e_el falied");
-}
+//static void nbnxn_cuda_clear_e_fshift(nbnxn_opencl_ptr_t cu_nb)
+//    //nbnxn_cuda_ptr_t cu_nb)
+//{
+//    cudaError_t    stat;
+//    /*cu_atomdata_t*/cl_atomdata_t *adat  = cu_nb->atdat;
+//    /*cudaStream_t*/cl_command_queue  ls    = cu_nb->stream[eintLocal];
+//
+//    // TO DO: Launch kernels to set to 0 the three buffers below
+//
+//    //stat = cudaMemsetAsync(adat->fshift, 0, SHIFTS * sizeof(*adat->fshift), ls);
+//    //CU_RET_ERR(stat, "cudaMemsetAsync on fshift falied");
+//    //stat = cudaMemsetAsync(adat->e_lj, 0, sizeof(*adat->e_lj), ls);
+//    //CU_RET_ERR(stat, "cudaMemsetAsync on e_lj falied");
+//    //stat = cudaMemsetAsync(adat->e_el, 0, sizeof(*adat->e_el), ls);
+//    //CU_RET_ERR(stat, "cudaMemsetAsync on e_el falied");
+//}
 
 ////void nbnxn_cuda_clear_outputs(nbnxn_cuda_ptr_t cu_nb, int flags)
 ////{
@@ -1170,8 +1159,7 @@ static void nbnxn_ocl_clear_f(nbnxn_opencl_ptr_t cu_nb, int natoms_clear)
 void nbnxn_ocl_init_atomdata(nbnxn_opencl_ptr_t        ocl_nb,
                               const nbnxn_atomdata_t *nbat)
 {
-    cl_int cl_error;
-    cudaError_t    stat;
+    cl_int         cl_error;
     int            nalloc, natoms;
     bool           realloced;
     bool           bDoTime   = ocl_nb->bDoTime;
@@ -1213,12 +1201,12 @@ void nbnxn_ocl_init_atomdata(nbnxn_opencl_ptr_t        ocl_nb,
 
         //stat = cudaMalloc((void **)&d_atdat->f, nalloc*sizeof(*d_atdat->f));
         //CU_RET_ERR(stat, "cudaMalloc failed on d_atdat->f");
-        d_atdat->f = clCreateBuffer(ocl_nb->dev_info->context, CL_MEM_READ_WRITE, nalloc * sizeof(float3), NULL, &cl_error);
+        d_atdat->f = clCreateBuffer(ocl_nb->dev_info->context, CL_MEM_READ_WRITE, nalloc * sizeof(cl_float3), NULL, &cl_error);
         // TO DO: handle errors, check clCreateBuffer flags
 
         //stat = cudaMalloc((void **)&d_atdat->xq, nalloc*sizeof(*d_atdat->xq));
         //CU_RET_ERR(stat, "cudaMalloc failed on d_atdat->xq");
-        d_atdat->xq = clCreateBuffer(ocl_nb->dev_info->context, CL_MEM_READ_WRITE, nalloc * sizeof(float4), NULL, &cl_error);
+        d_atdat->xq = clCreateBuffer(ocl_nb->dev_info->context, CL_MEM_READ_WRITE, nalloc * sizeof(cl_float4), NULL, &cl_error);
         // TO DO: handle errors, check clCreateBuffer flags
 
         //stat = cudaMalloc((void **)&d_atdat->atom_types, nalloc*sizeof(*d_atdat->atom_types));

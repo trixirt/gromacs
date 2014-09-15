@@ -1166,7 +1166,7 @@ void do_force_cutsVERLET(FILE *fplog, t_commrec *cr,
         wallcycle_start_nocount(wcycle, ewcLAUNCH_GPU_NB);
         if (DOMAINDECOMP(cr) && !bDiffKernels)
         {
-#ifdef GMX_USE_OPENCL
+#if defined(GMX_GPU) && defined(GMX_USE_OPENCL) 
             nbnxn_ocl_launch_cpyback(nbv->ocl_nbv, nbv->grp[eintNonlocal].nbat,
                                       flags, eatNonlocal);
 #else
@@ -1174,7 +1174,7 @@ void do_force_cutsVERLET(FILE *fplog, t_commrec *cr,
                                       flags, eatNonlocal);
 #endif
         }
-#ifdef GMX_USE_OPENCL
+#if defined(GMX_GPU) && defined(GMX_USE_OPENCL) 
         nbnxn_ocl_launch_cpyback(nbv->ocl_nbv, nbv->grp[eintLocal].nbat,
                                   flags, eatLocal);
 #else
@@ -1414,11 +1414,20 @@ void do_force_cutsVERLET(FILE *fplog, t_commrec *cr,
                 float cycles_tmp;
 
                 wallcycle_start(wcycle, ewcWAIT_GPU_NB_NL);
+#if defined(GMX_GPU) && !defined(GMX_USE_OPENCL)                        
                 nbnxn_cuda_wait_gpu(nbv->cu_nbv,
                                     nbv->grp[eintNonlocal].nbat,
                                     flags, eatNonlocal,
                                     enerd->grpp.ener[egLJSR], enerd->grpp.ener[egCOULSR],
                                     fr->fshift);
+#elif defined(GMX_GPU) && defined(GMX_USE_OPENCL)    
+#pragma message "WARNING Not implementet yet"                
+                //nbnxn_ocl_wait_gpu(nbv->cu_nbv,
+                //                    nbv->grp[eintNonlocal].nbat,
+                //                    flags, eatNonlocal,
+                //                    enerd->grpp.ener[egLJSR], enerd->grpp.ener[egCOULSR],
+                //                    fr->fshift);
+#endif                
                 cycles_tmp       = wallcycle_stop(wcycle, ewcWAIT_GPU_NB_NL);
                 cycles_wait_gpu += cycles_tmp;
                 cycles_force    += cycles_tmp;
@@ -1475,6 +1484,7 @@ void do_force_cutsVERLET(FILE *fplog, t_commrec *cr,
         /* wait for local forces (or calculate in emulation mode) */
         if (bUseGPU)
         {
+#if defined(GMX_GPU) && !defined(GMX_USE_OPENCL)            
             wallcycle_start(wcycle, ewcWAIT_GPU_NB_L);
             nbnxn_cuda_wait_gpu(nbv->cu_nbv,
                                 nbv->grp[eintLocal].nbat,
@@ -1488,6 +1498,10 @@ void do_force_cutsVERLET(FILE *fplog, t_commrec *cr,
             wallcycle_start_nocount(wcycle, ewcLAUNCH_GPU_NB);
             nbnxn_cuda_clear_outputs(nbv->cu_nbv, flags);
             wallcycle_stop(wcycle, ewcLAUNCH_GPU_NB);
+#elif defined(GMX_GPU) && defined(GMX_USE_OPENCL)    
+#pragma message "WARNING Not implemented yet"    
+
+#endif            
         }
         else
         {
@@ -2746,6 +2760,10 @@ void finish_run(FILE *fplog, t_commrec *cr,
 
     if (SIMMASTER(cr))
     {
+#if defined(GMX_GPU) && defined(GMX_USE_OPENCL)        
+#define nbnxn_cuda_get_timings(...) NULL
+#pragma message "WARNING Not implemented yet"      
+#endif        
         wallclock_gpu_t* gputimes = use_GPU(nbv) ?
             nbnxn_cuda_get_timings(nbv->cu_nbv) : NULL;
         wallcycle_print(fplog, cr->nnodes, cr->npmenodes,

@@ -737,7 +737,7 @@ static void gmx_print_version_info(FILE *fp)
     fprintf(fp, "Boost version:      %d.%d.%d%s\n", BOOST_VERSION / 100000,
             BOOST_VERSION / 100 % 1000, BOOST_VERSION % 100,
             bExternalBoost ? " (external)" : " (internal)");
-#ifdef GMX_GPU
+#if defined(GMX_GPU) && !defined(GMX_USE_OPENCL)
     gmx_print_version_info_gpu(fp);
 #endif
 }

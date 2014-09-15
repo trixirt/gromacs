@@ -81,9 +81,9 @@ extern "C" {
  *  nbnxn_cuda.cu by the nb_*_kfunc_ptr function pointer table
  *  should match the order of enumerated types below.
  */
-//enum eelCu {
-//    eelCuCUT, eelCuRF, eelCuEWALD_TAB, eelCuEWALD_TAB_TWIN, eelCuEWALD_ANA, eelCuEWALD_ANA_TWIN, eelCuNR
-//};
+enum eelOcl {
+    eelOclCUT, eelOclRF, eelOclEWALD_TAB, eelOclEWALD_TAB_TWIN, eelOclEWALD_ANA, eelOclEWALD_ANA_TWIN, eelOclNR
+};
 
 /*! \brief VdW CUDA kernel flavors.
  *
@@ -94,9 +94,9 @@ extern "C" {
  * nbnxn_cuda.cu by the nb_*_kfunc_ptr function pointer table
  * should match the order of enumerated types below.
  */
-//enum evdwCu {
-//    evdwCuCUT, evdwCuFSWITCH, evdwCuPSWITCH, evdwCuEWALDGEOM, evdwCuEWALDLB, evdwCuNR
-//};
+enum evdwOcl {
+    evdwOclCUT, evdwOclFSWITCH, evdwOclPSWITCH, evdwOclEWALDGEOM, evdwOclEWALDLB, evdwOclNR
+};
 
 /* All structs prefixed with "cu_" hold data used in GPU calculations and
  * are passed to the kernels, except cu_timers_t. */
@@ -153,7 +153,7 @@ typedef struct cl_atomdata
 
     //float3  *shift_vec;         /**< shifts                                       */
     cl_mem shift_vec;
-    bool     bShiftVecUploaded; /**< true if the shift vector has been uploaded   */
+    cl_bool     bShiftVecUploaded; /**< true if the shift vector has been uploaded   */
 } cl_atomdata_t;
 
 // Data structure shared between the OpenCL device code and OpenCL host code
@@ -177,8 +177,8 @@ typedef struct cl_atomdata_params
 typedef struct cl_nbparam
 {
 
-    int             eeltype;          /**< type of electrostatics, takes values from #eelCu */
-    int             vdwtype;          /**< type of VdW impl., takes values from #evdwCu     */
+    int             eeltype;          /**< type of electrostatics, takes values from #eelOcl */
+    int             vdwtype;          /**< type of VdW impl., takes values from #evdwOcl     */
 
     float           epsfac;           /**< charge multiplication factor                      */
     float           c_rf;             /**< Reaction-field/plain cutoff electrostatics const. */
@@ -271,7 +271,7 @@ typedef struct cl_plist
     int              nexcl;       /**< count for excl                               */
     int              excl_nalloc; /**< allocation size of excl                      */
 
-    bool             bDoPrune;    /**< true if pair-list pruning needs to be
+    cl_bool          bDoPrune;    /**< true if pair-list pruning needs to be
                                        done during the  current step                */
 }cl_plist_t;
 
@@ -328,8 +328,8 @@ typedef struct cl_timers
 struct nbnxn_opencl
 {
     ocl_gpu_info_t *dev_info;        /**< CUDA device information                              */    
-    bool             bUseTwoStreams; /**< true if doing both local/non-local NB work on GPU    */
-    bool             bUseStreamSync; /**< true if the standard cudaStreamSynchronize is used
+    cl_bool          bUseTwoStreams; /**< true if doing both local/non-local NB work on GPU    */
+    cl_bool          bUseStreamSync; /**< true if the standard cudaStreamSynchronize is used
                                           and not memory polling-based waiting                 */
     cl_atomdata_t   *atdat;          /**< atom data                                            */
     cl_nbparam_t    *nbparam;        /**< parameters required for the non-bonded calc.         */
@@ -348,7 +348,7 @@ struct nbnxn_opencl
      * concurrent streams, so we won't time if both l/nl work is done on GPUs.
      * Timer init/uninit is still done even with timing off so only the condition
      * setting bDoTime needs to be change if this CUDA "feature" gets fixed. */
-    bool             bDoTime;       /**< True if event-based timing is enabled.               */
+    cl_bool          bDoTime;       /**< True if event-based timing is enabled.               */
     cl_timers_t     *timers;        /**< CUDA event-based timers.                             */
     wallclock_gpu_t *timings;       /**< Timing data.                                         */
 };

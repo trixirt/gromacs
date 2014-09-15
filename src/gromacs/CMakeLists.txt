@@ -238,3 +238,19 @@ if (INSTALL_CUDART_LIB) #can be set manual by user
         message(WARNING "INSTALL_CUDART_LIB only makes sense with GMX_GPU")
     endif()
 endif()
+
+if(GMX_GPU AND GMX_USE_OPENCL)
+    #if (INSTALL_OPENCL_KERNELS)
+        set(OPENCL_KERNELS ${GMXLIB_OPENCL_KERNELS} ${MDLIB_OPENCL_KERNELS})       
+        
+        message(STATUS "Will Install OpenCL kernels: " ${OPENCL_KERNELS} " in " ${OCL_INSTALL_DIR} )
+        install(FILES ${OPENCL_KERNELS} DESTINATION
+            ${OCL_INSTALL_DIR} COMPONENT development)
+            
+        message(STATUS "Will Install OpenCL kernel dependencies: " ${OPENCL_KERNEL_DEPENDENCIES} " in " ${OCL_INSTALL_DIR} )
+        install(FILES ${OPENCL_KERNEL_DEPENDENCIES} DESTINATION
+            ${OCL_INSTALL_DIR} COMPONENT development)                
+    #elseif(EMBED_OPENCL_KERNELS)
+        #...
+    #endif()
+endif()

@@ -41,7 +41,7 @@
 /* Fixing headers: Attempting to include host system headers inside device code. 
  * Dependencies: real, M_FLOAT_1_SQRTPI. moved to opencl_types*/
 
-#include "gromacs/pbcutil/ishift.h"
+#include "ishift.h"
 
 /* Note that floating-point constants in CUDA code should be suffixed
  * with f (e.g. 0.5f), to stop the compiler producing intermediate
@@ -372,7 +372,7 @@ __kernel void test
     /* Pre-load i-atom x and q into shared memory */
     ci = sci * NCL_PER_SUPERCL + tidxj;
     ai = ci * CL_SIZE + tidxi;
-    xqib[tidxj * CL_SIZE + tidxi] = xq[ai] + shift_vec[nb_sci.shift];
+    xqib[tidxj * CL_SIZE + tidxi] = xq[ai] + make_float4(shift_vec[nb_sci.shift]);
 #ifdef IATYPE_SHMEM
     /* Pre-load the i-atom types into shared memory */
     atib[tidxj * CL_SIZE + tidxi] = atom_types[ai];
@@ -461,7 +461,7 @@ __kernel void test
                - doesn't work on CUDA <v4.1
                Tested with nvcc 3.2 - 5.0.7 */
 #if !defined PRUNE_NBL //&& __CUDA_ARCH__ < 300 && CUDA_VERSION >= 4010
-#pragma unroll 4
+//#pragma unroll 4
 #endif
             for (jm = 0; jm < NBNXN_GPU_JGROUP_SIZE; jm++)
             {
@@ -482,7 +482,7 @@ __kernel void test
 
                     /* The PME and RF kernels don't unroll with CUDA <v4.1. */
 #if !defined PRUNE_NBL //&& !(CUDA_VERSION < 4010 && defined EXCLUSION_FORCES)
-#pragma unroll 8
+//#pragma unroll 8
 #endif
                     for (i = 0; i < NCL_PER_SUPERCL; i++)
                     {

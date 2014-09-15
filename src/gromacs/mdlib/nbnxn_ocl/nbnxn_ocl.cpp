@@ -56,6 +56,8 @@
 
 //#include "nbnxn_cuda_types.h"
 
+#include <CL/opencl.h>
+
 #include "nbnxn_ocl_types.h"
 //#include "../../gmxlib/cuda_tools/cudautils.cuh"
 //#include "nbnxn_cuda.h"
