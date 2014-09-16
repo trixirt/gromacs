@@ -54,10 +54,15 @@ if(NOT GMX_OPENMP)
 endif()
 
 # detect OpenCL devices in the build host machine
+# TO DO: Test the WIN32 branch on Linux
+# TO DO: Have just one branch that would work for both Windows and Linux
 if (GMX_USE_OPENCL AND NOT GMX_OPENCL_DETECTION_DONE)
-    include(gmxDetectGpu)
-    #gmx_detect_OpenCL()
-	gmx_find_OpenCL()	
+	include(gmxDetectGpu)
+	if (WIN32)
+		gmx_find_OpenCL()		
+	else()		
+		gmx_detect_OpenCL()
+	endif()    
 endif()
 
 #Now configure necessary paths
@@ -67,24 +72,51 @@ if (GMX_USE_OPENCL AND GMX_DETECT_OPENCL_AVAILABLE)
     #1: In system
     #2: In paths indicated by environtment variables
     #3: In standard installation paths (e.g. /opt/AMDAPP, /usr/local/cuda etc..
-    #4: In Gromacs    
-    if(GMX_OPENCL_FORCE_LOCAL_HEADERS)
-        set(OPENCL_INCLUDE_DIRS ../src)
-	endif(GMX_OPENCL_FORCE_LOCAL_HEADERS)
-    
-    if(GMX_OPENCL_FORCE_CL11_API)
-        set(OPENCL_DEFINITIONS "-DCL_USE_DEPRECATED_OPENCL_1_1_APIS")
-    endif(GMX_OPENCL_FORCE_CL11_API)
-    
-	if(NOT WIN32)
-		set(OPENCL_DEFINITIONS "${OPENCL_DEFINITIONS} -Wno-comments")
-	endif()
+    #4: In Gromacs  
+	
+	# TO DO: Test the WIN32 branch on Linux
+	# TO DO: Have just one branch that would work for both Windows and Linux	
+	if (WIN32)		
+		if(GMX_OPENCL_FORCE_LOCAL_HEADERS)
+			set(OPENCL_INCLUDE_DIRS ../src)
+		endif(GMX_OPENCL_FORCE_LOCAL_HEADERS)
+		
+		if(GMX_OPENCL_FORCE_CL11_API)
+			set(OPENCL_DEFINITIONS "-DCL_USE_DEPRECATED_OPENCL_1_1_APIS")
+		endif(GMX_OPENCL_FORCE_CL11_API)
+		
+		# TO DO: This doesn't work on Nvidia, Windows. What was supposed to do?
+		#set(OPENCL_DEFINITIONS "${OPENCL_DEFINITIONS} -Wno-comments")		
 
-    message(STATUS "OpenCL lib: " ${OPENCL_LIBRARIES} ", PATH: " ${OPENCL_INCLUDE_DIRS} ", DEFINITIONS: " ${OPENCL_DEFINITIONS})
-    set(OPENCL_FOUND TRUE)
-    
-    add_definitions(${OPENCL_DEFINITIONS})
-    include_directories(${OPENCL_INCLUDE_DIRS})
+		message(STATUS "OpenCL lib: " ${OPENCL_LIBRARIES} ", PATH: " ${OPENCL_INCLUDE_DIRS} ", DEFINITIONS: " ${OPENCL_DEFINITIONS})
+		set(OPENCL_FOUND TRUE)
+		
+		add_definitions(${OPENCL_DEFINITIONS})
+		include_directories(${OPENCL_INCLUDE_DIRS})
+	else()
+		if(GMX_OPENCL_FORCE_LOCAL_HEADERS)
+			set(OPENCL_INCLUDE_DIRS ../src)
+		else()    
+			find_path(OPENCL_INCLUDE_DIRS NAMES CL/opencl.h CL/cl.h CL/cl_platform.h CL/cl_ext.h 
+			PATHS ../src /usr/local/cuda/include /opt/AMDAPP/include /opt/intel/opencl*/include
+			${CUDA_INC_PATH} ${AMDAPPSDKROOT}/include ${INTELOCLSDKROOT}/include
+			)  
+		endif()
+		
+		if(GMX_OPENCL_FORCE_CL11_API)
+			set(OPENCL_DEFINITIONS "-DCL_USE_DEPRECATED_OPENCL_1_1_APIS")
+		endif(GMX_OPENCL_FORCE_CL11_API)
+		
+		set(OPENCL_DEFINITIONS "${OPENCL_DEFINITIONS} -Wno-comments")
+		
+		find_library(OPENCL_LIBRARIES OpenCL)
+		
+		message(STATUS "OpenCL lib: " ${OPENCL_LIBRARIES} ", PATH: " ${OPENCL_INCLUDE_DIRS} ", DEFINITIONS: " ${OPENCL_DEFINITIONS})
+		set(OPENCL_FOUND TRUE)
+		
+		add_definitions(${OPENCL_DEFINITIONS})
+		include_directories(${OPENCL_INCLUDE_DIRS})		
+	endif()
     
 endif(GMX_USE_OPENCL AND GMX_DETECT_OPENCL_AVAILABLE)
 
