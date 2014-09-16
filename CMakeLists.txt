@@ -215,7 +215,7 @@ gmx_add_cache_dependency(GMX_COOL_QUOTES BOOL "NOT GMX_FAHCORE" OFF)
 
 # Decide on GPU settings based on user-settings and GPU/CUDA detection.
 # We support CUDA >=v4.0 on *nix, but <= v4.1 doesn't work with MSVC
-
+option(GMX_USE_OPENCL "Enable OpenCL accelerators" OFF)
 if(NOT GMX_USE_OPENCL)
     if(MSVC)
         set(REQUIRED_CUDA_VERSION 4.1)
@@ -228,11 +228,11 @@ else(NOT GMX_USE_OPENCL)
     #Now the OpenCL path
     if(GMX_GPU)
         #1.1 For nvidia, 1.2 for amd/intel. 2.0 cannot test
-        set(REQUIRED_OPENCL_MIN_VERSION 1.1)
-        set(REQUIRED_OPENCL_MAX_VERSION 1.2)
+        #set(REQUIRED_OPENCL_MIN_VERSION 1.1)
+        #set(REQUIRED_OPENCL_MAX_VERSION 1.2)
         include(gmxManageOpenCL)
     else(GMX_GPU)
-        message(FATAL_ERROR "OpenCL requested but GPU is not enabled (-DGMX_GPU=on) ")
+        message(FATAL_ERROR "OpenCL requested but GPU option is not enabled (try -DGMX_GPU=on) ")
     endif(GMX_GPU)    
 endif(NOT GMX_USE_OPENCL)
 
@@ -527,7 +527,7 @@ if (TMPI_ATOMICS_DISABLED)
    add_definitions(-DTMPI_ATOMICS_DISABLED)
 endif()
 
-if(GMX_GPU AND NOT GMX_USE_OPENCL)
+if(GMX_GPU)
     # now that we have detected the dependencies, do the second configure pass
     gmx_gpu_setup()
 endif()

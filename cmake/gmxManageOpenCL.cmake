@@ -32,91 +32,65 @@
 # To help us fund GROMACS development, we humbly ask that you cite
 # the research papers on the package. Check out http://www.gromacs.org.
 
-# If the user did not set GMX_OPENCL we'll consider this option to be
-# in "auto" mode meaning that we will:
-# - search for CUDA and set GMX_GPU=ON we find it
-# - check whether GPUs are present
-# - if CUDA is not found but GPUs were detected issue a warning
-#if (NOT DEFINED GMX_GPU)
-#    set(GMX_GPU_AUTO TRUE CACHE INTERNAL "GPU acceleration will be selected automatically")
-#endif()
-#option(GMX_GPU "Enable GPU acceleration" OFF)
-
-option(GMX_USE_OPENCL "Enable OpenCL accelerators" OFF)
 option(GMX_OPENCL_FORCE_LOCAL_HEADERS "Use the OpenCL headers redistributed with Gromacs" OFF)
 option(GMX_OPENCL_FORCE_CL11_API "Try this if you are having compilations issues with OpenCL enabled" OFF)
-if(GMX_USE_OPENCL AND GMX_DOUBLE)
+option(GMX_OPENCL_CL11_HIDE_COMMENT_WARNING "Tell compiler to hide warnings for comments caused by cl_gl_ext.h on Linux" ON)
+
+if(GMX_DOUBLE)
     message(FATAL_ERROR "OpenCL not available in double precision - Yet!")
 endif()
 
-if(NOT GMX_OPENMP)
-	message(WARNING "To use OpenCL GPU acceleration efficiently, mdrun requires OpenMP multi-threading. Without OpenMP a single CPU core can be used with a GPU which is not optimal. Note that with MPI multiple processes can be forced to use a single GPU, but this is typically inefficient. You need to set both C and C++ compilers that support OpenMP (CC and CXX environment variables, respectively) when using GPUs.")
-endif()
+#Look for OpenCL
+find_package(OpenCL REQUIRED)
 
+
+#Well the package is REQUIRED so if not found we have stopped already
+#But if it was not required consider handling the cases where:
+#1) nothing was found (mark something as off and jump out)
+#2) OpenCL library was found, but not the headers. Ask the use to install an SDK/Opencl dev package
+  
+message(STATUS "OPENCL_INCLUDE_DIRS: " "${OPENCL_INCLUDE_DIRS} ")
+message(STATUS "OPENCL_LIBRARIES: " "${OPENCL_LIBRARIES} ")
 # detect OpenCL devices in the build host machine
 # TO DO: Test the WIN32 branch on Linux
 # TO DO: Have just one branch that would work for both Windows and Linux
-if (GMX_USE_OPENCL AND NOT GMX_OPENCL_DETECTION_DONE)
-	include(gmxDetectGpu)
-	if (WIN32)
-		gmx_find_OpenCL()		
-	else()		
-		gmx_detect_OpenCL()
-	endif()    
-endif()
+#if (NOT GMX_OPENCL_DETECTION_DONE)
+#	include(gmxDetectGpu)
+#	if (WIN32 OR UNIX)
+#		gmx_find_OpenCL()		
+#	else()		
+#		gmx_detect_OpenCL()
+#	endif()    
+#endif()
 
-#Now configure necessary paths
-if (GMX_USE_OPENCL AND GMX_DETECT_OPENCL_AVAILABLE)
-    message(STATUS "Configuring OpenCL")
+#Now configure options
+message(STATUS "Setting OpenCL specific options")
     #Where can OpenCL headers be? and with what priority?
     #1: In system
     #2: In paths indicated by environtment variables
     #3: In standard installation paths (e.g. /opt/AMDAPP, /usr/local/cuda etc..
     #4: In Gromacs  
-	
-	# TO DO: Test the WIN32 branch on Linux
-	# TO DO: Have just one branch that would work for both Windows and Linux	
-	if (WIN32)		
-		if(GMX_OPENCL_FORCE_LOCAL_HEADERS)
-			set(OPENCL_INCLUDE_DIRS ../src)
-		endif(GMX_OPENCL_FORCE_LOCAL_HEADERS)
-		
-		if(GMX_OPENCL_FORCE_CL11_API)
-			set(OPENCL_DEFINITIONS "-DCL_USE_DEPRECATED_OPENCL_1_1_APIS")
-		endif(GMX_OPENCL_FORCE_CL11_API)
-		
-		# TO DO: This doesn't work on Nvidia, Windows. What was supposed to do?
-		#set(OPENCL_DEFINITIONS "${OPENCL_DEFINITIONS} -Wno-comments")		
 
-		message(STATUS "OpenCL lib: " ${OPENCL_LIBRARIES} ", PATH: " ${OPENCL_INCLUDE_DIRS} ", DEFINITIONS: " ${OPENCL_DEFINITIONS})
-		set(OPENCL_FOUND TRUE)
-		
-		add_definitions(${OPENCL_DEFINITIONS})
-		include_directories(${OPENCL_INCLUDE_DIRS})
-	else()
-		if(GMX_OPENCL_FORCE_LOCAL_HEADERS)
-			set(OPENCL_INCLUDE_DIRS ../src)
-		else()    
-			find_path(OPENCL_INCLUDE_DIRS NAMES CL/opencl.h CL/cl.h CL/cl_platform.h CL/cl_ext.h 
-			PATHS ../src /usr/local/cuda/include /opt/AMDAPP/include /opt/intel/opencl*/include
-			${CUDA_INC_PATH} ${AMDAPPSDKROOT}/include ${INTELOCLSDKROOT}/include
-			)  
-		endif()
-		
-		if(GMX_OPENCL_FORCE_CL11_API)
-			set(OPENCL_DEFINITIONS "-DCL_USE_DEPRECATED_OPENCL_1_1_APIS")
-		endif(GMX_OPENCL_FORCE_CL11_API)
-		
-		set(OPENCL_DEFINITIONS "${OPENCL_DEFINITIONS} -Wno-comments")
-		
-		find_library(OPENCL_LIBRARIES OpenCL)
-		
-		message(STATUS "OpenCL lib: " ${OPENCL_LIBRARIES} ", PATH: " ${OPENCL_INCLUDE_DIRS} ", DEFINITIONS: " ${OPENCL_DEFINITIONS})
-		set(OPENCL_FOUND TRUE)
-		
-		add_definitions(${OPENCL_DEFINITIONS})
-		include_directories(${OPENCL_INCLUDE_DIRS})		
-	endif()
+if(GMX_OPENCL_FORCE_LOCAL_HEADERS)
+    set(OPENCL_INCLUDE_DIRS ../src)
+endif(GMX_OPENCL_FORCE_LOCAL_HEADERS)    
+
+if(GMX_OPENCL_FORCE_CL11_API)
+    set(OPENCL_DEFINITIONS "-DCL_USE_DEPRECATED_OPENCL_1_1_APIS")
+endif(GMX_OPENCL_FORCE_CL11_API) 
     
-endif(GMX_USE_OPENCL AND GMX_DETECT_OPENCL_AVAILABLE)
+if(UNIX AND GMX_OPENCL_CL11_HIDE_COMMENT_WARNING)
+    set(OPENCL_DEFINITIONS ${OPENCL_DEFINITIONS} " -Wno-comment")
+endif()
 
+add_definitions(${OPENCL_DEFINITIONS})
+include_directories(${OPENCL_INCLUDE_DIRS})    
+    
+message(STATUS "OpenCL lib: " ${OPENCL_LIBRARIES} ", PATH: " ${OPENCL_INCLUDE_DIRS} ", DEFINITIONS: " ${OPENCL_DEFINITIONS})            
+
+macro(gmx_gpu_setup)
+    # no OpenMP is no good!
+    if(NOT GMX_OPENMP)
+        message(WARNING "To use GPU acceleration efficiently, mdrun requires OpenMP multi-threading. Without OpenMP a single CPU core can be used with a GPU which is not optimal. Note that with MPI multiple processes can be forced to use a single GPU, but this is typically inefficient. You need to set both C and C++ compilers that support OpenMP (CC and CXX environment variables, respectively) when using GPUs.")
+    endif()
+endmacro()
