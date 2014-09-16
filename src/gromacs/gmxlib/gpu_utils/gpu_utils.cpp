@@ -383,7 +383,7 @@ static const char*      kernel_filenames[]         = {"nbnxn_ocl_kernel_nvidia.c
 static size_t  get_ocl_kernel_source_file_info(kernel_filename_index_t kernel_src_id)
 {
     char * kernel_filename=NULL;
-    if( (kernel_filename = getenv("OCL_FILE_PATH")) != NULL) return strlen(kernel_filename + 1);
+    if( (kernel_filename = getenv("OCL_FILE_PATH")) != NULL) return (strlen(kernel_filename) + 1);
     else
     {
         /* Note we add 1 for the separator and 1 for the termination null char in the resulting string */
