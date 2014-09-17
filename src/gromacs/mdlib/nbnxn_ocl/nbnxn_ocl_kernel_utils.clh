@@ -529,7 +529,7 @@ void reduce_force_j_generic(__local float *f_buf, __global float3 *fout,
             f.z += f_buf[2 * FBUF_STRIDE + j];
         }
 
-        atomicAdd(&fout[aidx], f);
+        atomicAdd_g_f3(&fout[aidx], f);
         //atomicAdd(&(fout[aidx].x), f.x);
     }
 }
@@ -578,7 +578,7 @@ void reduce_force_i_generic(__local float *f_buf, __global float3 *fout,
             f.z += f_buf[2 * FBUF_STRIDE + j];
         }
 
-        atomicAdd(&fout[aidx], f);
+        atomicAdd_g_f3(&fout[aidx], f);
 
         if (bCalcFshift)
         {
@@ -623,7 +623,7 @@ void reduce_force_i_pow2(volatile __local float *f_buf, __global float3 *fout,
         f.y = f_buf[    FBUF_STRIDE + tidxj * CL_SIZE + tidxi] + f_buf[    FBUF_STRIDE + (tidxj + i) * CL_SIZE + tidxi];
         f.z = f_buf[2 * FBUF_STRIDE + tidxj * CL_SIZE + tidxi] + f_buf[2 * FBUF_STRIDE + (tidxj + i) * CL_SIZE + tidxi];
 
-        atomicAdd(&fout[aidx], f);
+        atomicAdd_g_f3(&fout[aidx], f);
 
         if (bCalcFshift)
         {

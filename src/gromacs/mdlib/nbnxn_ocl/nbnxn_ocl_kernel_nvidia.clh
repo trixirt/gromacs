@@ -684,7 +684,7 @@ __kernel void test
     if (bCalcFshift && tidxj == 0)
     {
         //atomicAdd(&(atdat->fshift[nb_sci.shift]),fshift_buf);
-        atomicAdd(&(fshift[nb_sci.shift]),fshift_buf);
+        atomicAdd_g_f3(&(fshift[nb_sci.shift]),fshift_buf);
     }
 
 #ifdef CALC_ENERGIES
