@@ -56,11 +56,11 @@ _INLINE_ float3 make_float3(float4 a)
     return (float3)(a.x, a.y, a.z);
 }
 
-_INLINE_ float norm(float3 a)
+_INLINE_ float norm_f3(float3 a)
 {
     return sqrt(dot(a,a));
 }
-_INLINE_ float norm_ref(float3 a)
+_INLINE_ float norm_ref_f3(float3 a)
 {
     return sqrt(a.x * a.x + a.y * a.y + a.z * a.z);
 }
@@ -72,15 +72,15 @@ _INLINE_ float norm2_ref(float3 a)
 {
     return (a.x * a.x + a.y * a.y + a.z * a.z);
 }
-_INLINE_ float dist3(float3 a, float3 b)
+_INLINE_ float dist3_f3(float3 a, float3 b)
 {
     return distance(b,a);
 }
-_INLINE_ float dist3_ref(float3 a, float3 b)
+_INLINE_ float dist3_ref_f3(float3 a, float3 b)
 {
-    return norm_ref(b - a);
+    return norm_ref_f3(b - a);
 }
-_INLINE_ void atomicAdd(volatile __local float *addr, float val)
+_INLINE_ void atomicAdd_l_f(volatile __local float *addr, float val)
 {
     union{
         unsigned int u32;
@@ -91,13 +91,13 @@ _INLINE_ void atomicAdd(volatile __local float *addr, float val)
         next.f32        = expected.f32 + val;
     } while( atomic_cmpxchg( (volatile __local unsigned int *)addr, expected.u32, next.u32) != expected.u32 );
 }
-_INLINE_ void atomicAdd(__local float3 *addr, float3 val)
+_INLINE_ void atomicAdd_l_f3(__local float3 *addr, float3 val)
 {
-    atomicAdd( ((__local float*)(addr)), val.x);
-    atomicAdd( ((__local float*)(addr))+1, val.y);
-    atomicAdd( ((__local float*)(addr))+2, val.z);
+    atomicAdd_l_f( ((__local float*)(addr)), val.x);
+    atomicAdd_l_f( ((__local float*)(addr))+1, val.y);
+    atomicAdd_l_f( ((__local float*)(addr))+2, val.z);
 }
-_INLINE_ void atomicAdd(volatile __global float *addr, float val)
+_INLINE_ void atomicAdd_g_f(volatile __global float *addr, float val)
 {
     union{
         unsigned int u32;
@@ -108,11 +108,11 @@ _INLINE_ void atomicAdd(volatile __global float *addr, float val)
         next.f32        = expected.f32 + val;
     } while( atomic_cmpxchg( (volatile __global unsigned int *)addr, expected.u32, next.u32) != expected.u32 );
 }
-_INLINE_ void atomicAdd(__global float3 *addr, float3 val)
+_INLINE_ void atomicAdd_g_f3(__global float3 *addr, float3 val)
 {
-    atomicAdd( ((__global float*)(addr)), val.x);
-    atomicAdd( ((__global float*)(addr))+1, val.y);
-    atomicAdd( ((__global float*)(addr))+2, val.z);
+    atomicAdd_g_f( ((__global float*)(addr)), val.x);
+    atomicAdd_g_f( ((__global float*)(addr))+1, val.y);
+    atomicAdd_g_f( ((__global float*)(addr))+2, val.z);
 }
 /*
 _INLINE_ void atomicAdd(volatile float *addr, float val)
@@ -141,23 +141,23 @@ _INLINE_ float4 make_float4(float3 a)
     return (float4)(a.x, a.y, a.z, 0.0f);
 }
 
-_INLINE_ float norm(float4 a)
+_INLINE_ float norm_f4(float4 a)
 {
     return sqrt(dot(a,a));
 }
 
-_INLINE_ float norm_ref(float4 a)
+_INLINE_ float norm_ref_f4(float4 a)
 {
     return sqrt(a.x * a.x + a.y * a.y + a.z * a.z + a.w * a.w);
 }
 
-_INLINE_ float dist3(float4 a, float4 b)
+_INLINE_ float dist3_f4(float4 a, float4 b)
 {
-    return norm(b - a);
+    return norm_f4(b - a);
 }
 
-_INLINE_ float dist3_ref(float4 a, float4 b)
+_INLINE_ float dist3_ref_f4(float4 a, float4 b)
 {
-    return norm_ref(b - a);
+    return norm_ref_f4(b - a);
 }
 #endif /* VECTYPE_OPS_CLH */
