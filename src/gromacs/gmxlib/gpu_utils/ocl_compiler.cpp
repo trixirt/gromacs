@@ -342,11 +342,11 @@ void handle_ocl_build_log(const char*   build_log,
 cl_int 
 ocl_compile_program(
     kernel_source_index_t kernel_source_file,
-    char                 *result_str,
-    cl_context             context,
+    char                * result_str,
+    cl_context            context,
     cl_device_id          device_id,
     char *                ocl_device_vendor,
-    cl_program            program
+    cl_program          * p_program
 )
 {
     cl_int cl_error     = CL_SUCCESS;
@@ -357,7 +357,7 @@ ocl_compile_program(
     size_t ocl_source_length    = 0;
     size_t kernel_filename_len  = 0;
     
-    program = NULL;
+    *p_program = NULL;
     
     kernel_filename_len = get_ocl_kernel_source_file_info(kernel_source_file);
     if(kernel_filename_len) kernel_filename = (char*)malloc(kernel_filename_len);
@@ -375,7 +375,7 @@ ocl_compile_program(
     }        
     
     
-    program = clCreateProgramWithSource(context, 1, (const char**)(&ocl_source), &ocl_source_length, &cl_error);
+    *p_program = clCreateProgramWithSource(context, 1, (const char**)(&ocl_source), &ocl_source_length, &cl_error);
     //CALLOCLFUNC_LOGERROR(cl_error, result_str, retval)
     //if (0 != retval)
     //    break;    
@@ -403,13 +403,13 @@ ocl_compile_program(
         //cl_error = clBuildProgram(program, 0, NULL, "-cl-fast-relaxed-math", NULL, NULL);
         //cl_error = clBuildProgram(program, 0, NULL, "-I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\mdlib\\nbnxn_ocl\\ -I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\pbcutil\\ -I C:\\Anca\\SC\\gromacs\\gromacs\\src -I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\legacyheaders -I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\mdlib", NULL, NULL);        
         //cl_error = clBuildProgram(program, 0, NULL, "-I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\mdlib\\nbnxn_ocl\\ -I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\pbcutil\\ -I C:\\Anca\\SC\\gromacs\\gromacs\\src\\ -I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\legacyheaders\\ -I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\mdlib\\", NULL, NULL);        
-        build_status = clBuildProgram(program, 0, NULL, build_options_string, NULL, NULL);        
+        build_status = clBuildProgram(*p_program, 0, NULL, build_options_string, NULL, NULL);        
         
         // Do not fail now if the compilation fails. Dump the LOG and then fail.
         //CALLOCLFUNC_LOGERROR(build_status, result_str, retval);
         
         // Get log string size
-        cl_error = clGetProgramBuildInfo(program, device_id, CL_PROGRAM_BUILD_LOG, 0, NULL, &build_log_size);
+        cl_error = clGetProgramBuildInfo(*p_program, device_id, CL_PROGRAM_BUILD_LOG, 0, NULL, &build_log_size);
         //CALLOCLFUNC_LOGERROR(cl_error, result_str, retval);
         
         if (build_log_size && (cl_error == CL_SUCCESS) )
@@ -420,7 +420,7 @@ ocl_compile_program(
             build_log = (char*)malloc(build_log_size);
             if (build_log)
             {
-                cl_error = clGetProgramBuildInfo(program, device_id, CL_PROGRAM_BUILD_LOG, build_log_size, build_log, NULL);                    
+                cl_error = clGetProgramBuildInfo(*p_program, device_id, CL_PROGRAM_BUILD_LOG, build_log_size, build_log, NULL);                    
                 
                 if(!cl_error)
                 {

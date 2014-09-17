@@ -25,11 +25,11 @@ typedef enum{
 cl_int
 ocl_compile_program(
     kernel_source_index_t kernel_source_file,
-    char                 *result_str,
+    char                * result_str,
     cl_context            context,
     cl_device_id          device_id,
     char *                ocl_device_vendor,
-    cl_program            program
+    cl_program          * p_program
 );
 
 #endif /* OCL_COMPILER_H */
