@@ -5,7 +5,7 @@
 #include <CL/cl_platform.h>
 
 typedef enum{ 
-    _default_kernel_source_file_ = 0,
+    _default_kernel_source_ = 0,
     _num_kernels_
 } kernel_source_index_t;
 

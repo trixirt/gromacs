@@ -276,18 +276,17 @@ gmx_bool init_ocl_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
             break;
 
         cl_error = 
-            ocl_compile_program(_default_kernel_source_file_,
+            ocl_compile_program(_default_kernel_source_,
                                 result_str,
                                 context,
                                 device_id,
                                 selected_ocl_gpu->device_vendor,
                                 &program
                                );          
-        CALLOCLFUNC_LOGERROR(cl_error, result_str, retval)
-        if (0 != retval)
-            break;            
-
-        assert(program!=NULL);
+        if(cl_error != CL_SUCCESS) {
+            retval=-1; 
+            break;                      
+        }
         
         {
             //cl_kernel k = clCreateKernel(program, "nbnxn_kernel_ElecCut_VdwLJ_F_prune_opencl", &cl_error);

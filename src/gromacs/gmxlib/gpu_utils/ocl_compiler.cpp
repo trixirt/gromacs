@@ -82,10 +82,10 @@ create_ocl_build_options_length(
         build_options_length += 
             strlen(custom_build_options_prepend)+whitespace;
        
-    if ( !strcmp(
+    /*if ( !strcmp(
             build_device_vendor,"Advanced Micro Devices, Inc." ) 
        )
-        build_options_length += get_ocl_build_option_length(_amd_cpp_)+whitespace;        
+        build_options_length += get_ocl_build_option_length(_amd_cpp_)+whitespace;        */
 
     build_options_length += 
         get_ocl_build_option_length(_include_install_opencl_dir_)+whitespace;
@@ -121,7 +121,7 @@ create_ocl_build_options(char * build_options_string,
         build_options_string[char_added++] =' ';
     }    
     
-    if (!strcmp(build_device_vendor,"Advanced Micro Devices, Inc.") )
+    /*if (!strcmp(build_device_vendor,"Advanced Micro Devices, Inc.") )
     {
         strncpy( build_options_string+char_added, 
                  get_ocl_build_option(_amd_cpp_),
@@ -129,7 +129,7 @@ create_ocl_build_options(char * build_options_string,
         
         char_added += get_ocl_build_option_length(_amd_cpp_);        
         build_options_string[char_added++]=' ';
-    }
+    }*/
     
     strncpy( build_options_string+char_added,
              get_ocl_build_option(_include_install_opencl_dir_),
@@ -283,6 +283,7 @@ void handle_ocl_build_log(const char*   build_log,
         const char *log_footer      = "---------------LOG END----------------\n"; 
         char status_suffix[10];
         char *build_info;
+        char *log_fname;
         
         build_info = (char*)malloc(32 + strlen(build_options_string) );
         sprintf(build_info,"-- Used build options: %s\n", build_options_string);
@@ -291,13 +292,12 @@ void handle_ocl_build_log(const char*   build_log,
         {
             strncpy(status_suffix, (build_status==CL_SUCCESS)?"SUCCEEDED":"FAILED",10);        
     
-            char *log_fname = (char*)malloc(strlen(kernel_filenames[kernel_filename_id]) 
+            log_fname = (char*)malloc(strlen(kernel_filenames[kernel_filename_id]) 
                                      + strlen(status_suffix) + 2
                                    );
             
             sprintf(log_fname,"%s.%s",kernel_filenames[kernel_filename_id],status_suffix);       
             build_log_file = fopen(log_fname,"w");       
-            free(log_fname);
         }
     
         size_t complete_message_size = 0;
@@ -328,6 +328,10 @@ void handle_ocl_build_log(const char*   build_log,
                 fprintf(build_log_file, "%s" , complete_message);
 
             fclose(build_log_file);
+            
+            printf("The OpenCL compilation log has been saved in \"%s\"\n",log_fname);
+            
+            free(log_fname);
         }
         if(dumpStdErr)
         {
@@ -356,24 +360,21 @@ ocl_compile_program(
     
     size_t ocl_source_length    = 0;
     size_t kernel_filename_len  = 0;
-    
-    *p_program = NULL;
-    
+        
     kernel_filename_len = get_ocl_kernel_source_file_info(kernel_source_file);
     if(kernel_filename_len) kernel_filename = (char*)malloc(kernel_filename_len);
     
     get_ocl_kernel_source_path(kernel_filename, kernel_source_file, kernel_filename_len);                       
     
     ocl_source = load_ocl_source(kernel_filename, &kernel_filename_len);
-    
-    free(kernel_filename);
-    
+        
     if (!ocl_source)
     {            
         sprintf(result_str, "Error loading OpenCL code %s",kernel_filename);
         return CL_BUILD_PROGRAM_FAILURE;
     }        
     
+    free(kernel_filename);    
     
     *p_program = clCreateProgramWithSource(context, 1, (const char**)(&ocl_source), &ocl_source_length, &cl_error);
     //CALLOCLFUNC_LOGERROR(cl_error, result_str, retval)
