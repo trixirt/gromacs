@@ -54,13 +54,22 @@
 
 #define WARP_SIZE  32
 
-__constant sampler_t generic_sampler     = CLK_NORMALIZED_COORDS_FALSE /* Natural coords */
-                                            | CLK_ADDRESS_NONE          /* No clamp/repeat*/ 
-                                            | CLK_FILTER_NEAREST ;      /* No interpolation */
+#undef KERNEL_UTILS_INLINE
+
+#ifdef KERNEL_UTILS_INLINE
+#define __INLINE__ inline
+#else
+#define __INLINE__
+#endif
+
 //-------------------
 
 #ifndef NBNXN_OPENCL_KERNEL_UTILS_CLH
 #define NBNXN_OPENCL_KERNEL_UTILS_CLH
+
+__constant sampler_t generic_sampler     = CLK_NORMALIZED_COORDS_FALSE /* Natural coords */
+                                            | CLK_ADDRESS_NONE          /* No clamp/repeat*/ 
+                                            | CLK_FILTER_NEAREST ;      /* No interpolation */
 
 #define __device__ 
 
@@ -209,34 +218,34 @@ typedef struct {
 /*! i-cluster interaction mask for a super-cluster with all NCL_PER_SUPERCL bits set */
 __constant unsigned supercl_interaction_mask = ((1U << NCL_PER_SUPERCL) - 1U);
 
-/////////////*! Apply force switch,  force + energy version. */
-////////////static inline __device__
-////////////void calculate_force_switch_F(__constant          cl_nbparam_t *nbparam,
-////////////                              float               c6,
-////////////                              float               c12,
-////////////                              float               inv_r,
-////////////                              float               r2,
-////////////                              float              *F_invr)
-////////////{
-////////////    float r, r_switch;
-////////////
-////////////    /* force switch constants */
-////////////    float disp_shift_V2 = nbparam->dispersion_shift.c2;
-////////////    float disp_shift_V3 = nbparam->dispersion_shift.c3;
-////////////    float repu_shift_V2 = nbparam->repulsion_shift.c2;
-////////////    float repu_shift_V3 = nbparam->repulsion_shift.c3;
-////////////
-////////////    r         = r2 * inv_r;
-////////////    r_switch  = r - nbparam->rvdw_switch;
-////////////    r_switch  = r_switch >= 0.0f ? r_switch : 0.0f;
-////////////
-////////////    *F_invr  +=
-////////////        -c6*(disp_shift_V2 + disp_shift_V3*r_switch)*r_switch*r_switch*inv_r +
-////////////        c12*(-repu_shift_V2 + repu_shift_V3*r_switch)*r_switch*r_switch*inv_r;
-////////////}
-////////////
+/*! Apply force switch,  force + energy version. */
+static __INLINE__ __device__
+void calculate_force_switch_F(__global  cl_nbparam_params_t *nbparam,                              
+                              float     c6,
+                              float     c12,
+                              float     inv_r,
+                              float     r2,
+                              float *   F_invr)
+{
+    float r, r_switch;
+
+    /* force switch constants */
+    float disp_shift_V2 = nbparam->dispersion_shift.c2;
+    float disp_shift_V3 = nbparam->dispersion_shift.c3;
+    float repu_shift_V2 = nbparam->repulsion_shift.c2;
+    float repu_shift_V3 = nbparam->repulsion_shift.c3;
+
+    r         = r2 * inv_r;
+    r_switch  = r - nbparam->rvdw_switch;
+    r_switch  = r_switch >= 0.0f ? r_switch : 0.0f;
+
+    *F_invr  +=
+        -c6*(disp_shift_V2 + disp_shift_V3*r_switch)*r_switch*r_switch*inv_r +
+        c12*(-repu_shift_V2 + repu_shift_V3*r_switch)*r_switch*r_switch*inv_r;
+}
+
 /*! Apply force switch, force-only version. */
-static inline __device__
+static __INLINE__ __device__
 void calculate_force_switch_F_E(//__constant          cl_nbparam_t *nbparam,
                                 __constant          cl_nbparam_params_t *nbparam,
                                 float               c6,
@@ -272,7 +281,7 @@ void calculate_force_switch_F_E(//__constant          cl_nbparam_t *nbparam,
 }
 
 /*! Apply potential switch, force-only version. */
-static inline __device__
+static __INLINE__ __device__
 void calculate_potential_switch_F(//__constant          cl_nbparam_t *nbparam,
                                     __constant          cl_nbparam_params_t *nbparam,
                                   float               c6,
@@ -307,7 +316,7 @@ void calculate_potential_switch_F(//__constant          cl_nbparam_t *nbparam,
 }
 
 /*! Apply potential switch, force + energy version. */
-static inline __device__
+static __INLINE__ __device__
 void calculate_potential_switch_F_E(__constant          cl_nbparam_params_t *nbparam,
                                     float               c6,
                                     float               c12,
@@ -342,7 +351,7 @@ void calculate_potential_switch_F_E(__constant          cl_nbparam_params_t *nbp
 /*! Calculate LJ-PME grid force contribution with
  *  geometric combination rule.
  */
-static inline __device__
+static __INLINE__ __device__
 void calculate_lj_ewald_comb_geom_F(read_only image2d_t     nbfp_comb_climg2d,
                                     int                typei,
                                     int                typej,
@@ -370,9 +379,9 @@ void calculate_lj_ewald_comb_geom_F(read_only image2d_t     nbfp_comb_climg2d,
 /*! Calculate LJ-PME grid force + energy contribution with
  *  geometric combination rule.
  */
-static inline __device__
+static __INLINE__ __device__
 void calculate_lj_ewald_comb_geom_F_E(read_only image2d_t     nbfp_comb_climg2d,
-                                      __constant         cl_nbparam_params_t *nbparam,
+                                      __global           cl_nbparam_params_t *nbparam,
                                       int                typei,
                                       int                typej,
                                       float              r2,
@@ -407,9 +416,9 @@ void calculate_lj_ewald_comb_geom_F_E(read_only image2d_t     nbfp_comb_climg2d,
  *  We use a single F+E kernel with conditional because the performance impact
  *  of this is pretty small and LB on the CPU is anyway very slow.
  */
-static inline __device__
+static __INLINE__ __device__
 void calculate_lj_ewald_comb_LB_F_E(read_only image2d_t     nbfp_comb_climg2d,
-                                    __constant         cl_nbparam_params_t *nbparam,
+                                    __global           cl_nbparam_params_t *nbparam,
                                     int                typei,
                                     int                typej,
                                     float              r2,
@@ -455,11 +464,10 @@ void calculate_lj_ewald_comb_LB_F_E(read_only image2d_t     nbfp_comb_climg2d,
 /*! Interpolate Ewald coulomb force using the table through the tex_nbfp texture.
  *  Original idea: from the OpenMM project
  */
-static inline __device__
-float interpolate_coulomb_force_r(
-                                    read_only image2d_t     coulomb_tab_climg2d,
-                                    float r, 
-                                    float scale)
+static __INLINE__ __device__ float 
+interpolate_coulomb_force_r(read_only image2d_t     coulomb_tab_climg2d,
+                            float r, 
+                            float scale)
 {
     float   normalized = scale * r;
     int     index      = (int) normalized;
@@ -471,51 +479,51 @@ float interpolate_coulomb_force_r(
                 * read_imagef(coulomb_tab_climg2d, generic_sampler, (int2)(index,0)).x;
 }
 
-/////////////*! Calculate analytical Ewald correction term. */
-////////////static inline __device__
-////////////float pmecorrF(float z2)
-////////////{
-////////////    const float FN6 = -1.7357322914161492954e-8f;
-////////////    const float FN5 = 1.4703624142580877519e-6f;
-////////////    const float FN4 = -0.000053401640219807709149f;
-////////////    const float FN3 = 0.0010054721316683106153f;
-////////////    const float FN2 = -0.019278317264888380590f;
-////////////    const float FN1 = 0.069670166153766424023f;
-////////////    const float FN0 = -0.75225204789749321333f;
-////////////
-////////////    const float FD4 = 0.0011193462567257629232f;
-////////////    const float FD3 = 0.014866955030185295499f;
-////////////    const float FD2 = 0.11583842382862377919f;
-////////////    const float FD1 = 0.50736591960530292870f;
-////////////    const float FD0 = 1.0f;
-////////////
-////////////    float       z4;
-////////////    float       polyFN0, polyFN1, polyFD0, polyFD1;
-////////////
-////////////    z4          = z2*z2;
-////////////
-////////////    polyFD0     = FD4*z4 + FD2;
-////////////    polyFD1     = FD3*z4 + FD1;
-////////////    polyFD0     = polyFD0*z4 + FD0;
-////////////    polyFD0     = polyFD1*z2 + polyFD0;
-////////////
-////////////    polyFD0     = 1.0f/polyFD0;
-////////////
-////////////    polyFN0     = FN6*z4 + FN4;
-////////////    polyFN1     = FN5*z4 + FN3;
-////////////    polyFN0     = polyFN0*z4 + FN2;
-////////////    polyFN1     = polyFN1*z4 + FN1;
-////////////    polyFN0     = polyFN0*z4 + FN0;
-////////////    polyFN0     = polyFN1*z2 + polyFN0;
-////////////
-////////////    return polyFN0*polyFD0;
-////////////}
+/*! Calculate analytical Ewald correction term. */
+static __INLINE__ __device__
+float pmecorrF(float z2)
+{
+    const float FN6 = -1.7357322914161492954e-8f;
+    const float FN5 = 1.4703624142580877519e-6f;
+    const float FN4 = -0.000053401640219807709149f;
+    const float FN3 = 0.0010054721316683106153f;
+    const float FN2 = -0.019278317264888380590f;
+    const float FN1 = 0.069670166153766424023f;
+    const float FN0 = -0.75225204789749321333f;
+
+    const float FD4 = 0.0011193462567257629232f;
+    const float FD3 = 0.014866955030185295499f;
+    const float FD2 = 0.11583842382862377919f;
+    const float FD1 = 0.50736591960530292870f;
+    const float FD0 = 1.0f;
+
+    float       z4;
+    float       polyFN0, polyFN1, polyFD0, polyFD1;
+
+    z4          = z2*z2;
+
+    polyFD0     = FD4*z4 + FD2;
+    polyFD1     = FD3*z4 + FD1;
+    polyFD0     = polyFD0*z4 + FD0;
+    polyFD0     = polyFD1*z2 + polyFD0;
+
+    polyFD0     = 1.0f/polyFD0;
+
+    polyFN0     = FN6*z4 + FN4;
+    polyFN1     = FN5*z4 + FN3;
+    polyFN0     = polyFN0*z4 + FN2;
+    polyFN1     = polyFN1*z4 + FN1;
+    polyFN0     = polyFN0*z4 + FN0;
+    polyFN0     = polyFN1*z2 + polyFN0;
+
+    return polyFN0*polyFD0;
+}
 
 /*! Final j-force reduction; this generic implementation works with
  *  arbitrary array sizes.
  */
-/* AMD OpenCL compiler error "Undeclared function index 1024" if inlined */
-//static inline __device__
+/* AMD OpenCL compiler error "Undeclared function index 1024" if __INLINE__d */
+//static __INLINE__ __device__
 void reduce_force_j_generic(__local float *f_buf, __global float3 *fout,
                             int tidxi, int tidxj, int aidx)
 {
@@ -538,7 +546,7 @@ void reduce_force_j_generic(__local float *f_buf, __global float3 *fout,
 //////////// *  array sizes and with sm >= 3.0
 //////////// */
 ////////////#if 0
-////////////static inline __device__
+////////////static __INLINE__ __device__
 ////////////void reduce_force_j_warp_shfl(float3 f, float3 *fout,
 ////////////                              int tidxi, int aidx)
 ////////////{
@@ -563,7 +571,7 @@ void reduce_force_j_generic(__local float *f_buf, __global float3 *fout,
 /*! Final i-force reduction; this generic implementation works with
  *  arbitrary array sizes.
  */
-static inline __device__
+static __INLINE__ __device__
 void reduce_force_i_generic(__local float *f_buf, __global float3 *fout,
                             float3 *fshift_buf, bool bCalcFshift,
                             int tidxi, int tidxj, int aidx)
@@ -590,7 +598,7 @@ void reduce_force_i_generic(__local float *f_buf, __global float3 *fout,
 /*! Final i-force reduction; this implementation works only with power of two
  *  array sizes.
  */
-static inline __device__
+static __INLINE__ __device__
 void reduce_force_i_pow2(volatile __local float *f_buf, __global float3 *fout,
                          float3 *fshift_buf, bool bCalcFshift,
                          int tidxi, int tidxj, int aidx)
@@ -635,7 +643,7 @@ void reduce_force_i_pow2(volatile __local float *f_buf, __global float3 *fout,
 /*! Final i-force reduction wrapper; calls the generic or pow2 reduction depending
  *  on whether the size of the array to be reduced is power of two or not.
  */
-static inline __device__
+static __INLINE__ __device__
 void reduce_force_i(__local float *f_buf, __global float3 *f,
                     float3 *fshift_buf, bool bCalcFshift,
                     int tidxi, int tidxj, int ai)
@@ -654,7 +662,7 @@ void reduce_force_i(__local float *f_buf, __global float3 *f,
 //////////// *  array sizes and with sm >= 3.0
 //////////// */
 ////////////#if 0
-////////////static inline __device__
+////////////static __INLINE__ __device__
 ////////////void reduce_force_i_warp_shfl(float3 fin, float3 *fout,
 ////////////                              float3 *fshift_buf, bool bCalcFshift,
 ////////////                              int tidxj, int aidx)
@@ -687,7 +695,7 @@ void reduce_force_i(__local float *f_buf, __global float3 *f,
 /////////////*! Energy reduction; this implementation works only with power of two
 //////////// *  array sizes.
 //////////// */
-////////////static inline __device__
+////////////static __INLINE__ __device__
 ////////////void reduce_energy_pow2(volatile __local float *buf,
 ////////////                        float *e_lj, float *e_el,
 ////////////                        unsigned int tidx)
@@ -724,7 +732,7 @@ void reduce_force_i(__local float *f_buf, __global float3 *f,
 //////////// *  array sizes and with sm >= 3.0
 //////////// */
 ////////////#if 0
-////////////static inline __device__
+////////////static __INLINE__ __device__
 ////////////void reduce_energy_warp_shfl(float E_lj, float E_el,
 ////////////                             float *e_lj, float *e_el,
 ////////////                             int tidx)

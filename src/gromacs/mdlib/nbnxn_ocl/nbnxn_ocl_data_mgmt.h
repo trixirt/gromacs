@@ -33,7 +33,7 @@
  * the research papers on the package. Check out http://www.gromacs.org.
  */
 
-#ifndef NBNXN_OCL_DATA_MGMT_H
+#if !defined(NBNXN_OCL_DATA_MGMT_H) && defined(GMX_USE_OPENCL)
 #define NBNXN_OCL_DATA_MGMT_H
 
 #include "types/simple.h"
@@ -48,7 +48,7 @@
 #define FUNC_QUALIFIER
 #else
 #define FUNC_TERM {}
-#define FUNC_QUALIFIER static
+#define FUNC_QUALIFIER static;
 #endif
 
 #ifdef __cplusplus

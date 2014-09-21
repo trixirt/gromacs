@@ -10,18 +10,6 @@
 #include <CL/opencl.h>
 
 #include "ocl_compiler.hpp"
-
-#define CALLOCLFUNC_LOGERROR(func, err_str, retval) {\
-    cl_int opencl_ret = func;\
-    if (CL_SUCCESS != opencl_ret)\
-    {\
-        sprintf(err_str, "OpenCL error %d", opencl_ret);\
-        retval = -1;\
-    }\
-    else\
-        retval = 0;\
-    }
-
     
 //#define OCL_FILE_PATH "C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\mdlib\\nbnxn_ocl\\nbnxn_ocl_kernels.cl"
 //#define OCL_FILE_PATH "C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\gmxlib\\ocl_tools\\vectype_ops.clh"
@@ -50,6 +38,8 @@ const char* build_options_list[] = {
     "-I"OCL_INSTALL_DIR_NAME,
     "-I../../src/gromacs/gmxlib/ocl_tools -I../../src/gromacs/mdlib/nbnxn_ocl -I../../src/gromacs/pbcutil"
 };
+
+static const char*      kernel_filenames[]         = {"nbnxn_ocl_kernels.clh"};
 
 static const char* get_ocl_build_option(build_options_index_t build_option_id)
 {
@@ -161,14 +151,11 @@ create_ocl_build_options(char * build_options_string,
     
 }
 
-/* TODO to structure .. */
-static const char*      kernel_filenames[]         = {"nbnxn_ocl_kernel_nvidia.clh"};
-
 /* TODO comments .. */
 static size_t  get_ocl_kernel_source_file_info(kernel_source_index_t kernel_src_id)
 {
     char * kernel_filename=NULL;
-    if( (kernel_filename = getenv("OCL_FILE_PATH")) != NULL) return strlen(kernel_filename + 1);
+    if( (kernel_filename = getenv("OCL_FILE_PATH")) != NULL) return (strlen(kernel_filename) + 1);
     else
     {
         /* Note we add 1 for the separator and 1 for the termination null char in the resulting string */
@@ -308,20 +295,15 @@ void handle_ocl_build_log(const char*   build_log,
         complete_message_size += strlen(build_info) + strlen(log_header) + strlen(log_footer);
         complete_message_size += strlen(build_log);
         complete_message_size += 1; //null termination
-        complete_message_size += 1; //Guard
         complete_message = (char*)malloc(complete_message_size);
-        
-        complete_message[complete_message_size-1]=';';
-    
+            
         sprintf(complete_message,"%s%s%s%s%s",
             (build_status == CL_SUCCESS)?success_header:fail_header,
             build_info,
             log_header,            
             build_log,
             log_footer);
-    
-        assert(complete_message[complete_message_size-1]==';');
-        
+            
         if(dumpFile)
         {
             if(build_log_file)

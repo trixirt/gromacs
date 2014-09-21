@@ -33,8 +33,6 @@
  * the research papers on the package. Check out http://www.gromacs.org.
  */
 
-//Test
-//#include "nbnxn_opencl_kernel_utils.clh"
 #include "nbnxn_ocl_kernel_utils.clh"
 
 /* #include "gromacs/math/utilities.h" */
@@ -212,18 +210,18 @@
 //__launch_bounds__(64, 16)
 //#endif
 #ifdef PRUNE_NBL
-#ifdef CALC_ENERGIES
-__kernel void NB_KERNEL_FUNC_NAME(nbnxn_kernel, _VF_prune_opencl)
+    #ifdef CALC_ENERGIES
+        __kernel void NB_KERNEL_FUNC_NAME(nbnxn_kernel, _VF_prune_opencl)
+    #else
+        __kernel void NB_KERNEL_FUNC_NAME(nbnxn_kernel, _F_prune_opencl)
+    #endif
 #else
-__kernel void NB_KERNEL_FUNC_NAME(nbnxn_kernel, _F_prune_opencl)
-#endif
-#else
-#ifdef CALC_ENERGIES
-__kernel void NB_KERNEL_FUNC_NAME(nbnxn_kernel, _VF_cuda_opencl)
-#else
-//__kernel void NB_KERNEL_FUNC_NAME(nbnxn_kernel, _F_cuda_opencl)
-__kernel void test
-#endif
+    #ifdef CALC_ENERGIES
+        __kernel void NB_KERNEL_FUNC_NAME(nbnxn_kernel, _VF_opencl)
+    #else
+        __kernel void NB_KERNEL_FUNC_NAME(nbnxn_kernel, _F_opencl)
+        //__kernel void test
+    #endif
 #endif
 (cl_atomdata_params_t atomdata_params,
  cl_nbparam_params_t nbparam_params,
@@ -231,7 +229,7 @@ __kernel void test
 
 
  const __global float4 *xq,
- const __global float3 *f,
+ __global float3 *f,
  const __global float *e_lj,
  const __global float *e_el,
  //const __global float3 *fshift, 
@@ -564,14 +562,14 @@ __kernel void test
 #ifdef CALC_ENERGIES
                                 calculate_lj_ewald_comb_geom_F_E(nbparam, typei, typej, r2, inv_r2, lje_coeff2, lje_coeff6_6, int_bit, &F_invr, &E_lj_p);
 #else
-                                calculate_lj_ewald_comb_geom_F(nbparam, typei, typej, r2, inv_r2, lje_coeff2, lje_coeff6_6, &F_invr);
+                                calculate_lj_ewald_comb_geom_F(nbfp_comb_climg2d, typei, typej, r2, inv_r2, lje_coeff2, lje_coeff6_6, &F_invr);
 #endif                          /* CALC_ENERGIES */
 #elif defined LJ_EWALD_COMB_LB
-                                calculate_lj_ewald_comb_LB_F_E(nbparam, typei, typej, r2, inv_r2, lje_coeff2, lje_coeff6_6,
+                                calculate_lj_ewald_comb_LB_F_E(nbfp_comb_climg2d, nbparam, typei, typej, r2, inv_r2, lje_coeff2, lje_coeff6_6,
 #ifdef CALC_ENERGIES
-                                                               int_bit, &F_invr, &E_lj_p
+                                                               int_bit, true, &F_invr, &E_lj_p
 #else
-                                                               0, &F_invr, NULL
+                                                               0, false, &F_invr, 0
 #endif /* CALC_ENERGIES */
                                                                );
 #endif /* LJ_EWALD_COMB_GEOM */
@@ -618,7 +616,7 @@ __kernel void test
 #ifdef USE_TEXOBJ
                                                         interpolate_coulomb_force_r(nbparam->coulomb_tab_texobj, r2 * inv_r, coulomb_tab_scale)
 #else
-                                                        interpolate_coulomb_force_r(r2 * inv_r, coulomb_tab_scale)
+                                                        interpolate_coulomb_force_r(coulomb_tab_climg2d, r2 * inv_r, coulomb_tab_scale)
 #endif /* USE_TEXOBJ */
                                                         ) * inv_r;
 #endif /* EL_EWALD_ANA/TAB */

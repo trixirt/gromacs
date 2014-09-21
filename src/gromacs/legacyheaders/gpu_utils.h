@@ -54,9 +54,10 @@
 #define FUNC_TERM_SIZE_T ;
 #define FUNC_TERM_VOID ;
 #define FUNC_QUALIFIER
-#define FUNC_TERM_INT_OPENCL {return -1}
-#define FUNC_TERM_VOID_OPENCL {} ;
+#define FUNC_TERM_INT_OPENCL {return -1;}
+#define FUNC_TERM_VOID_OPENCL {}
 #define FUNC_QUALIFIER_OPENCL static
+typedef int ocl_gpu_id_t;
 #elif defined(GMX_GPU) && defined(GMX_USE_OPENCL)
 #define FUNC_TERM_INT {return -1; }
 #define FUNC_TERM_SIZE_T {return 0; }
@@ -70,9 +71,10 @@
 #define FUNC_TERM_SIZE_T {return 0; }
 #define FUNC_TERM_VOID {}
 #define FUNC_QUALIFIER static
-#define FUNC_TERM_INT_OPENCL {return -1}
-#define FUNC_TERM_VOID_OPENCL {} ;
+#define FUNC_TERM_INT_OPENCL {return -1;}
+#define FUNC_TERM_VOID_OPENCL {}
 #define FUNC_QUALIFIER_OPENCL static
+typedef int ocl_gpu_id_t;
 #endif
 
 #ifdef __cplusplus
