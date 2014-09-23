@@ -35,6 +35,7 @@ const char* build_options_list[] = {
     "-cl-std=CL1.2",
     "-cl-fast-relaxed-math",
     "-cl-opt-disable",
+    "-g",
     "-I"OCL_INSTALL_DIR_NAME,
     "-I../../src/gromacs/gmxlib/ocl_tools -I../../src/gromacs/mdlib/nbnxn_ocl -I../../src/gromacs/pbcutil"
 };
@@ -78,6 +79,12 @@ create_ocl_build_options_length(
         build_options_length += get_ocl_build_option_length(_amd_cpp_)+whitespace;        */
 
     build_options_length += 
+        get_ocl_build_option_length(_generic_noopt_compilation_)+whitespace;    
+    
+    build_options_length += 
+        get_ocl_build_option_length(_generic_debug_symbols_)+whitespace;         
+        
+    build_options_length += 
         get_ocl_build_option_length(_include_install_opencl_dir_)+whitespace;
         
     build_options_length += 
@@ -110,6 +117,20 @@ create_ocl_build_options(char * build_options_string,
         char_added += strlen(custom_build_options_prepend);
         build_options_string[char_added++] =' ';
     }    
+    
+    strncpy( build_options_string+char_added, 
+             get_ocl_build_option(_generic_noopt_compilation_),
+             get_ocl_build_option_length(_generic_noopt_compilation_) );
+        
+    char_added += get_ocl_build_option_length(_generic_noopt_compilation_);        
+    build_options_string[char_added++]=' ';    
+    
+    strncpy( build_options_string+char_added, 
+             get_ocl_build_option(_generic_debug_symbols_),
+             get_ocl_build_option_length(_generic_debug_symbols_) );
+        
+    char_added += get_ocl_build_option_length(_generic_debug_symbols_);        
+    build_options_string[char_added++]=' ';        
     
     /*if (!strcmp(build_device_vendor,"Advanced Micro Devices, Inc.") )
     {

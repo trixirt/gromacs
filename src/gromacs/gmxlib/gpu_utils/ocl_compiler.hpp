@@ -2,7 +2,7 @@
 
 #ifndef OCL_COMPILER_H
 #define OCL_COMPILER_H
-#include <CL/cl_platform.h>
+#include <CL/opencl.h>
 
 typedef enum{ 
     _default_kernel_source_ = 0, /* Standard source file with generated methods/energy/prune */
@@ -16,7 +16,8 @@ typedef enum{
     _generic_cl11_        ,
     _generic_cl12_        ,
     _generic_fast_relaxed_math_ ,
-    _generic_debug_compilation_ ,
+    _generic_noopt_compilation_ ,
+    _generic_debug_symbols_,
     _include_install_opencl_dir_,
     _include_source_opencl_dirs_,
     _num_build_options_

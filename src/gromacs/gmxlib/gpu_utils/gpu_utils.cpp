@@ -11,6 +11,8 @@
 #include "gpu_utils.h"
 #include "gromacs/utility/smalloc.h"
 
+#include <CL/opencl.h>
+
 #include "ocl_compiler.hpp"
 
 #define CALLOCLFUNC_LOGERROR(func, err_str, retval) {\
@@ -36,10 +38,14 @@ int detect_ocl_gpus(gmx_gpu_info_t *gpu_info, char *err_str)
     int retval;    
     cl_uint ocl_platform_count;
     cl_platform_id *ocl_platform_ids;    
-
+    cl_device_type req_dev_type = CL_DEVICE_TYPE_GPU;
+    
     retval = 0;
     ocl_platform_ids = NULL;
 
+    if(getenv("OCL_FORCE_CPU")!=NULL)
+        req_dev_type = CL_DEVICE_TYPE_CPU;
+    
     while (1)
     {
         CALLOCLFUNC_LOGERROR(clGetPlatformIDs(0, NULL, &ocl_platform_count), err_str, retval)
@@ -59,7 +65,7 @@ int detect_ocl_gpus(gmx_gpu_info_t *gpu_info, char *err_str)
         {            
             cl_uint ocl_device_count;
 
-            CALLOCLFUNC_LOGERROR(clGetDeviceIDs(ocl_platform_ids[i], CL_DEVICE_TYPE_GPU, 0, NULL, &ocl_device_count), err_str, retval)
+            CALLOCLFUNC_LOGERROR(clGetDeviceIDs(ocl_platform_ids[i], req_dev_type, 0, NULL, &ocl_device_count), err_str, retval)
             if (0 != retval)
                 break;
 
@@ -83,7 +89,7 @@ int detect_ocl_gpus(gmx_gpu_info_t *gpu_info, char *err_str)
             {            
                 cl_uint ocl_device_count;
 
-                CALLOCLFUNC_LOGERROR(clGetDeviceIDs(ocl_platform_ids[i], CL_DEVICE_TYPE_GPU, gpu_info->nocl_dev, ocl_device_ids, &ocl_device_count), err_str, retval)
+                CALLOCLFUNC_LOGERROR(clGetDeviceIDs(ocl_platform_ids[i], req_dev_type, gpu_info->nocl_dev, ocl_device_ids, &ocl_device_count), err_str, retval)
                 if (0 != retval)
                     break;
 
