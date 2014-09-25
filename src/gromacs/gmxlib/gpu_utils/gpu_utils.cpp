@@ -250,7 +250,6 @@ gmx_bool init_ocl_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
     cl_command_queue command_queue;
     cl_uint num_kernels;
     cl_kernel *kernels;
-
     int retval;
 
     assert(gpu_info);
@@ -311,8 +310,8 @@ gmx_bool init_ocl_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
 
                 cl_error = clGetKernelInfo(kernels[i], CL_KERNEL_NUM_ARGS,
                     sizeof(num_args), &num_args, NULL);
-            }
-
+            }        
+            
             //free(kernels);
         }
 

@@ -33,29 +33,18 @@
  * the research papers on the package. Check out http://www.gromacs.org.
  */
  
-// Test bench for vectype and kernel_utils
-
 #include "vectype_ops.clh"
+#include "nbnxn_consts.h"
 
 #define __IN_OPENCL_KERNEL__
-//////////////////////////////////////#include "nbnxn_ocl_types.h"
-#define NBNXN_GPU_CLUSTER_SIZE         8
-#define NBNXN_GPU_JGROUP_SIZE       4
-#define NBNXN_AVOID_SING_R2_INC  1.0e-12f
+
+
 #define CL_SIZE                 (NBNXN_GPU_CLUSTER_SIZE)
-
-#define GPU_NSUBCELL_Z 2
-#define GPU_NSUBCELL_Y 2
-#define GPU_NSUBCELL_X 2
-#define GPU_NSUBCELL   (GPU_NSUBCELL_Z*GPU_NSUBCELL_Y*GPU_NSUBCELL_X)
-
-#define NBNXN_GPU_NCLUSTER_PER_SUPERCLUSTER  GPU_NSUBCELL
 #define NCL_PER_SUPERCL         (NBNXN_GPU_NCLUSTER_PER_SUPERCLUSTER)
 
 #define WARP_SIZE  32
 
 #undef KERNEL_UTILS_INLINE
-
 #ifdef KERNEL_UTILS_INLINE
 #define __INLINE__ inline
 #else

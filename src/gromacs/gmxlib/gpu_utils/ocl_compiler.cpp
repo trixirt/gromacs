@@ -37,7 +37,7 @@ const char* build_options_list[] = {
     "-cl-opt-disable",
     "-g",
     "-I"OCL_INSTALL_DIR_NAME,
-    "-I../../src/gromacs/gmxlib/ocl_tools -I../../src/gromacs/mdlib/nbnxn_ocl -I../../src/gromacs/pbcutil"
+    "-I../../src/gromacs/gmxlib/ocl_tools -I../../src/gromacs/mdlib/nbnxn_ocl -I../../src/gromacs/pbcutil -I../../src/gromacs/mdlib"
 };
 
 static const char*      kernel_filenames[]         = {"nbnxn_ocl_kernels.cl"};
@@ -346,6 +346,28 @@ void handle_ocl_build_log(const char*   build_log,
     }
 }
 
+static cl_int ocl_get_warp_size(cl_context context, cl_device_id device_id)
+{
+    cl_int cl_error = CL_SUCCESS;
+    cl_int warp_size = 0;
+    const char *dummy_kernel="__kernel void test(__global int* test){test[get_local_id(0)] = 0;}";
+    size_t dummy_size = strlen(dummy_kernel);
+    cl_program program =
+        clCreateProgramWithSource(context, 1, (const char**)&dummy_kernel, NULL, &cl_error);
+        
+    cl_error = 
+        clBuildProgram(program, 0, NULL, NULL, NULL, NULL);
+        
+    cl_kernel kernel = clCreateKernel(program,"test",&cl_error);
+    
+    cl_error = clGetKernelWorkGroupInfo(kernel,device_id, CL_KERNEL_PREFERRED_WORK_GROUP_SIZE_MULTIPLE,
+                    sizeof(int), &warp_size, NULL);      
+    
+    assert(cl_error!=CL_SUCCESS);
+    return warp_size;
+    
+}
+
 cl_int 
 ocl_compile_program(
     kernel_source_index_t kernel_source_file,
@@ -357,6 +379,9 @@ ocl_compile_program(
 )
 {
     cl_int cl_error     = CL_SUCCESS;
+    cl_int warp_size    = 0;
+    
+    warp_size = ocl_get_warp_size(context,device_id);
     
     char* ocl_source        = NULL;
     char* kernel_filename   = NULL;
@@ -394,13 +419,17 @@ ocl_compile_program(
         // 
         
         size_t build_options_length = 
-        create_ocl_build_options_length(ocl_device_vendor,NULL,NULL);
+                create_ocl_build_options_length(ocl_device_vendor,NULL,NULL);
         
         char * build_options_string = (char *)malloc(build_options_length);
         
+        char custom_build_options_prepend[32];
+        snprintf(custom_build_options_prepend,32,"-DWARP_SIZE_TEST=%d",warp_size);
+        
         create_ocl_build_options(build_options_string,
                                  build_options_length,
-                                 ocl_device_vendor,NULL,NULL);
+                                 ocl_device_vendor,
+                                 custom_build_options_prepend,NULL);
         
         size_t build_log_size       = 0;
         
@@ -445,3 +474,4 @@ ocl_compile_program(
     return build_status | cl_error;
         
 }
+
