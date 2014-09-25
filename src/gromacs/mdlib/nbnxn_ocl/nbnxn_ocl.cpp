@@ -348,19 +348,20 @@ static inline int calc_shmem_required()
     /* NOTE: with the default kernel on sm3.0 we need shmem only for pre-loading */
     /* i-atom x+q in shared memory */
     //shmem  = NCL_PER_SUPERCL * CL_SIZE * sizeof(float4);
-    shmem  = NCL_PER_SUPERCL * CL_SIZE * sizeof(float) * 4;
+    shmem  = NCL_PER_SUPERCL * CL_SIZE * sizeof(float) * 4; /* xqib */
     /* cj in shared memory, for both warps separately */
-    shmem += 2 * NBNXN_GPU_JGROUP_SIZE * sizeof(int);
+    shmem += 2 * NBNXN_GPU_JGROUP_SIZE * sizeof(int);       /* cjs  */
 #ifdef IATYPE_SHMEM // CUDA ARCH >= 300
     /* i-atom types in shared memory */
     assert("Should not be defined");
-    shmem += NCL_PER_SUPERCL * CL_SIZE * sizeof(int);
+    shmem += NCL_PER_SUPERCL * CL_SIZE * sizeof(int);       /* atib */
 #endif
-//#if __CUDA_ARCH__ < 300
+/* #if __CUDA_ARCH__ < 300 */
     /* force reduction buffers in shared memory */
-    shmem += CL_SIZE * CL_SIZE * 3 * sizeof(float);
-//#endif
-
+    shmem += CL_SIZE * CL_SIZE * 3 * sizeof(float);         /* f_buf */
+/* #endif */
+    /* Warp vote. In fact it must be * number of warps in block.. */
+    shmem += sizeof(cl_uint) * 2; /* warp_any */ 
     return shmem;
 }
 

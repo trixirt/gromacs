@@ -244,7 +244,7 @@
  __read_only image2d_t coulomb_tab_climg2d,
  
  const __global nbnxn_sci_t* pl_sci,
- const __global nbnxn_cj4_t* pl_cj4,
+ __global nbnxn_cj4_t* pl_cj4,
  const __global nbnxn_excl_t* excl,
  
  int bCalcFshift,
@@ -348,20 +348,24 @@
     
     /* shmem buffer for cj, for both warps separately */
     __local int *cjs     = (__local int *)(xqib + NCL_PER_SUPERCL * CL_SIZE);
+    #define LOCAL_OFFSET cjs + 2 * NBNXN_GPU_JGROUP_SIZE
+    
 #ifdef IATYPE_SHMEM //Should not be defined! CUDA > 300
     /* shmem buffer for i atom-type pre-loading */
-    __local int *atib = (__local int *)(cjs + 2 * NBNXN_GPU_JGROUP_SIZE);
+    __local int *atib = (__local int *)(LOCAL_OFFSET);
+    #undef LOCAL_OFFSET
+    #define LOCAL_OFFSET atib + NCL_PER_SUPERCL * CL_SIZE
 #endif
 
 #ifndef REDUCE_SHUFFLE
     /* shmem j force buffer */
-#ifdef IATYPE_SHMEM //Should not be defined! CUDA > 300
-    __local float *f_buf = (__local float *)(atib + NCL_PER_SUPERCL * CL_SIZE);
-#else
-    __local float *f_buf = (__local float *)(cjs + 2 * NBNXN_GPU_JGROUP_SIZE);
-#endif
-#endif
-
+    __local float *f_buf = (__local float *)(LOCAL_OFFSET);
+    #undef LOCAL_OFFSET    
+    #define LOCAL_OFFSET f_buf + CL_SIZE * CL_SIZE * 3
+#endif    
+    __local uint *warp_any = (__local uint*)(LOCAL_OFFSET);
+#undef LOCAL_OFFSET
+    
     nb_sci      = pl_sci[bidx];         /* my i super-cluster's index = current bidx */
     sci         = nb_sci.sci;           /* super-cluster */
     cij4_start  = nb_sci.cj4_ind_start; /* first ...*/
@@ -375,6 +379,10 @@
     /* Pre-load the i-atom types into shared memory */
     atib[tidxj * CL_SIZE + tidxi] = atom_types[ai];
 #endif
+    /* Initialise warp vote. (8x8 block) 2 warps for nvidia */
+    if(tidx==0 || tidx==32)
+        warp_any[widx] = 0;
+    
     barrier(CLK_LOCAL_MEM_FENCE);
 
     for (ci_offset = 0; ci_offset < NCL_PER_SUPERCL; ci_offset++)
@@ -500,13 +508,15 @@
                             r2      = norm2(rv);
 
 #ifdef PRUNE_NBL
+                            /* vote.. should code shmem serialisation, wonder what the hit will be */
+                            if (r2 < rlist_sq)
+                                warp_any[widx]=1;
+                            
                             /* If _none_ of the atoms pairs are in cutoff range,
                                the bit corresponding to the current
-                               cluster-pair in imask gets set to 0. */
-                            if (!__any(r2 < rlist_sq))
-                            {
+                               cluster-pair in imask gets set to 0. */                            
+                            if (!warp_any[widx])
                                 imask &= ~mask_ji;
-                            }
 #endif
 
                             int_bit = (wexcl & mask_ji) ? 1.0f : 0.0f;
