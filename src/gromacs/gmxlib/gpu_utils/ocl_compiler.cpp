@@ -40,7 +40,7 @@ const char* build_options_list[] = {
     "-I../../src/gromacs/gmxlib/ocl_tools -I../../src/gromacs/mdlib/nbnxn_ocl -I../../src/gromacs/pbcutil"
 };
 
-static const char*      kernel_filenames[]         = {"nbnxn_ocl_kernels.clh"};
+static const char*      kernel_filenames[]         = {"nbnxn_ocl_kernels.cl"};
 
 static const char* get_ocl_build_option(build_options_index_t build_option_id)
 {

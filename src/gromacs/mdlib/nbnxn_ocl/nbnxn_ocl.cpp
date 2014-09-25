@@ -351,14 +351,15 @@ static inline int calc_shmem_required()
     shmem  = NCL_PER_SUPERCL * CL_SIZE * sizeof(float) * 4;
     /* cj in shared memory, for both warps separately */
     shmem += 2 * NBNXN_GPU_JGROUP_SIZE * sizeof(int);
-#ifdef IATYPE_SHMEM
+#ifdef IATYPE_SHMEM // CUDA ARCH >= 300
     /* i-atom types in shared memory */
+    assert("Should not be defined");
     shmem += NCL_PER_SUPERCL * CL_SIZE * sizeof(int);
 #endif
-#if __CUDA_ARCH__ < 300
+//#if __CUDA_ARCH__ < 300
     /* force reduction buffers in shared memory */
     shmem += CL_SIZE * CL_SIZE * 3 * sizeof(float);
-#endif
+//#endif
 
     return shmem;
 }
