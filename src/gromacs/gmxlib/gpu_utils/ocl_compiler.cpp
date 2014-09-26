@@ -349,7 +349,7 @@ void handle_ocl_build_log(const char*   build_log,
 static cl_int ocl_get_warp_size(cl_context context, cl_device_id device_id)
 {
     cl_int cl_error = CL_SUCCESS;
-    cl_int warp_size = 0;
+    size_t warp_size = 0;
     const char *dummy_kernel="__kernel void test(__global int* test){test[get_local_id(0)] = 0;}";
     size_t dummy_size = strlen(dummy_kernel);
     cl_program program =
@@ -361,7 +361,7 @@ static cl_int ocl_get_warp_size(cl_context context, cl_device_id device_id)
     cl_kernel kernel = clCreateKernel(program,"test",&cl_error);
     
     cl_error = clGetKernelWorkGroupInfo(kernel,device_id, CL_KERNEL_PREFERRED_WORK_GROUP_SIZE_MULTIPLE,
-                    sizeof(int), &warp_size, &dummy_size);      
+                    sizeof(size_t), &warp_size, NULL);      
     
     assert(cl_error!=CL_SUCCESS);
     return warp_size;
