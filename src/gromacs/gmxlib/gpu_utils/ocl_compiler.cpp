@@ -361,7 +361,7 @@ static cl_int ocl_get_warp_size(cl_context context, cl_device_id device_id)
     cl_kernel kernel = clCreateKernel(program,"test",&cl_error);
     
     cl_error = clGetKernelWorkGroupInfo(kernel,device_id, CL_KERNEL_PREFERRED_WORK_GROUP_SIZE_MULTIPLE,
-                    sizeof(int), &warp_size, NULL);      
+                    sizeof(int), &warp_size, &dummy_size);      
     
     assert(cl_error!=CL_SUCCESS);
     return warp_size;
