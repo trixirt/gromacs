@@ -73,16 +73,14 @@ create_ocl_build_options_length(
         build_options_length += 
             strlen(custom_build_options_prepend)+whitespace;
        
-    /*if ( !strcmp(
-            build_device_vendor,"Advanced Micro Devices, Inc." ) 
-       )
-        build_options_length += get_ocl_build_option_length(_amd_cpp_)+whitespace;        */
+    if (!strcmp(build_device_vendor,"Advanced Micro Devices, Inc.") || 
+        !strcmp(build_device_vendor,"GenuineIntel") )
+    {
+        build_options_length += get_ocl_build_option_length(_generic_debug_symbols_)+whitespace;       
+    }                        
 
     build_options_length += 
-        get_ocl_build_option_length(_generic_noopt_compilation_)+whitespace;    
-    
-    build_options_length += 
-        get_ocl_build_option_length(_generic_debug_symbols_)+whitespace;         
+        get_ocl_build_option_length(_generic_noopt_compilation_)+whitespace;        
         
     build_options_length += 
         get_ocl_build_option_length(_include_install_opencl_dir_)+whitespace;
@@ -123,24 +121,19 @@ create_ocl_build_options(char * build_options_string,
              get_ocl_build_option_length(_generic_noopt_compilation_) );
         
     char_added += get_ocl_build_option_length(_generic_noopt_compilation_);        
-    build_options_string[char_added++]=' ';    
+    build_options_string[char_added++]=' ';            
     
-    strncpy( build_options_string+char_added, 
-             get_ocl_build_option(_generic_debug_symbols_),
-             get_ocl_build_option_length(_generic_debug_symbols_) );
-        
-    char_added += get_ocl_build_option_length(_generic_debug_symbols_);        
-    build_options_string[char_added++]=' ';        
-    
-    /*if (!strcmp(build_device_vendor,"Advanced Micro Devices, Inc.") )
+    if (!strcmp(build_device_vendor,"Advanced Micro Devices, Inc.") || 
+        !strcmp(build_device_vendor,"GenuineIntel")
+    )
     {
         strncpy( build_options_string+char_added, 
-                 get_ocl_build_option(_amd_cpp_),
-                 get_ocl_build_option_length(_amd_cpp_) );
+                 get_ocl_build_option(_generic_debug_symbols_),
+                 get_ocl_build_option_length(_generic_debug_symbols_) );
         
-        char_added += get_ocl_build_option_length(_amd_cpp_);        
+        char_added += get_ocl_build_option_length(_generic_debug_symbols_);        
         build_options_string[char_added++]=' ';
-    }*/
+    }
     
     strncpy( build_options_string+char_added,
              get_ocl_build_option(_include_install_opencl_dir_),
