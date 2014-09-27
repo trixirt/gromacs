@@ -294,27 +294,27 @@ gmx_bool init_ocl_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
             break;                      
         }
         
-        {
-            //cl_kernel k = clCreateKernel(program, "nbnxn_kernel_ElecCut_VdwLJ_F_prune_opencl", &cl_error);
-            char kernel_name[256];
-            cl_int num_args;
-            
-            cl_error = clCreateKernelsInProgram(program, 0, NULL, &num_kernels);
+        //{
+        //    //cl_kernel k = clCreateKernel(program, "nbnxn_kernel_ElecCut_VdwLJ_F_prune_opencl", &cl_error);
+        //    char kernel_name[256];
+        //    cl_int num_args;
 
-            kernels = (cl_kernel*)malloc(num_kernels * sizeof(cl_kernel));
-            cl_error = clCreateKernelsInProgram(program, num_kernels, kernels, NULL);
+        //    cl_error = clCreateKernelsInProgram(program, 0, NULL, &num_kernels);
 
-            for (cl_uint i = 0; i < num_kernels; i++)
-            {                
-                cl_error = clGetKernelInfo(kernels[i], CL_KERNEL_FUNCTION_NAME,
-                    sizeof(kernel_name), &kernel_name, NULL);
+        //    kernels = (cl_kernel*)malloc(num_kernels * sizeof(cl_kernel));
+        //    cl_error = clCreateKernelsInProgram(program, num_kernels, kernels, NULL);
 
-                cl_error = clGetKernelInfo(kernels[i], CL_KERNEL_NUM_ARGS,
-                    sizeof(num_args), &num_args, NULL);
-            }
+        //    for (cl_uint i = 0; i < num_kernels; i++)
+        //    {                
+        //        cl_error = clGetKernelInfo(kernels[i], CL_KERNEL_FUNCTION_NAME,
+        //            sizeof(kernel_name), &kernel_name, NULL);
 
-            //free(kernels);
-        }
+        //        cl_error = clGetKernelInfo(kernels[i], CL_KERNEL_NUM_ARGS,
+        //            sizeof(num_args), &num_args, NULL);
+        //    }
+
+        //    //free(kernels);
+        //}
 
         retval = 0;
         break;
@@ -324,8 +324,9 @@ gmx_bool init_ocl_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
     {
         selected_ocl_gpu->context = context;
         selected_ocl_gpu->command_queue = command_queue;
-        selected_ocl_gpu->num_kernels = num_kernels;
-        selected_ocl_gpu->kernels = kernels;
+        selected_ocl_gpu->program = program;
+        //selected_ocl_gpu->num_kernels = num_kernels;
+        //selected_ocl_gpu->kernels = kernels;
     }
 
     return (0 == retval);
