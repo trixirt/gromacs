@@ -255,8 +255,10 @@ void calculate_force_switch_F_E(//__constant          cl_nbparam_t *nbparam,
                                 float               c12,
                                 float               inv_r,
                                 float               r2,
-                                __global float      *F_invr,
-                                __global float      *E_lj)
+                                //__global float      *F_invr,
+                                //__global float      *E_lj)
+                                float      *F_invr,
+                                float      *E_lj)
 {
     float r, r_switch;
 
@@ -389,7 +391,7 @@ void calculate_lj_ewald_comb_geom_F(read_only image2d_t     nbfp_comb_climg2d,
  */
 static __INLINE__ __device__
 void calculate_lj_ewald_comb_geom_F_E(read_only image2d_t     nbfp_comb_climg2d,
-                                      __global           cl_nbparam_params_t *nbparam,
+                                      cl_nbparam_params_t *nbparam,
                                       int                typei,
                                       int                typej,
                                       float              r2,
