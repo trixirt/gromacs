@@ -829,6 +829,7 @@ void nbnxn_ocl_init(FILE                 *fplog,
 
     /* local/non-local GPU streams */
     nb->stream[eintLocal] = clCreateCommandQueue(nb->dev_info->context, nb->dev_info->ocl_gpu_id.ocl_device_id, queue_properties, &cl_error);
+    assert(cl_error == CL_SUCCESS);
     // TO DO: check for errors        
     //stat = cudaStreamCreate(&nb->stream[eintLocal]);
     //CU_RET_ERR(stat, "cudaStreamCreate on stream[eintLocal] failed");
@@ -855,6 +856,7 @@ void nbnxn_ocl_init(FILE                 *fplog,
 #else
         //stat = cudaStreamCreate(&nb->stream[eintNonlocal]);
         nb->stream[eintNonlocal] = clCreateCommandQueue(nb->dev_info->context, nb->dev_info->ocl_gpu_id.ocl_device_id, queue_properties, &cl_error);
+        assert(cl_error == CL_SUCCESS);        
         // TO DO: check for errors        
         //CU_RET_ERR(stat, "cudaStreamCreate on stream[eintNonlocal] failed");
 #endif
@@ -862,11 +864,13 @@ void nbnxn_ocl_init(FILE                 *fplog,
 
     /* init events for sychronization (timing disabled for performance reasons!) */
     nb->nonlocal_done = clCreateUserEvent(nb->dev_info->context, &cl_error);
+    assert(cl_error == CL_SUCCESS);    
     // TO DO: check for errors
     //stat = cudaEventCreateWithFlags(&nb->nonlocal_done, cudaEventDisableTiming);
     //CU_RET_ERR(stat, "cudaEventCreate on nonlocal_done failed");
 
     nb->misc_ops_done = clCreateUserEvent(nb->dev_info->context, &cl_error);
+    assert(cl_error == CL_SUCCESS);    
     // TO DO: check for errors
     //stat = cudaEventCreateWithFlags(&nb->misc_ops_done, cudaEventDisableTiming);
     //CU_RET_ERR(stat, "cudaEventCreate on misc_ops_one failed");
