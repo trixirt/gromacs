@@ -242,6 +242,7 @@ void ocl_realloc_buffered(cl_mem *d_dest, void *h_src,
         //CU_RET_ERR(stat, "cudaMalloc failed in cu_free_buffered");
 
         *d_dest = clCreateBuffer(context, CL_MEM_READ_WRITE, *curr_alloc_size * type_size, NULL, &cl_error);
+        assert(cl_error == CL_SUCCESS);
         // TO DO: handle errors, check clCreateBuffer flags
     }
 
