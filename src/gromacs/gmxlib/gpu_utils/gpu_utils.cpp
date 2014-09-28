@@ -294,6 +294,24 @@ gmx_bool init_ocl_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
             break;                      
         }
         
+        cl_kernel aux_kernel;
+        
+        aux_kernel = clCreateKernel(program,"memset_f",&cl_error);
+        assert(cl_error == CL_SUCCESS);       
+        selected_ocl_gpu->auxiliary_kernels[selected_ocl_gpu->_aux_kernel_memset_f_] = aux_kernel;          
+        
+        aux_kernel = clCreateKernel(program,"memset_f2",&cl_error);
+        assert(cl_error == CL_SUCCESS);       
+        selected_ocl_gpu->auxiliary_kernels[selected_ocl_gpu->_aux_kernel_memset_f2_] = aux_kernel;           
+        
+        aux_kernel = clCreateKernel(program,"memset_f3",&cl_error);
+        assert(cl_error == CL_SUCCESS);        
+        selected_ocl_gpu->auxiliary_kernels[selected_ocl_gpu->_aux_kernel_memset_f3_] = aux_kernel;        
+        
+        aux_kernel = clCreateKernel(program,"zero_e_fshift",&cl_error);
+        assert(cl_error == CL_SUCCESS);        
+        selected_ocl_gpu->auxiliary_kernels[selected_ocl_gpu->_aux_kernel_zero_e_fshift_] = aux_kernel;                       
+        
         //{
         //    //cl_kernel k = clCreateKernel(program, "nbnxn_kernel_ElecCut_VdwLJ_F_prune_opencl", &cl_error);
         //    char kernel_name[256];
@@ -354,4 +372,36 @@ ocl_gpu_id_t get_ocl_gpu_device_id(const gmx_gpu_info_t *gpu_info,
 
     return gpu_info->ocl_dev[gpu_opt->ocl_dev_use[idx]].ocl_gpu_id;
     //return gpu_info->cuda_dev[gpu_opt->cuda_dev_use[idx]].id;
+}
+
+/* Debugger callable function that prints the name of a kernel function pointer */
+cl_int dbg_ocl_kernel_name(const cl_kernel kernel)
+{     
+    cl_int cl_error = CL_SUCCESS;    
+    char kernel_name[256];
+    cl_error = clGetKernelInfo(kernel, CL_KERNEL_FUNCTION_NAME,
+                            sizeof(kernel_name), &kernel_name, NULL);                       
+    if(cl_error)
+    {
+        printf("No kernel found!\n",kernel);
+    }else{
+        printf("%s\n",kernel_name);
+    }
+    return cl_error;    
+}
+
+/* Debugger callable function that prints the name of a kernel function pointer */
+cl_int dbg_ocl_kernel_name_address(void* kernel)
+{     
+    cl_int cl_error = CL_SUCCESS;    
+    char kernel_name[256];
+    cl_error = clGetKernelInfo((cl_kernel)kernel, CL_KERNEL_FUNCTION_NAME,
+                            sizeof(kernel_name), &kernel_name, NULL);                       
+    if(cl_error)
+    {
+        printf("No kernel found!\n",kernel);
+    }else{
+        printf("%s\n",kernel_name);
+    }
+    return cl_error;    
 }

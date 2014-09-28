@@ -313,6 +313,7 @@ static inline cl_kernel select_nbnxn_kernel(ocl_gpu_info_t *dev_info,
             kernel_name_to_run = nb_kfunc_noener_noprune_ptr[eeltype][evdwtype];
         }
     }
+    printf("Selected kernel: %s\n",kernel_name_to_run);
 
     ret_kernel = clCreateKernel(dev_info->program, kernel_name_to_run, &cl_error);
     // TO DO: handle errors
@@ -355,7 +356,7 @@ static inline int calc_shmem_required()
     shmem += 2 * NBNXN_GPU_JGROUP_SIZE * sizeof(int);       /* cjs  */
 #ifdef IATYPE_SHMEM // CUDA ARCH >= 300
     /* i-atom types in shared memory */
-    assert("Should not be defined");
+    #pragma error "Should not be defined
     shmem += NCL_PER_SUPERCL * CL_SIZE * sizeof(int);       /* atib */
 #endif
 /* #if __CUDA_ARCH__ < 300 */

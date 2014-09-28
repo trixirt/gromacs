@@ -119,6 +119,7 @@ static int ocl_copy_H2D_generic(cl_mem d_dest, void* h_src, size_t offset, size_
         //stat = cudaMemcpyAsync(d_dest, h_src, bytes, cudaMemcpyHostToDevice, s);
         //CU_RET_ERR(stat, "HtoD cudaMemcpyAsync failed");
         cl_error = clEnqueueWriteBuffer(command_queue, d_dest, CL_FALSE, offset, bytes, h_src, 0, NULL, copy_event);
+        assert(cl_error == CL_SUCCESS);
         // TO DO: handle errors
     }
     else
@@ -126,6 +127,7 @@ static int ocl_copy_H2D_generic(cl_mem d_dest, void* h_src, size_t offset, size_
         //stat = cudaMemcpy(d_dest, h_src, bytes, cudaMemcpyHostToDevice);
         //CU_RET_ERR(stat, "HtoD cudaMemcpy failed");
         cl_error = clEnqueueWriteBuffer(command_queue, d_dest, CL_TRUE, offset, bytes, h_src, 0, NULL, copy_event);
+        assert(cl_error == CL_SUCCESS);        
         // TO DO: handle errors
     }
 
@@ -156,11 +158,13 @@ int ocl_copy_D2H_generic(void * h_dest, cl_mem d_src, size_t offset, size_t byte
     if (bAsync)
     {        
         cl_error = clEnqueueReadBuffer(command_queue, d_src, CL_FALSE, offset, bytes, h_dest, 0, NULL, copy_event);
+        assert(cl_error == CL_SUCCESS);        
         // TO DO: handle errors
     }
     else
     {        
         cl_error = clEnqueueReadBuffer(command_queue, d_src, CL_TRUE, offset, bytes, h_dest, 0, NULL, copy_event);
+        assert(cl_error == CL_SUCCESS);        
         // TO DO: handle errors
     }
 
@@ -182,6 +186,7 @@ void ocl_free_buffered(cl_mem d_ptr, int *n, int *nalloc)
     if (d_ptr)
     {
         cl_error = clReleaseMemObject(d_ptr);
+        assert(cl_error == CL_SUCCESS);        
         // TO DO: handle errors,
         //stat = cudaFree(d_ptr);
         //CU_RET_ERR(stat, "cudaFree failed");
@@ -267,11 +272,11 @@ static void init_ewald_coulomb_force_table(//cu_nbparam_t          *nbp,
                                            const ocl_gpu_info_t *dev_info)
 {
     float       *ftmp;//, *coul_tab;
-    cl_mem coul_tab;
+    cl_mem       coul_tab;
     int          tabsize;
     double       tabscale;
 
-    cl_int cl_error;
+    cl_int       cl_error;
 
     tabsize     = GPU_EWALD_COULOMB_FORCE_TABLE_SIZE;
     /* Subtract 2 iso 1 to avoid access out of range due to rounding */
@@ -300,6 +305,7 @@ static void init_ewald_coulomb_force_table(//cu_nbparam_t          *nbp,
 
         coul_tab = clCreateImage2D(dev_info->context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
             &array_format, tabsize, 1, 0, ftmp, &cl_error);
+        assert(cl_error == CL_SUCCESS);
         // TO DO: handle errors
 
         nbp->coulomb_tab_climg2d = coul_tab;
@@ -353,23 +359,27 @@ static void init_atomdata_first(/*cu_atomdata_t*/cl_atomdata_t *ad, int ntypes, 
 
     //stat        = cudaMalloc((void**)&ad->shift_vec, SHIFTS*sizeof(*ad->shift_vec));
     //CU_RET_ERR(stat, "cudaMalloc failed on ad->shift_vec");
-    ad->shift_vec = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, SHIFTS * sizeof(cl_float3), NULL, &cl_error);
+    ad->shift_vec = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, SHIFTS * sizeof(cl_float3), NULL, &cl_error);        
+    assert(cl_error == CL_SUCCESS);
     ad->bShiftVecUploaded = false;
     // TO DO: handle errors, check clCreateBuffer flags
 
     //stat = cudaMalloc((void**)&ad->fshift, SHIFTS*sizeof(*ad->fshift));
     //CU_RET_ERR(stat, "cudaMalloc failed on ad->fshift");
     ad->fshift = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, SHIFTS * sizeof(cl_float3), NULL, &cl_error);
+    assert(cl_error == CL_SUCCESS);    
     // TO DO: handle errors, check clCreateBuffer flags
 
     //stat = cudaMalloc((void**)&ad->e_lj, sizeof(*ad->e_lj));
     //CU_RET_ERR(stat, "cudaMalloc failed on ad->e_lj");
     ad->e_lj = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, sizeof(float), NULL, &cl_error);
+    assert(cl_error == CL_SUCCESS);    
     // TO DO: handle errors, check clCreateBuffer flags
 
     //stat = cudaMalloc((void**)&ad->e_el, sizeof(*ad->e_el));
     //CU_RET_ERR(stat, "cudaMalloc failed on ad->e_el");
     ad->e_el = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, sizeof(float), NULL, &cl_error);
+    assert(cl_error == CL_SUCCESS);    
     // TO DO: handle errors, check clCreateBuffer flags
 
     /* initialize to NULL poiters to data that is not allocated here and will
@@ -384,9 +394,7 @@ static void init_atomdata_first(/*cu_atomdata_t*/cl_atomdata_t *ad, int ntypes, 
 
 /*! Selects the Ewald kernel type, analytical on SM 3.0 and later, tabulated on
     earlier GPUs, single or twin cut-off. */
-static int pick_ewald_kernel_type(bool                   bTwinCut,
-                                 // const cuda_dev_info_t *dev_info
-                                 const ocl_gpu_info_t *dev_info)
+static int pick_ewald_kernel_type(bool bTwinCut)
 {
     bool bUseAnalyticalEwald, bForceAnalyticalEwald, bForceTabulatedEwald;
     int  kernel_type;
@@ -522,7 +530,7 @@ static void init_nbparam(/*cu_nbparam_t*/cl_nbparam_t  *nbp,
     else if ((EEL_PME(ic->eeltype) || ic->eeltype == eelEWALD))
     {
         /* Initially rcoulomb == rvdw, so it's surely not twin cut-off. */
-        nbp->eeltype = pick_ewald_kernel_type(false, dev_info);
+        nbp->eeltype = pick_ewald_kernel_type(false);
     }
     else
     {
@@ -594,6 +602,7 @@ static void init_nbparam(/*cu_nbparam_t*/cl_nbparam_t  *nbp,
 
         nbp->nbfp_climg2d = clCreateImage2D(dev_info->context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
             &array_format, nnbfp, 1, 0, nbat->nbfp, &cl_error);
+        assert(cl_error == CL_SUCCESS);
         // TO DO: handle errors
 
 
@@ -601,6 +610,7 @@ static void init_nbparam(/*cu_nbparam_t*/cl_nbparam_t  *nbp,
         {
             nbp->nbfp_comb_climg2d = clCreateImage2D(dev_info->context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
                 &array_format, nnbfp_comb, 1, 0, nbat->nbfp_comb, &cl_error);
+            assert(cl_error == CL_SUCCESS);            
             // TO DO: handle errors
         }
         else
@@ -610,6 +620,7 @@ static void init_nbparam(/*cu_nbparam_t*/cl_nbparam_t  *nbp,
             // don't accept NULL values for image2D parameters.
             nbp->nbfp_comb_climg2d = clCreateImage2D(dev_info->context, CL_MEM_READ_WRITE,
                 &array_format, 1, 1, 0, NULL, &cl_error);
+            assert(cl_error == CL_SUCCESS);
             // TO DO: handle errors
         }
     }
@@ -776,7 +787,6 @@ void nbnxn_ocl_init(FILE                 *fplog,
     cl_int            cl_error;    
     char              sbuf[STRLEN];
     bool              bStreamSync, bNoStreamSync, bTMPIAtomics, bX86, bOldDriver;
-    int               cuda_drv_ver;
     cl_command_queue_properties queue_properties;
 
     assert(gpu_info);
@@ -996,6 +1006,94 @@ void nbnxn_ocl_init(FILE                 *fplog,
     }
 }
 
+/*! Clears nonbonded shift force output array and energy outputs on the GPU. */
+static void 
+nbnxn_ocl_clear_e_fshift(nbnxn_opencl_ptr_t ocl_nb)
+{
+    
+    cl_int               cl_error = CL_SUCCESS;
+    cl_atomdata_t *      adat     = ocl_nb->atdat;
+    cl_command_queue     ls       = ocl_nb->stream[eintLocal];    
+    ocl_gpu_info_t *     dev_info = ocl_nb->dev_info;
+    
+    size_t               dim_block[3] = {1,1,1} ;
+    size_t               dim_grid[3]  = {1,1,1};
+    cl_int               shifts       = SHIFTS*3;
+    
+    cl_int               arg_no;
+    cl_int               kernel_id = 
+        ocl_nb->dev_info->_aux_kernel_zero_e_fshift_;
+    
+    cl_kernel            zero_e_fshift = 
+        ocl_nb->dev_info->auxiliary_kernels[kernel_id];
+    
+    
+    dim_block[0] = 64;
+    dim_grid[0]  = ((shifts/64)*64) + ((shifts%64)?64:0) ;
+
+    arg_no = 0;    
+    cl_error = clSetKernelArg(zero_e_fshift, arg_no++, sizeof(cl_mem), &(adat->fshift));    
+    cl_error |= clSetKernelArg(zero_e_fshift, arg_no++, sizeof(cl_mem), &(adat->e_lj));     
+    cl_error |= clSetKernelArg(zero_e_fshift, arg_no++, sizeof(cl_mem), &(adat->e_el));     
+    cl_error |= clSetKernelArg(zero_e_fshift, arg_no++, sizeof(cl_uint), &shifts);         
+    assert(cl_error == CL_SUCCESS);
+    
+    cl_error = clEnqueueNDRangeKernel(ls, zero_e_fshift, 3, NULL, dim_grid, dim_block, 0, NULL, NULL);    
+    cl_error |= clFinish(ls);        
+    assert(cl_error == CL_SUCCESS);    
+    
+}
+
+/*! Clears the first natoms_clear elements of the GPU nonbonded force output array. */
+static void nbnxn_ocl_clear_f(nbnxn_opencl_ptr_t ocl_nb, int natoms_clear)
+{
+    
+    cl_int               cl_error = CL_SUCCESS;
+    cl_atomdata_t *      adat     = ocl_nb->atdat;
+    cl_command_queue     ls       = ocl_nb->stream[eintLocal];    
+    ocl_gpu_info_t *     dev_info = ocl_nb->dev_info;
+    cl_float             value    = 0.0f;
+    
+    size_t               dim_block[3] = {1,1,1} ;
+    size_t               dim_grid[3]  = {1,1,1};
+    
+    cl_int               arg_no;
+    cl_int               kernel_id = 
+        ocl_nb->dev_info->_aux_kernel_memset_f3_;
+    
+    cl_kernel            memset_f = 
+        ocl_nb->dev_info->auxiliary_kernels[kernel_id];
+    
+    dim_block[0] = 64;
+    dim_grid[0]  = ((natoms_clear/64)*64) + ((natoms_clear%64)?64:0) ;
+    
+    arg_no = 0;    
+    cl_error = clSetKernelArg(memset_f, arg_no++, sizeof(cl_mem), &(adat->f));      
+    cl_error = clSetKernelArg(memset_f, arg_no++, sizeof(cl_float), &value);      
+    cl_error |= clSetKernelArg(memset_f, arg_no++, sizeof(cl_uint), &natoms_clear);         
+    assert(cl_error == CL_SUCCESS);
+    
+    cl_error = clEnqueueNDRangeKernel(ls, memset_f, 3, NULL, dim_grid, dim_block, 0, NULL, NULL);    
+    cl_error |= clFinish(ls);        
+    assert(cl_error == CL_SUCCESS);
+
+    //stat = cudaMemsetAsync(adat->f, 0, natoms_clear * sizeof(*adat->f), ls);
+    //CU_RET_ERR(stat, "cudaMemsetAsync on f falied");
+}
+
+void 
+nbnxn_ocl_clear_outputs(nbnxn_opencl_ptr_t ocl_nb, 
+                        int flags)
+{
+    nbnxn_ocl_clear_f(ocl_nb, ocl_nb->atdat->natoms);
+    /* clear shift force array and energies if the outputs were
+       used in the current step */
+    if (flags & GMX_FORCE_VIRIAL)
+    {
+        nbnxn_ocl_clear_e_fshift(ocl_nb);
+    }
+}
+
 void nbnxn_ocl_init_const(nbnxn_opencl_ptr_t                ocl_nb,
                            const interaction_const_t      *ic,
                            const nonbonded_verlet_group_t *nbv_group)
@@ -1007,8 +1105,8 @@ void nbnxn_ocl_init_const(nbnxn_opencl_ptr_t                ocl_nb,
     ////init_nbparam(cu_nb->nbparam, ic, nbv_group[0].nbat, cu_nb->dev_info);
     init_nbparam(ocl_nb->nbparam, ic, nbv_group[0].nbat, ocl_nb->dev_info);
 
-    /////* clear energy and shift force outputs */
-    ////nbnxn_cuda_clear_e_fshift(cu_nb);
+    /* clear energy and shift force outputs */
+    nbnxn_ocl_clear_e_fshift(ocl_nb);
 }
 
 void nbnxn_ocl_init_pairlist(nbnxn_opencl_ptr_t        ocl_nb,
@@ -1096,64 +1194,6 @@ void nbnxn_ocl_upload_shiftvec(nbnxn_opencl_ptr_t        ocl_nb,
                           SHIFTS * sizeof(cl_float3), ls, NULL);
         adat->bShiftVecUploaded = true;
     }
-}
-
-/*! Clears the first natoms_clear elements of the GPU nonbonded force output array. */
-/*
-static void nbnxn_cuda_clear_f(nbnxn_cuda_ptr_t cu_nb, int natoms_clear)
-{
-    cudaError_t    stat;
-    cu_atomdata_t *adat  = cu_nb->atdat;
-    cudaStream_t   ls    = cu_nb->stream[eintLocal];
-
-    stat = cudaMemsetAsync(adat->f, 0, natoms_clear * sizeof(*adat->f), ls);
-    CU_RET_ERR(stat, "cudaMemsetAsync on f falied");
-}*/
-
-/*! Clears nonbonded shift force output array and energy outputs on the GPU. */
-//static void nbnxn_cuda_clear_e_fshift(nbnxn_opencl_ptr_t cu_nb)
-//    //nbnxn_cuda_ptr_t cu_nb)
-//{
-//    cudaError_t    stat;
-//    /*cu_atomdata_t*/cl_atomdata_t *adat  = cu_nb->atdat;
-//    /*cudaStream_t*/cl_command_queue  ls    = cu_nb->stream[eintLocal];
-//
-//    // TO DO: Launch kernels to set to 0 the three buffers below
-//
-//    //stat = cudaMemsetAsync(adat->fshift, 0, SHIFTS * sizeof(*adat->fshift), ls);
-//    //CU_RET_ERR(stat, "cudaMemsetAsync on fshift falied");
-//    //stat = cudaMemsetAsync(adat->e_lj, 0, sizeof(*adat->e_lj), ls);
-//    //CU_RET_ERR(stat, "cudaMemsetAsync on e_lj falied");
-//    //stat = cudaMemsetAsync(adat->e_el, 0, sizeof(*adat->e_el), ls);
-//    //CU_RET_ERR(stat, "cudaMemsetAsync on e_el falied");
-//}
-
-////void nbnxn_cuda_clear_outputs(nbnxn_cuda_ptr_t cu_nb, int flags)
-////{
-////    nbnxn_cuda_clear_f(cu_nb, cu_nb->atdat->natoms);
-////    /* clear shift force array and energies if the outputs were
-////       used in the current step */
-////    if (flags & GMX_FORCE_VIRIAL)
-////    {
-////        nbnxn_cuda_clear_e_fshift(cu_nb);
-////    }
-////}
-
-
-
-
-/*! Clears the first natoms_clear elements of the GPU nonbonded force output array. */
-static void nbnxn_ocl_clear_f(nbnxn_opencl_ptr_t cu_nb, int natoms_clear)
-{
-    // TO DO: add kernel calls to implement a memset operation
-    // OpenCL 1.2: can use clEnqueueFillBuffer
-
-    //cudaError_t    stat;
-    //cu_atomdata_t *adat  = cu_nb->atdat;
-    //cudaStream_t   ls    = cu_nb->stream[eintLocal];
-
-    //stat = cudaMemsetAsync(adat->f, 0, natoms_clear * sizeof(*adat->f), ls);
-    //CU_RET_ERR(stat, "cudaMemsetAsync on f falied");
 }
 
 void nbnxn_ocl_init_atomdata(nbnxn_opencl_ptr_t        ocl_nb,
@@ -1435,8 +1475,8 @@ int nbnxn_ocl_min_ci_balanced(nbnxn_opencl_ptr_t ocl_nb)
            gpu_min_ci_balanced_factor * ocl_nb->dev_info->compute_units : 0;     
 }
 
-////gmx_bool nbnxn_cuda_is_kernel_ewald_analytical(const nbnxn_cuda_ptr_t cu_nb)
-////{
-////    return ((cu_nb->nbparam->eeltype == eelCuEWALD_ANA) ||
-////            (cu_nb->nbparam->eeltype == eelCuEWALD_ANA_TWIN));
-////}
+gmx_bool nbnxn_ocl_is_kernel_ewald_analytical(const nbnxn_opencl_ptr_t ocl_nb)
+{
+    return ((ocl_nb->nbparam->eeltype == eelOclEWALD_ANA) ||
+            (ocl_nb->nbparam->eeltype == eelOclEWALD_ANA_TWIN));
+}

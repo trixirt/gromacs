@@ -49,7 +49,10 @@ extern "C" {
 } /* fixes auto-indentation problems */
 #endif
 
+/* ?? Why force EWALD analytical ??
 #define HAS_CC_3_0_OR_LATER 1
+*/
+#define HAS_CC_3_0_OR_LATER 0
 
 #if defined(GMX_GPU) && defined(GMX_USE_OPENCL)
 #include <CL/opencl.h>
@@ -90,6 +93,15 @@ typedef struct
     cl_context          context;
     cl_command_queue    command_queue;
     cl_program          program;
+    cl_kernel           auxiliary_kernels[3];
+    
+    /* This causes a mayhem of warnings, TODO fix it */
+    enum { _aux_kernel_memset_f_ =0,
+           _aux_kernel_memset_f2_,
+           _aux_kernel_memset_f3_,
+           _aux_kernel_zero_e_fshift_,
+           _num_aux_kernels_};
+          
     //cl_uint             num_kernels;
     //cl_kernel           *kernels;
 } ocl_gpu_info_t, *ocl_gpu_info_ptr_t;
