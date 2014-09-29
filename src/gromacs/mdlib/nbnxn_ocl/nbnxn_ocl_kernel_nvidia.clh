@@ -33,8 +33,6 @@
  * the research papers on the package. Check out http://www.gromacs.org.
  */
 
-//Test
-//#include "nbnxn_opencl_kernel_utils.clh"
 #include "nbnxn_ocl_kernel_utils.clh"
 
 /* #include "gromacs/math/utilities.h" */
@@ -212,18 +210,18 @@
 //__launch_bounds__(64, 16)
 //#endif
 #ifdef PRUNE_NBL
-#ifdef CALC_ENERGIES
-__kernel void NB_KERNEL_FUNC_NAME(nbnxn_kernel, _VF_prune_opencl)
+    #ifdef CALC_ENERGIES
+        __kernel void NB_KERNEL_FUNC_NAME(nbnxn_kernel, _VF_prune_opencl)
+    #else
+        __kernel void NB_KERNEL_FUNC_NAME(nbnxn_kernel, _F_prune_opencl)
+    #endif
 #else
-__kernel void NB_KERNEL_FUNC_NAME(nbnxn_kernel, _F_prune_opencl)
-#endif
-#else
-#ifdef CALC_ENERGIES
-__kernel void NB_KERNEL_FUNC_NAME(nbnxn_kernel, _VF_cuda_opencl)
-#else
-//__kernel void NB_KERNEL_FUNC_NAME(nbnxn_kernel, _F_cuda_opencl)
-__kernel void test
-#endif
+    #ifdef CALC_ENERGIES
+        __kernel void NB_KERNEL_FUNC_NAME(nbnxn_kernel, _VF_opencl)
+    #else
+        __kernel void NB_KERNEL_FUNC_NAME(nbnxn_kernel, _F_opencl)
+        //__kernel void test
+    #endif
 #endif
 (cl_atomdata_params_t atomdata_params,
  cl_nbparam_params_t nbparam_params,
@@ -231,9 +229,9 @@ __kernel void test
 
 
  const __global float4 *xq,
- const __global float3 *f,
- const __global float *e_lj,
- const __global float *e_el,
+ __global float3 *f,
+ __global float *e_lj,
+ __global float *e_el,
  //const __global float3 *fshift, 
  __global float3 *fshift, 
  const __global int *atom_types,
@@ -246,7 +244,7 @@ __kernel void test
  __read_only image2d_t coulomb_tab_climg2d,
  
  const __global nbnxn_sci_t* pl_sci,
- const __global nbnxn_cj4_t* pl_cj4,
+ __global nbnxn_cj4_t* pl_cj4,
  const __global nbnxn_excl_t* excl,
  
  int bCalcFshift,
@@ -270,7 +268,7 @@ __kernel void test
     //const nbnxn_sci_t *pl_sci       = plist->sci;
     cl_atomdata_params_t *atdat = &atomdata_params;
     cl_nbparam_params_t *nbparam = &nbparam_params;
-    cl_plist_params_t *plist = &plist_params;
+    //cl_plist_params_t *plist = &plist_params; //<--Does not seem to be needed anymore
 
 #ifndef PRUNE_NBL
     const
@@ -350,20 +348,24 @@ __kernel void test
     
     /* shmem buffer for cj, for both warps separately */
     __local int *cjs     = (__local int *)(xqib + NCL_PER_SUPERCL * CL_SIZE);
-#ifdef IATYPE_SHMEM
+    #define LOCAL_OFFSET cjs + 2 * NBNXN_GPU_JGROUP_SIZE
+    
+#ifdef IATYPE_SHMEM //Should not be defined! CUDA > 300
     /* shmem buffer for i atom-type pre-loading */
-    __local int *atib = (__local int *)(cjs + 2 * NBNXN_GPU_JGROUP_SIZE);
+    __local int *atib = (__local int *)(LOCAL_OFFSET);
+    #undef LOCAL_OFFSET
+    #define LOCAL_OFFSET atib + NCL_PER_SUPERCL * CL_SIZE
 #endif
 
 #ifndef REDUCE_SHUFFLE
     /* shmem j force buffer */
-#ifdef IATYPE_SHMEM
-    __local float *f_buf = (__local float *)(atib + NCL_PER_SUPERCL * CL_SIZE);
-#else
-    __local float *f_buf = (__local float *)(cjs + 2 * NBNXN_GPU_JGROUP_SIZE);
-#endif
-#endif
-
+    __local float *f_buf = (__local float *)(LOCAL_OFFSET);
+    #undef LOCAL_OFFSET    
+    #define LOCAL_OFFSET f_buf + CL_SIZE * CL_SIZE * 3
+#endif    
+    __local uint *warp_any = (__local uint*)(LOCAL_OFFSET);
+#undef LOCAL_OFFSET
+    
     nb_sci      = pl_sci[bidx];         /* my i super-cluster's index = current bidx */
     sci         = nb_sci.sci;           /* super-cluster */
     cij4_start  = nb_sci.cj4_ind_start; /* first ...*/
@@ -373,10 +375,14 @@ __kernel void test
     ci = sci * NCL_PER_SUPERCL + tidxj;
     ai = ci * CL_SIZE + tidxi;
     xqib[tidxj * CL_SIZE + tidxi] = xq[ai] + make_float4(shift_vec[nb_sci.shift]);
-#ifdef IATYPE_SHMEM
+#ifdef IATYPE_SHMEM //Should not be defined! CUDA > 300
     /* Pre-load the i-atom types into shared memory */
     atib[tidxj * CL_SIZE + tidxi] = atom_types[ai];
 #endif
+    /* Initialise warp vote. (8x8 block) 2 warps for nvidia */
+    if(tidx==0 || tidx==32)
+        warp_any[widx] = 0;
+    
     barrier(CLK_LOCAL_MEM_FENCE);
 
     for (ci_offset = 0; ci_offset < NCL_PER_SUPERCL; ci_offset++)
@@ -407,7 +413,7 @@ __kernel void test
 #endif
 
 #if defined LJ_EWALD
-            E_lj += read_imagef(nbfp_climg2d, generic_sampler, (int2)(atom_types[(sci*NCL_PER_SUPERCL + i)*CL_SIZE + tidxi]*(ntypes + 1)*2),0);
+            E_lj += read_imagef(nbfp_climg2d, generic_sampler, (int2)(atom_types[(sci*NCL_PER_SUPERCL + i)*CL_SIZE + tidxi]*(ntypes + 1)*2,0)).x;
 #endif /* LJ_EWALD */
         }
 
@@ -454,7 +460,10 @@ __kernel void test
             {
                 cjs[tidxi + tidxj * NBNXN_GPU_JGROUP_SIZE / 4] = pl_cj4[j4].cj[tidxi];
             }
-
+            /* CPU DEBUG..  */
+#if WARP_SIZE_TEST==1
+    barrier(CLK_LOCAL_MEM_FENCE);
+#endif            
             /* Unrolling this loop
                - with pruning leads to register spilling;
                - on Kepler is much slower;
@@ -471,7 +480,9 @@ __kernel void test
 
                     cj      = cjs[jm + (tidxj & 4) * NBNXN_GPU_JGROUP_SIZE / 4];
                     aj      = cj * CL_SIZE + tidxj;
-
+#if WARP_SIZE_TEST==1
+    barrier(CLK_LOCAL_MEM_FENCE);
+#endif  
                     /* load j atom data */
                     xqbuf   = xq[aj];
                     xj      = make_float3(xqbuf);
@@ -502,13 +513,15 @@ __kernel void test
                             r2      = norm2(rv);
 
 #ifdef PRUNE_NBL
+                            /* vote.. should code shmem serialisation, wonder what the hit will be */
+                            if (r2 < rlist_sq)
+                                warp_any[widx]=1;
+                            
                             /* If _none_ of the atoms pairs are in cutoff range,
                                the bit corresponding to the current
-                               cluster-pair in imask gets set to 0. */
-                            if (!__any(r2 < rlist_sq))
-                            {
+                               cluster-pair in imask gets set to 0. */                            
+                            if (!warp_any[widx])
                                 imask &= ~mask_ji;
-                            }
 #endif
 
                             int_bit = (wexcl & mask_ji) ? 1.0f : 0.0f;
@@ -523,7 +536,7 @@ __kernel void test
                             {
                                 /* load the rest of the i-atom parameters */
                                 qi      = xqbuf.w;
-#ifdef IATYPE_SHMEM
+#ifdef IATYPE_SHMEM //Should not be defined! CUDA > 300
                                 typei   = atib[i * CL_SIZE + tidxi];
 #else
                                 typei   = atom_types[ai];
@@ -562,16 +575,16 @@ __kernel void test
 #ifdef LJ_EWALD
 #ifdef LJ_EWALD_COMB_GEOM
 #ifdef CALC_ENERGIES
-                                calculate_lj_ewald_comb_geom_F_E(nbparam, typei, typej, r2, inv_r2, lje_coeff2, lje_coeff6_6, int_bit, &F_invr, &E_lj_p);
+                                calculate_lj_ewald_comb_geom_F_E(nbfp_comb_climg2d, nbparam, typei, typej, r2, inv_r2, lje_coeff2, lje_coeff6_6, int_bit, &F_invr, &E_lj_p);
 #else
-                                calculate_lj_ewald_comb_geom_F(nbparam, typei, typej, r2, inv_r2, lje_coeff2, lje_coeff6_6, &F_invr);
+                                calculate_lj_ewald_comb_geom_F(nbfp_comb_climg2d, typei, typej, r2, inv_r2, lje_coeff2, lje_coeff6_6, &F_invr);
 #endif                          /* CALC_ENERGIES */
 #elif defined LJ_EWALD_COMB_LB
-                                calculate_lj_ewald_comb_LB_F_E(nbparam, typei, typej, r2, inv_r2, lje_coeff2, lje_coeff6_6,
+                                calculate_lj_ewald_comb_LB_F_E(nbfp_comb_climg2d, nbparam, typei, typej, r2, inv_r2, lje_coeff2, lje_coeff6_6,
 #ifdef CALC_ENERGIES
-                                                               int_bit, &F_invr, &E_lj_p
+                                                               int_bit, true, &F_invr, &E_lj_p
 #else
-                                                               0, &F_invr, NULL
+                                                               0, false, &F_invr, 0
 #endif /* CALC_ENERGIES */
                                                                );
 #endif /* LJ_EWALD_COMB_GEOM */
@@ -618,7 +631,7 @@ __kernel void test
 #ifdef USE_TEXOBJ
                                                         interpolate_coulomb_force_r(nbparam->coulomb_tab_texobj, r2 * inv_r, coulomb_tab_scale)
 #else
-                                                        interpolate_coulomb_force_r(r2 * inv_r, coulomb_tab_scale)
+                                                        interpolate_coulomb_force_r(coulomb_tab_climg2d, r2 * inv_r, coulomb_tab_scale)
 #endif /* USE_TEXOBJ */
                                                         ) * inv_r;
 #endif /* EL_EWALD_ANA/TAB */
@@ -632,7 +645,7 @@ __kernel void test
 #endif
 #ifdef EL_EWALD_ANY
                                 /* 1.0f - erff is faster than erfcf */
-                                E_el    += qi * qj_f * (inv_r * (int_bit - erff(r2 * inv_r * beta)) - int_bit * ewald_shift);
+                                E_el    += qi * qj_f * (inv_r * (int_bit - erf(r2 * inv_r * beta)) - int_bit * ewald_shift);
 #endif                          /* EL_EWALD_ANY */
 #endif
                                 f_ij    = rv * F_invr;

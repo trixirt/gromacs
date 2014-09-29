@@ -33,7 +33,7 @@
  * the research papers on the package. Check out http://www.gromacs.org.
  */
 
-#ifndef NBNXN_OCL_DATA_MGMT_H
+#if !defined(NBNXN_OCL_DATA_MGMT_H) && defined(GMX_USE_OPENCL)
 #define NBNXN_OCL_DATA_MGMT_H
 
 #include "types/simple.h"
@@ -48,7 +48,7 @@
 #define FUNC_QUALIFIER
 #else
 #define FUNC_TERM {}
-#define FUNC_QUALIFIER static
+#define FUNC_QUALIFIER static;
 #endif
 
 #ifdef __cplusplus
@@ -96,11 +96,13 @@ FUNC_QUALIFIER
 void nbnxn_ocl_upload_shiftvec(nbnxn_opencl_ptr_t       gmx_unused         cu_nb,
                                 const struct nbnxn_atomdata_t gmx_unused *nbatom) FUNC_TERM
 
-///////** Clears GPU outputs: nonbonded force, shift force and energy. */
-//////FUNC_QUALIFIER
-//////void nbnxn_cuda_clear_outputs(nbnxn_cuda_ptr_t gmx_unused cu_nb,
-//////                              int              gmx_unused flags) FUNC_TERM
-//////
+/** Clears GPU outputs: nonbonded force, shift force and energy. */
+FUNC_QUALIFIER
+void nbnxn_ocl_clear_outputs(
+    ocl_gpu_info_t *    dev_info, 
+    nbnxn_cuda_ptr_t    cl_nb,
+    int gmx_unused      flags) FUNC_TERM
+
 ///////** Frees all GPU resources used for the nonbonded calculations. */
 //////FUNC_QUALIFIER
 //////void nbnxn_cuda_free(nbnxn_cuda_ptr_t gmx_unused  cu_nb) FUNC_TERM
@@ -146,16 +148,16 @@ int nbnxn_ocl_min_ci_balanced(nbnxn_opencl_ptr_t gmx_unused ocl_nb)
 }
 #endif
 
-///////** Returns if analytical Ewald CUDA kernels are used. */
-//////FUNC_QUALIFIER
-//////gmx_bool nbnxn_cuda_is_kernel_ewald_analytical(const nbnxn_cuda_ptr_t gmx_unused cu_nb)
-//////#ifdef GMX_GPU
-//////;
-//////#else
-//////{
-//////    return FALSE;
-//////}
-//////#endif
+/** Returns if analytical Ewald CUDA kernels are used. */
+FUNC_QUALIFIER
+gmx_bool nbnxn_ocl_is_kernel_ewald_analytical(const nbnxn_opencl_ptr_t gmx_unused ocl_nb)
+#if defined(GMX_GPU) && defined(GMX_USE_OPENCL)
+;
+#else
+{
+    return FALSE;
+}
+#endif
 
 FUNC_QUALIFIER
 int ocl_copy_H2D_async(cl_mem d_dest, void * h_src, size_t offset, size_t bytes, cl_command_queue command_queue, cl_event *copy_event);

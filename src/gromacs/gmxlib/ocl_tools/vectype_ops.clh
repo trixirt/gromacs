@@ -80,6 +80,7 @@ _INLINE_ float dist3_ref_f3(float3 a, float3 b)
 {
     return norm_ref_f3(b - a);
 }
+
 _INLINE_ void atomicAdd_l_f(volatile __local float *addr, float val)
 {
     union{

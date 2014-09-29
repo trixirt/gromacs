@@ -213,7 +213,7 @@ makeGpuUsageReport(const gmx_gpu_info_t *gpu_info,
                    const gmx_gpu_opt_t  *gpu_opt,
                    size_t                numPpRanks)
 {
-#ifdef GMX_USE_OPENCL
+#if defined(GMX_GPU) && defined(GMX_USE_OPENCL)
     int ngpu_use  = gpu_opt->nocl_dev_use;
     int ngpu_comp = gpu_info->nocl_dev_compatible;
 #else
@@ -233,22 +233,22 @@ makeGpuUsageReport(const gmx_gpu_info_t *gpu_info,
 
     {
         
-#ifdef GMX_USE_OPENCL
+#if defined(GMX_GPU) && defined(GMX_USE_OPENCL)
         std::vector<char*> gpuNamesInUse;
 #else
         std::vector<int> gpuIdsInUse;
 #endif
         for (int i = 0; i < ngpu_use; i++)
         {
-#ifdef GMX_USE_OPENCL
+#if defined(GMX_GPU) && defined(GMX_USE_OPENCL)
             //gpuIdsInUse.push_back(i);
             gpuNamesInUse.push_back(gpu_info->ocl_dev[i].device_name);
 #else
-            gpuIdsInUse.push_back(get_gpu_device_id(gpu_info, gpu_opt, i));
+            gpuIdsInUse.push_back(get_cuda_gpu_device_id(gpu_info, gpu_opt, i));
 #endif
         }
 
-#ifdef GMX_USE_OPENCL
+#if defined(GMX_GPU) && defined(GMX_USE_OPENCL)
         std::string gpuIdsString = makeGpuNamesString(gpuNamesInUse);
 #else
         std::string gpuIdsString = makeGpuIdsString(gpuIdsInUse);
@@ -563,7 +563,7 @@ static int gmx_count_gpu_dev_unique(const gmx_gpu_info_t *gpu_info,
     assert(gpu_info);
     assert(gpu_opt);
 
-#ifdef GMX_USE_OPENCL
+#if defined(GMX_GPU) && defined(GMX_USE_OPENCL)
     ngpu        = gpu_info->nocl_dev;
 #else
     ngpu        = gpu_info->ncuda_dev;
@@ -574,16 +574,16 @@ static int gmx_count_gpu_dev_unique(const gmx_gpu_info_t *gpu_info,
 
     /* Each element in uniq_ids will be set to 0 or 1. The n-th element set
      * to 1 indicates that the respective GPU was selected to be used. */
-#ifdef GMX_USE_OPENCL
+#if defined(GMX_GPU) && defined(GMX_USE_OPENCL)
     for (i = 0; i < gpu_opt->nocl_dev_use; i++)
 #else
     for (i = 0; i < gpu_opt->ncuda_dev_use; i++)
 #endif
     {
-#ifdef GMX_USE_OPENCL
+#if defined(GMX_GPU) && defined(GMX_USE_OPENCL)
         uniq_ids[i] = 1;
 #else
-        uniq_ids[get_gpu_device_id(gpu_info, gpu_opt, i)] = 1;
+        uniq_ids[get_cuda_gpu_device_id(gpu_info, gpu_opt, i)] = 1;
 #endif
     }
     /* Count the devices used. */

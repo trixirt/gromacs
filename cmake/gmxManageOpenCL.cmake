@@ -34,7 +34,7 @@
 
 option(GMX_OPENCL_FORCE_LOCAL_HEADERS "Use the OpenCL headers redistributed with Gromacs" OFF)
 option(GMX_OPENCL_FORCE_CL11_API "Try this if you are having compilations issues with OpenCL enabled" OFF)
-option(GMX_OPENCL_CL11_HIDE_COMMENT_WARNING "Tell compiler to hide warnings for comments caused by cl_gl_ext.h on Linux" ON)
+option(GMX_OPENCL_HIDE_COMMENT_WARNING "Tell compiler to hide warnings for comments caused by cl_gl_ext.h on Linux" ON)
 
 if(GMX_DOUBLE)
     message(FATAL_ERROR "OpenCL not available in double precision - Yet!")
@@ -79,7 +79,7 @@ if(GMX_OPENCL_FORCE_CL11_API)
     set(OPENCL_DEFINITIONS "-DCL_USE_DEPRECATED_OPENCL_1_1_APIS")
 endif(GMX_OPENCL_FORCE_CL11_API) 
     
-if(UNIX AND GMX_OPENCL_CL11_HIDE_COMMENT_WARNING)
+if(UNIX AND GMX_OPENCL_HIDE_COMMENT_WARNING)
     set(OPENCL_DEFINITIONS ${OPENCL_DEFINITIONS} " -Wno-comment")
 endif()
 

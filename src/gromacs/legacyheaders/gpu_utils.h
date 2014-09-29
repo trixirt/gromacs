@@ -54,9 +54,10 @@
 #define FUNC_TERM_SIZE_T ;
 #define FUNC_TERM_VOID ;
 #define FUNC_QUALIFIER
-#define FUNC_TERM_INT_OPENCL {return -1}
-#define FUNC_TERM_VOID_OPENCL {} ;
+#define FUNC_TERM_INT_OPENCL {return -1;}
+#define FUNC_TERM_VOID_OPENCL {}
 #define FUNC_QUALIFIER_OPENCL static
+typedef int ocl_gpu_id_t;
 #elif defined(GMX_GPU) && defined(GMX_USE_OPENCL)
 #define FUNC_TERM_INT {return -1; }
 #define FUNC_TERM_SIZE_T {return 0; }
@@ -70,9 +71,10 @@
 #define FUNC_TERM_SIZE_T {return 0; }
 #define FUNC_TERM_VOID {}
 #define FUNC_QUALIFIER static
-#define FUNC_TERM_INT_OPENCL {return -1}
-#define FUNC_TERM_VOID_OPENCL {} ;
+#define FUNC_TERM_INT_OPENCL {return -1;}
+#define FUNC_TERM_VOID_OPENCL {}
 #define FUNC_QUALIFIER_OPENCL static
+typedef int ocl_gpu_id_t;
 #endif
 
 #ifdef __cplusplus
@@ -139,6 +141,12 @@ void get_ocl_gpu_device_info_string(char gmx_unused *s, const gmx_gpu_info_t gmx
 
 FUNC_QUALIFIER
 size_t sizeof_cuda_dev_info(void) FUNC_TERM_SIZE_T
+
+#if defined(GMX_GPU) && defined(GMX_USE_OPENCL) && !defined(DNDEBUG)
+/* Debugger callable function that prints the name of a kernel function pointer */
+cl_int dbg_ocl_kernel_name(const cl_kernel kernel);
+cl_int dbg_ocl_kernel_name_address(void* kernel);
+#endif
 
 #ifdef __cplusplus
 }

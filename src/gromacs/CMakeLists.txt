@@ -247,6 +247,7 @@ if(GMX_GPU AND GMX_USE_OPENCL)
         install(FILES ${OPENCL_KERNELS} DESTINATION
             ${OCL_INSTALL_DIR} COMPONENT development)
             
+        set(OPENCL_KERNEL_DEPENDENCIES ${PBCUTIL_OPENCL_KERNEL_DEPENDENCIES} ${MDLIB_OPENCL_KERNEL_DEPENDENCIES})
         message(STATUS "Will Install OpenCL kernel dependencies: " ${OPENCL_KERNEL_DEPENDENCIES} " in " ${OCL_INSTALL_DIR} )
         install(FILES ${OPENCL_KERNEL_DEPENDENCIES} DESTINATION
             ${OCL_INSTALL_DIR} COMPONENT development)                

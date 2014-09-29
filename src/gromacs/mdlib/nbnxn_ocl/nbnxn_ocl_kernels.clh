@@ -46,6 +46,8 @@
  *  NOTE: No include fence as it is meant to be included multiple times.
  */
 
+#include "nbnxn_ocl_kernel_utils.clh"
+
 /* Analytical plain cut-off electrostatics kernels
  */
 #define EL_CUTOFF
@@ -57,7 +59,7 @@
 /* LJ-Ewald w geometric combination rules */
 #define LJ_EWALD_COMB_GEOM
 #define NB_KERNEL_FUNC_NAME(x, ...) x ## _ElecCut_VdwLJEwCombGeom ## __VA_ARGS__
-#include "nbnxn_ocl_kernel_nvidia.clh"
+#include "nbnxn_ocl_kernel_nvidia.clh" /* compile ok, weird it mentions unrolled as requested!? */
 #undef LJ_EWALD_COMB_GEOM
 #undef NB_KERNEL_FUNC_NAME
 /* LJ-Ewald w LB combination rules */
