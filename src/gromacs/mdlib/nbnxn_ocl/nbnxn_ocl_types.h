@@ -244,8 +244,8 @@ typedef struct cl_nbparam_params
     switch_consts_t vdw_switch;       /**< VdW switch constants                     */   
 
     /* Ewald Coulomb force table data - accessed through texture memory */
-    int                    coulomb_tab_size;   /**< table size (s.t. it fits in texture cache) */
-    float                  coulomb_tab_scale;  /**< table scale/spacing                        */    
+    int             coulomb_tab_size;   /**< table size (s.t. it fits in texture cache) */
+    float           coulomb_tab_scale;  /**< table scale/spacing                        */    
 }cl_nbparam_params_t;
 
 

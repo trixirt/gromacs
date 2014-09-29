@@ -10,6 +10,8 @@
 #include "types/hw_info.h"
 #include "gpu_utils.h"
 #include "gromacs/utility/smalloc.h"
+#include "gromacs/utility/cstringutil.h"
+#include "gromacs/utility/fatalerror.h"
 
 #include <CL/opencl.h>
 
@@ -374,6 +376,46 @@ ocl_gpu_id_t get_ocl_gpu_device_id(const gmx_gpu_info_t *gpu_info,
     //return gpu_info->cuda_dev[gpu_opt->cuda_dev_use[idx]].id;
 }
 
+void ocl_pmalloc(void **h_ptr, size_t nbytes)
+{
+    //cudaError_t stat;
+    char        strbuf[STRLEN];
+    //int         flag = cudaHostAllocDefault;
+
+    printf("Warning, pmalloc in OpenCL is doing a normal alloc instead of page-locked alloc\n");
+    
+    if (nbytes == 0)
+    {
+        *h_ptr = NULL;
+        return;
+    }
+
+    //CU_CHECK_PREV_ERR();
+
+    //stat = cudaMallocHost(h_ptr, nbytes, flag);
+    *h_ptr = malloc(nbytes);
+    if(! *h_ptr)
+    {
+        sprintf(strbuf, "cudaMallocHost of size %d bytes failed", (int)nbytes);
+        gmx_fatal(FARGS, "%s: %s\n", __PRETTY_FUNCTION__,strbuf);        
+    }
+    //CU_RET_ERR(stat, strbuf);
+}
+
+void ocl_pfree(void *h_ptr)
+{
+    //cudaError_t stat;
+
+    printf("Warning, pfree in OpenCL is not deallocating page-locked memory\n");
+    
+    if (h_ptr)
+    {
+        free(h_ptr);        
+        h_ptr = NULL;
+    }
+    return;
+}
+
 /* Debugger callable function that prints the name of a kernel function pointer */
 cl_int dbg_ocl_kernel_name(const cl_kernel kernel)
 {     
@@ -383,7 +425,7 @@ cl_int dbg_ocl_kernel_name(const cl_kernel kernel)
                             sizeof(kernel_name), &kernel_name, NULL);                       
     if(cl_error)
     {
-        printf("No kernel found!\n",kernel);
+        printf("No kernel found!\n");
     }else{
         printf("%s\n",kernel_name);
     }

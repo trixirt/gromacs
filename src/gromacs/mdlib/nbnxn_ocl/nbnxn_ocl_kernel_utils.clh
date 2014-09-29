@@ -34,7 +34,7 @@
  */
  
 #include "vectype_ops.clh"
-#include "nbnxn_consts.h"
+#include "../nbnxn_consts.h"
 
 #define __IN_OPENCL_KERNEL__
 
@@ -143,8 +143,8 @@ typedef struct cl_nbparam_params
     switch_consts_t vdw_switch;       /**< VdW switch constants                     */   
 
     /* Ewald Coulomb force table data - accessed through texture memory */
-    int                    coulomb_tab_size;   /**< table size (s.t. it fits in texture cache) */
-    float                  coulomb_tab_scale;  /**< table scale/spacing                        */    
+    int             coulomb_tab_size;   /**< table size (s.t. it fits in texture cache) */
+    float           coulomb_tab_scale;  /**< table scale/spacing                        */    
 }cl_nbparam_params_t;
 
 
@@ -527,7 +527,7 @@ float pmecorrF(float z2)
  */
 /* AMD OpenCL compiler error "Undeclared function index 1024" if __INLINE__d */
 //static __INLINE__ __device__
-void reduce_force_j_generic(__local float *f_buf, __global float3 *fout,
+void reduce_force_j_generic(__local float *f_buf, __global float *fout, //__global float3 *fout,
                             int tidxi, int tidxj, int aidx)
 {
     if (tidxi == 0)
@@ -540,7 +540,7 @@ void reduce_force_j_generic(__local float *f_buf, __global float3 *fout,
             f.z += f_buf[2 * FBUF_STRIDE + j];
         }
 
-        atomicAdd_g_f3(&fout[aidx], f);
+        atomicAdd_g_f3(&fout[3*aidx], f);
         //atomicAdd(&(fout[aidx].x), f.x);
     }
 }
@@ -575,7 +575,7 @@ void reduce_force_j_generic(__local float *f_buf, __global float3 *fout,
  *  arbitrary array sizes.
  */
 static __INLINE__ __device__
-void reduce_force_i_generic(__local float *f_buf, __global float3 *fout,
+void reduce_force_i_generic(__local float *f_buf, __global float *fout, //__global float3 *fout,
                             float3 *fshift_buf, bool bCalcFshift,
                             int tidxi, int tidxj, int aidx)
 {
@@ -589,7 +589,7 @@ void reduce_force_i_generic(__local float *f_buf, __global float3 *fout,
             f.z += f_buf[2 * FBUF_STRIDE + j];
         }
 
-        atomicAdd_g_f3(&fout[aidx], f);
+        atomicAdd_g_f3(&fout[3*aidx], f);
 
         if (bCalcFshift)
         {
@@ -602,7 +602,7 @@ void reduce_force_i_generic(__local float *f_buf, __global float3 *fout,
  *  array sizes.
  */
 static __INLINE__ __device__
-void reduce_force_i_pow2(volatile __local float *f_buf, __global float3 *fout,
+void reduce_force_i_pow2(volatile __local float *f_buf, __global float *fout, //__global float3 *fout,
                          float3 *fshift_buf, bool bCalcFshift,
                          int tidxi, int tidxj, int aidx)
 {
@@ -634,7 +634,7 @@ void reduce_force_i_pow2(volatile __local float *f_buf, __global float3 *fout,
         f.y = f_buf[    FBUF_STRIDE + tidxj * CL_SIZE + tidxi] + f_buf[    FBUF_STRIDE + (tidxj + i) * CL_SIZE + tidxi];
         f.z = f_buf[2 * FBUF_STRIDE + tidxj * CL_SIZE + tidxi] + f_buf[2 * FBUF_STRIDE + (tidxj + i) * CL_SIZE + tidxi];
 
-        atomicAdd_g_f3(&fout[aidx], f);
+        atomicAdd_g_f3(&fout[3*aidx], f);
 
         if (bCalcFshift)
         {
@@ -647,7 +647,7 @@ void reduce_force_i_pow2(volatile __local float *f_buf, __global float3 *fout,
  *  on whether the size of the array to be reduced is power of two or not.
  */
 static __INLINE__ __device__
-void reduce_force_i(__local float *f_buf, __global float3 *f,
+void reduce_force_i(__local float *f_buf, __global float *f, //__global float3 *f,
                     float3 *fshift_buf, bool bCalcFshift,
                     int tidxi, int tidxj, int ai)
 {

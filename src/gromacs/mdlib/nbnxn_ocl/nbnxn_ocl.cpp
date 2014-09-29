@@ -356,7 +356,7 @@ static inline int calc_shmem_required()
     shmem += 2 * NBNXN_GPU_JGROUP_SIZE * sizeof(int);       /* cjs  */
 #ifdef IATYPE_SHMEM // CUDA ARCH >= 300
     /* i-atom types in shared memory */
-    #pragma error "Should not be defined
+    #pragma error "Should not be defined"
     shmem += NCL_PER_SUPERCL * CL_SIZE * sizeof(int);       /* atib */
 #endif
 /* #if __CUDA_ARCH__ < 300 */
@@ -396,7 +396,7 @@ static void fillin_ocl_structures(cl_atomdata_t *adat, cl_nbparam_t *nbp, cl_pli
     nbparams_params->two_k_rf = nbp->two_k_rf;
     nbparams_params->vdwtype = nbp->vdwtype;
     nbparams_params->vdw_switch = nbp->vdw_switch;
-
+    
     plist_params->bDoPrune = plist->bDoPrune;
     plist_params->cj4_nalloc = plist->cj4_nalloc;
     plist_params->excl_nalloc = plist->excl_nalloc;
@@ -569,7 +569,6 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
     cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(plist->excl));
     cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(int), &bCalcFshift);
     cl_error = clSetKernelArg(nb_kernel, arg_no++, shmem, NULL);
-
 
     cl_error = clEnqueueNDRangeKernel(stream, nb_kernel, 3, NULL, dim_grid, dim_block, 0, NULL, NULL);
 
