@@ -60,8 +60,6 @@
 #include "gromacs/utility/fatalerror.h"
 #include "gromacs/utility/smalloc.h"
 
-#pragma message "WARNING pmalloc not implemented yet"    
-#define pmalloc(...)
 
 static bool bUseCudaEventBlockingSync = false; /* makes the CPU thread block */
 
@@ -283,7 +281,7 @@ static void init_ewald_coulomb_force_table(//cu_nbparam_t          *nbp,
     /* Subtract 2 iso 1 to avoid access out of range due to rounding */
     tabscale    = (tabsize - 2) / sqrt(nbp->rcoulomb_sq);
 
-    pmalloc((void**)&ftmp, tabsize*sizeof(*ftmp));
+    ocl_pmalloc((void**)&ftmp, tabsize*sizeof(*ftmp));
 
     table_spline3_fill_ewald_lr(ftmp, NULL, NULL, tabsize,
                                 1/tabscale, nbp->ewald_beta, v_q_ewald_lr);
@@ -310,6 +308,8 @@ static void init_ewald_coulomb_force_table(//cu_nbparam_t          *nbp,
         // TO DO: handle errors
 
         nbp->coulomb_tab_climg2d = coul_tab;
+        nbp->coulomb_tab_size     = tabsize;
+        nbp->coulomb_tab_scale    = tabscale; 
 
 ////#ifdef TEXOBJ_SUPPORTED
 ////        /* Only device CC >= 3.0 (Kepler and later) support texture objects */
@@ -360,14 +360,14 @@ static void init_atomdata_first(/*cu_atomdata_t*/cl_atomdata_t *ad, int ntypes, 
 
     //stat        = cudaMalloc((void**)&ad->shift_vec, SHIFTS*sizeof(*ad->shift_vec));
     //CU_RET_ERR(stat, "cudaMalloc failed on ad->shift_vec");
-    ad->shift_vec = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, SHIFTS * sizeof(cl_float3), NULL, &cl_error);        
+    ad->shift_vec = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, SHIFTS * sizeof(rvec), NULL, &cl_error);        
     assert(cl_error == CL_SUCCESS);
     ad->bShiftVecUploaded = false;
     // TO DO: handle errors, check clCreateBuffer flags
 
     //stat = cudaMalloc((void**)&ad->fshift, SHIFTS*sizeof(*ad->fshift));
     //CU_RET_ERR(stat, "cudaMalloc failed on ad->fshift");
-    ad->fshift = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, SHIFTS * sizeof(cl_float3), NULL, &cl_error);
+    ad->fshift = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, SHIFTS * sizeof(rvec), NULL, &cl_error);
     assert(cl_error == CL_SUCCESS);    
     // TO DO: handle errors, check clCreateBuffer flags
 
@@ -606,6 +606,11 @@ static void init_nbparam(/*cu_nbparam_t*/cl_nbparam_t  *nbp,
         assert(cl_error == CL_SUCCESS);
         // TO DO: handle errors
 
+        /* We are still binding this to the kernels, so just copy the data as well for test */
+        printf("Warning: %s:%d Memory copy that is not needed (and kernel arg attach)\n",__FUNCTION__,__LINE__);
+        nbp->nbfp = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, nnbfp * sizeof(*nbat->nbfp), NULL, &cl_error);        
+        ocl_copy_H2D(nbp->nbfp, nbat->nbfp, 0, nnbfp*sizeof(*nbat->nbfp), dev_info->command_queue);
+        assert(cl_error == CL_SUCCESS);
 
         if (ic->vdwtype == evdwPME)
         {
@@ -812,9 +817,9 @@ void nbnxn_ocl_init(FILE                 *fplog,
     snew(nb->timings, 1);
 
     /* init nbst */
-    pmalloc((void**)&nb->nbst.e_lj, sizeof(*nb->nbst.e_lj));
-    pmalloc((void**)&nb->nbst.e_el, sizeof(*nb->nbst.e_el));
-    pmalloc((void**)&nb->nbst.fshift, SHIFTS * sizeof(*nb->nbst.fshift));
+    ocl_pmalloc((void**)&nb->nbst.e_lj, sizeof(*nb->nbst.e_lj));
+    ocl_pmalloc((void**)&nb->nbst.e_el, sizeof(*nb->nbst.e_el));
+    ocl_pmalloc((void**)&nb->nbst.fshift, SHIFTS * sizeof(*nb->nbst.fshift));
 
     init_plist(nb->plist[eintLocal]);
 
@@ -1196,7 +1201,7 @@ void nbnxn_ocl_upload_shiftvec(nbnxn_opencl_ptr_t        ocl_nb,
     if (nbatom->bDynamicBox || !adat->bShiftVecUploaded)
     {
         ocl_copy_H2D_async(adat->shift_vec, nbatom->shift_vec, 0,
-                          SHIFTS * sizeof(cl_float3), ls, NULL);
+                          SHIFTS * sizeof(rvec), ls, NULL);
         adat->bShiftVecUploaded = true;
     }
 }

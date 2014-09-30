@@ -1,4 +1,4 @@
-
+#define __IN_OPENCL_KERNEL__
 
 /* Auxiliary kernels */
 __kernel void

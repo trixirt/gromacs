@@ -416,7 +416,9 @@ ocl_compile_program(
         // 
         
         char custom_build_options_prepend[32];
-        snprintf(custom_build_options_prepend,32,"-DWARP_SIZE_TEST=%d",warp_size);
+        // TO DO: check if snprintf must be used. On VS this gives an error: snprintf identifier not found
+        //snprintf(custom_build_options_prepend,32,"-DWARP_SIZE_TEST=%d",warp_size);
+        sprintf(custom_build_options_prepend,"-DWARP_SIZE_TEST=%d",warp_size);
         
         size_t build_options_length = 
                 create_ocl_build_options_length(ocl_device_vendor,custom_build_options_prepend,NULL);

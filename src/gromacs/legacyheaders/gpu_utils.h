@@ -142,6 +142,12 @@ void get_ocl_gpu_device_info_string(char gmx_unused *s, const gmx_gpu_info_t gmx
 FUNC_QUALIFIER
 size_t sizeof_cuda_dev_info(void) FUNC_TERM_SIZE_T
 
+FUNC_QUALIFIER_OPENCL
+void ocl_pmalloc(void **h_ptr, size_t nbytes) FUNC_TERM_VOID_OPENCL
+
+FUNC_QUALIFIER_OPENCL
+void ocl_pfree(void *h_ptr) FUNC_TERM_VOID_OPENCL
+
 #if defined(GMX_GPU) && defined(GMX_USE_OPENCL) && !defined(DNDEBUG)
 /* Debugger callable function that prints the name of a kernel function pointer */
 cl_int dbg_ocl_kernel_name(const cl_kernel kernel);
