@@ -606,12 +606,6 @@ static void init_nbparam(/*cu_nbparam_t*/cl_nbparam_t  *nbp,
         assert(cl_error == CL_SUCCESS);
         // TO DO: handle errors
 
-        /* We are still binding this to the kernels, so just copy the data as well for test */
-        printf("Warning: %s:%d Memory copy that is not needed (and kernel arg attach)\n",__FUNCTION__,__LINE__);
-        nbp->nbfp = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, nnbfp * sizeof(*nbat->nbfp), NULL, &cl_error);        
-        ocl_copy_H2D(nbp->nbfp, nbat->nbfp, 0, nnbfp*sizeof(*nbat->nbfp), dev_info->command_queue);
-        assert(cl_error == CL_SUCCESS);
-
         if (ic->vdwtype == evdwPME)
         {
             nbp->nbfp_comb_climg2d = clCreateImage2D(dev_info->context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,

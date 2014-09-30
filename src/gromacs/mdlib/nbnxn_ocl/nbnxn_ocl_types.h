@@ -200,11 +200,11 @@ typedef struct cl_nbparam
 
     /* LJ non-bonded parameters - accessed through texture memory */
     //float                 *nbfp;             /**< nonbonded parameter table with C6/C12 pairs per atom type-pair, 2*ntype^2 elements */
-    cl_mem                  nbfp;
+    //cl_mem                  nbfp;
     //openclTextureObject_t  nbfp_climg2d;      /**< texture object bound to nbfp                                                       */
     cl_mem                  nbfp_climg2d;      /**< texture object bound to nbfp                                                       */
     //float                 *nbfp_comb;        /**< nonbonded parameter table per atom type, 2*ntype elements                          */
-    cl_mem                 nbfp_comb;        /**< nonbonded parameter table per atom type, 2*ntype elements                          */
+    //cl_mem                 nbfp_comb;        /**< nonbonded parameter table per atom type, 2*ntype elements                          */
     //openclTextureObject_t  nbfp_comb_climg2d; /**< texture object bound to nbfp_texobj                                                */
     cl_mem                  nbfp_comb_climg2d; /**< texture object bound to nbfp_texobj                                                */
 
