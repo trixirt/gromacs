@@ -1245,7 +1245,7 @@ void nbnxn_ocl_init_atomdata(nbnxn_opencl_ptr_t        ocl_nb,
 
         //stat = cudaMalloc((void **)&d_atdat->f, nalloc*sizeof(*d_atdat->f));
         //CU_RET_ERR(stat, "cudaMalloc failed on d_atdat->f");
-        d_atdat->f = clCreateBuffer(ocl_nb->dev_info->context, CL_MEM_READ_WRITE, nalloc * sizeof(cl_float3), NULL, &cl_error);
+        d_atdat->f = clCreateBuffer(ocl_nb->dev_info->context, CL_MEM_READ_WRITE, nalloc * sizeof(/*cl_float3*/rvec), NULL, &cl_error);
         // TO DO: handle errors, check clCreateBuffer flags
 
         //stat = cudaMalloc((void **)&d_atdat->xq, nalloc*sizeof(*d_atdat->xq));
