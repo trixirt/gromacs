@@ -248,8 +248,7 @@ gmx_bool init_ocl_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
     cl_device_id device_id;
     cl_context context;
     cl_program program;
-    cl_int cl_error;
-    cl_command_queue command_queue;
+    cl_int cl_error;    
     cl_uint num_kernels;
     cl_kernel *kernels;
 
@@ -274,11 +273,6 @@ gmx_bool init_ocl_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
         context_properties[2] = 0;
         
         context = clCreateContext(context_properties, 1, &device_id, NULL, NULL, &cl_error);
-        CALLOCLFUNC_LOGERROR(cl_error, result_str, retval)
-        if (0 != retval)
-            break;
-
-        command_queue = clCreateCommandQueue(context, device_id, 0, &cl_error);
         CALLOCLFUNC_LOGERROR(cl_error, result_str, retval)
         if (0 != retval)
             break;
@@ -342,8 +336,7 @@ gmx_bool init_ocl_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
 
     if (0 == retval)
     {
-        selected_ocl_gpu->context = context;
-        selected_ocl_gpu->command_queue = command_queue;
+        selected_ocl_gpu->context = context;        
         selected_ocl_gpu->program = program;
         //selected_ocl_gpu->num_kernels = num_kernels;
         //selected_ocl_gpu->kernels = kernels;

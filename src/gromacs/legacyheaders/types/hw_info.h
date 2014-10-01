@@ -90,8 +90,7 @@ typedef struct
     int                 compute_units;
     int                 stat;
 
-    cl_context          context;
-    cl_command_queue    command_queue;
+    cl_context          context;    
     cl_program          program;
 
      /* This causes a mayhem of warnings, TODO fix it */
