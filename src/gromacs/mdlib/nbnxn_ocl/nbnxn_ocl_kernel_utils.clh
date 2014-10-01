@@ -36,9 +36,6 @@
 #include "vectype_ops.clh"
 #include "../nbnxn_consts.h"
 
-#define __IN_OPENCL_KERNEL__
-
-
 #define CL_SIZE                 (NBNXN_GPU_CLUSTER_SIZE)
 #define NCL_PER_SUPERCL         (NBNXN_GPU_NCLUSTER_PER_SUPERCLUSTER)
 

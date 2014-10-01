@@ -397,7 +397,7 @@ void ocl_pmalloc(void **h_ptr, size_t nbytes)
     if(! *h_ptr)
     {
         sprintf(strbuf, "cudaMallocHost of size %d bytes failed", (int)nbytes);
-        gmx_fatal(FARGS, "%s: %s\n", __PRETTY_FUNCTION__,strbuf);        
+        gmx_fatal(FARGS, "%s: %s\n", __FUNCTION__,strbuf);        
     }
     //CU_RET_ERR(stat, strbuf);
 }

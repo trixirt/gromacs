@@ -37,7 +37,8 @@ const char* build_options_list[] = {
     "-cl-opt-disable",
     "-g",
     "-I"OCL_INSTALL_DIR_NAME,
-    "-I../../src/gromacs/gmxlib/ocl_tools -I../../src/gromacs/mdlib/nbnxn_ocl -I../../src/gromacs/pbcutil -I../../src/gromacs/mdlib"
+    "-I../../src/gromacs/gmxlib/ocl_tools           -I../../src/gromacs/mdlib/nbnxn_ocl            -I../../src/gromacs/pbcutil            -I../../src/gromacs/mdlib \
+    -I../../../gromacs/src/gromacs/gmxlib/ocl_tools -I../../../gromacs/src/gromacs/mdlib/nbnxn_ocl -I../../../gromacs/src/gromacs/pbcutil -I../../../gromacs/src/gromacs/mdlib"
 };
 
 static const char*      kernel_filenames[]         = {"nbnxn_ocl_kernels.cl"};
@@ -408,15 +409,10 @@ ocl_compile_program(
     
     // Build the program
     cl_int build_status         = CL_SUCCESS;    
-    {
-        
-        // Anca, how to add manually the includes:
-        // const char * custom_build_options_prepend = 
-        //      "-I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\mdlib\\nbnxn_ocl\\ -I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\pbcutil\\ -I C:\\Anca\\SC\\gromacs\\gromacs\\src\\ -I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\legacyheaders\\ -I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\mdlib\\"
-        // 
-        
-        char custom_build_options_prepend[32];
-        snprintf(custom_build_options_prepend,32,"-DWARP_SIZE_TEST=%d",warp_size);
+    {      
+        char custom_build_options_prepend[256] = {0};
+
+        sprintf(custom_build_options_prepend, "-DWARP_SIZE_TEST=%d", warp_size);        
         
         size_t build_options_length = 
                 create_ocl_build_options_length(ocl_device_vendor,custom_build_options_prepend,NULL);
