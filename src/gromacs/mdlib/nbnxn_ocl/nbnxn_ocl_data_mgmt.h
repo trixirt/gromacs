@@ -103,10 +103,10 @@ void nbnxn_ocl_clear_outputs(
     nbnxn_cuda_ptr_t    cl_nb,
     int gmx_unused      flags) FUNC_TERM
 
-///////** Frees all GPU resources used for the nonbonded calculations. */
-//////FUNC_QUALIFIER
-//////void nbnxn_cuda_free(nbnxn_cuda_ptr_t gmx_unused  cu_nb) FUNC_TERM
-//////
+/** Frees all GPU resources used for the nonbonded calculations. */
+FUNC_QUALIFIER
+void nbnxn_ocl_free(nbnxn_opencl_ptr_t gmx_unused  cu_nb) FUNC_TERM
+
 ///////** Returns the GPU timings structure or NULL if GPU is not used or timing is off. */
 //////FUNC_QUALIFIER
 //////wallclock_gpu_t * nbnxn_cuda_get_timings(nbnxn_cuda_ptr_t gmx_unused cu_nb)

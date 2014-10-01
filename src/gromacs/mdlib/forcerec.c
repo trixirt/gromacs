@@ -3370,7 +3370,11 @@ void free_gpu_resources(const t_forcerec *fr,
     if (bIsPPrankUsingGPU)
     {
         /* free nbnxn data in GPU memory */
+#ifdef GMX_USE_OPENCL
+        nbnxn_ocl_free(fr->nbv->ocl_nbv);
+#else
         nbnxn_cuda_free(fr->nbv->cu_nbv);
+#endif
 
         /* With tMPI we need to wait for all ranks to finish deallocation before
          * destroying the context in free_gpu() as some ranks may be sharing

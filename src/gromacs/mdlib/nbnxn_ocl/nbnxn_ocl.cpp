@@ -750,6 +750,13 @@ static inline bool atomic_cas(volatile unsigned int *ptr,
 #endif
 }
 
+void nbnxn_ocl_wait_gpu(nbnxn_opencl_ptr_t cu_nb,
+                         const nbnxn_atomdata_t *nbatom,
+                         int flags, int aloc,
+                         real *e_lj, real *e_el, rvec *fshift)
+{
+    // TO DO: Implement this function for OpenCL
+}
 ////void nbnxn_cuda_wait_gpu(nbnxn_cuda_ptr_t cu_nb,
 ////                         const nbnxn_atomdata_t *nbatom,
 ////                         int flags, int aloc,
