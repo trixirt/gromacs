@@ -370,7 +370,7 @@
     /* Pre-load i-atom x and q into shared memory */
     ci = sci * NCL_PER_SUPERCL + tidxj;
     ai = ci * CL_SIZE + tidxi;
-    xqib[tidxj * CL_SIZE + tidxi] = xq[ai] + make_float4(shift_vec[nb_sci.shift]);
+    xqib[tidxj * CL_SIZE + tidxi] = xq[ai] + (float4)(shift_vec[3*nb_sci.shift], shift_vec[3*nb_sci.shift + 1], shift_vec[3*nb_sci.shift + 2], 0.0f);
 #ifdef IATYPE_SHMEM //Should not be defined! CUDA > 300
     /* Pre-load the i-atom types into shared memory */
     atib[tidxj * CL_SIZE + tidxi] = atom_types[ai];
@@ -408,6 +408,12 @@
             E_el += qi*qi;
 #endif
 
+#ifndef DEBUG_E_EL_SUM            
+#define DEBUG_E_EL_SUM
+#endif            
+            
+#ifndef DEBUG_E_EL_SUM            
+            
 #if defined LJ_EWALD
             E_lj += read_imagef(nbfp_climg2d, generic_sampler, (int2)(atom_types[(sci*NCL_PER_SUPERCL + i)*CL_SIZE + tidxi]*(ntypes + 1)*2,0)).x;
 #endif /* LJ_EWALD */
@@ -693,9 +699,11 @@
     if (bCalcFshift && tidxj == 0)
     {
         //atomicAdd(&(atdat->fshift[nb_sci.shift]),fshift_buf);
-        atomicAdd_g_f3(&(fshift[nb_sci.shift]),fshift_buf);
+        atomicAdd_g_f3(&(fshift[3*nb_sci.shift]),fshift_buf);
     }
 
+#endif    // DEBUG_E_EL_SUM        
+    
 #ifdef CALC_ENERGIES
     /* flush the energies to shmem and reduce them */
     f_buf[              tidx] = E_lj;
