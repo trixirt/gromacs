@@ -1291,6 +1291,10 @@ void nbnxn_ocl_init_atomdata(nbnxn_opencl_ptr_t        ocl_nb,
     }
 }
 
+void nbnxn_ocl_free(nbnxn_opencl_ptr_t ocl_nb)
+{
+    // TO DO: Implement this functions for OpenCL
+}
 ////void nbnxn_cuda_free(nbnxn_cuda_ptr_t cu_nb)
 ////{
 ////    cudaError_t      stat;

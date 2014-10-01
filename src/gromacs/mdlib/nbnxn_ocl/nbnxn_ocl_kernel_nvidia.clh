@@ -659,6 +659,8 @@ __global float *fshift, // __global float3 *fshift,
                         mask_ji += mask_ji;
                     }
 
+                    /* reduce j forces */
+
                     /* store j forces in shmem */
                     f_buf[                  tidx] = fcj_buf.x;
                     f_buf[    FBUF_STRIDE + tidx] = fcj_buf.y;
