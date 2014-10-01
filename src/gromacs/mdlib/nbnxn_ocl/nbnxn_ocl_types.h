@@ -328,6 +328,20 @@ typedef struct cl_timers
 struct nbnxn_opencl
 {
     ocl_gpu_info_t *dev_info;        /**< CUDA device information                              */    
+
+                                    /** non-bonded kernels */
+                                    /** organized similar with nb_kfunc_xxx arrays in nbnxn_ocl.cpp */
+    cl_kernel           kernel_noener_noprune_ptr[eelOclNR][evdwOclNR];
+    cl_kernel           kernel_ener_noprune_ptr[eelOclNR][evdwOclNR] ;
+    cl_kernel           kernel_noener_prune_ptr[eelOclNR][evdwOclNR];
+    cl_kernel           kernel_ener_prune_ptr[eelOclNR][evdwOclNR];
+
+                                    /** auxiliary kernels implementing memset like functions */
+    cl_kernel           kernel_memset_f;
+    cl_kernel           kernel_memset_f2;
+    cl_kernel           kernel_memset_f3;
+    cl_kernel           kernel_zero_e_fshift;
+
     cl_bool          bUseTwoStreams; /**< true if doing both local/non-local NB work on GPU    */
     cl_bool          bUseStreamSync; /**< true if the standard cudaStreamSynchronize is used
                                           and not memory polling-based waiting                 */
