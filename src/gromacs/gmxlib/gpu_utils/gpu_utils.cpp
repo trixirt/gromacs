@@ -93,7 +93,7 @@ int detect_ocl_gpus(gmx_gpu_info_t *gpu_info, char *err_str)
 
                 CALLOCLFUNC_LOGERROR(clGetDeviceIDs(ocl_platform_ids[i], req_dev_type, gpu_info->nocl_dev, ocl_device_ids, &ocl_device_count), err_str, retval)
                 if (0 != retval)
-                    break;
+                    continue;
 
                 if (1 > ocl_device_count)
                     break;

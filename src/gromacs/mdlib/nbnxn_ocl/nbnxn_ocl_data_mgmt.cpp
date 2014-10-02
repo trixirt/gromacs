@@ -171,7 +171,7 @@ int ocl_copy_D2H_generic(void * h_dest, cl_mem d_src, size_t offset, size_t byte
 
 int ocl_copy_D2H_async(void * h_dest, cl_mem d_src, size_t offset, size_t bytes, cl_command_queue command_queue, cl_event *copy_event)
 {
-    return ocl_copy_D2H_generic(h_dest, d_src, offset, bytes, true, command_queue, copy_event);
+    return ocl_copy_D2H_generic(h_dest, d_src, offset, bytes, false, command_queue, copy_event); // Changed into synchronized reading to avoid race condition. FIXME
 }
 
 /*!
@@ -1067,7 +1067,7 @@ nbnxn_ocl_clear_e_fshift(nbnxn_opencl_ptr_t ocl_nb)
     assert(cl_error == CL_SUCCESS);
     
     cl_error = clEnqueueNDRangeKernel(ls, zero_e_fshift, 3, NULL, dim_grid, dim_block, 0, NULL, NULL);    
-    cl_error |= clFinish(ls);        
+    //cl_error |= clFinish(ls);        
     assert(cl_error == CL_SUCCESS);    
     
 }
@@ -1099,7 +1099,7 @@ static void nbnxn_ocl_clear_f(nbnxn_opencl_ptr_t ocl_nb, int natoms_clear)
     assert(cl_error == CL_SUCCESS);
     
     cl_error = clEnqueueNDRangeKernel(ls, memset_f, 3, NULL, dim_grid, dim_block, 0, NULL, NULL);    
-    cl_error |= clFinish(ls);        
+    //cl_error |= clFinish(ls);        
     assert(cl_error == CL_SUCCESS);
 
     //stat = cudaMemsetAsync(adat->f, 0, natoms_clear * sizeof(*adat->f), ls);
