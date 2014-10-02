@@ -160,10 +160,9 @@ static unsigned int poll_wait_pattern = (0x7FU << 23);
 ////}
 
 
-/* Constant arrays listing all kernel function pointers and enabling selection
-   of a kernel in an elegant manner. */
+/* Constant arrays listing all kernel function names. */
 
-/*! Pointers to the non-bonded kernels organized in 2-dim arrays by:
+/*! Pointers to the non-bonded kernel names organized in 2-dim arrays by:
  *  electrostatics and VDW type.
  *
  *  Note that the row- and column-order of function pointers has to match the
@@ -276,30 +275,30 @@ static const char* nb_kfunc_ener_prune_ptr[eelOclNR][evdwOclNR] =
 ////}
 
 /*! Return a pointer to the kernel version to be executed at the current step. */
-static inline cl_kernel select_nbnxn_kernel(ocl_gpu_info_t *dev_info,
+static inline cl_kernel select_nbnxn_kernel(nbnxn_opencl_ptr_t ocl_nb,
                                             int  eeltype,
                                                        int  evdwtype,
                                                        bool bDoEne,
                                                        bool bDoPrune)
 {
     const char* kernel_name_to_run;
-    cl_kernel ret_kernel;
+    cl_kernel *kernel_ptr;
     cl_int cl_error;
 
     assert(eeltype < eelOclNR);
     assert(evdwtype < eelOclNR);
-
-    ret_kernel = NULL;
 
     if (bDoEne)
     {
         if (bDoPrune)
         {
             kernel_name_to_run = nb_kfunc_ener_prune_ptr[eeltype][evdwtype];
+            kernel_ptr = &(ocl_nb->kernel_ener_prune_ptr[eeltype][evdwtype]);
         }
         else
         {
             kernel_name_to_run = nb_kfunc_ener_noprune_ptr[eeltype][evdwtype];
+            kernel_ptr = &(ocl_nb->kernel_ener_noprune_ptr[eeltype][evdwtype]);
         }
     }
     else
@@ -307,18 +306,21 @@ static inline cl_kernel select_nbnxn_kernel(ocl_gpu_info_t *dev_info,
         if (bDoPrune)
         {
             kernel_name_to_run = nb_kfunc_noener_prune_ptr[eeltype][evdwtype];
+            kernel_ptr = &(ocl_nb->kernel_noener_prune_ptr[eeltype][evdwtype]);
         }
         else
         {
             kernel_name_to_run = nb_kfunc_noener_noprune_ptr[eeltype][evdwtype];
+            kernel_ptr = &(ocl_nb->kernel_noener_noprune_ptr[eeltype][evdwtype]);
         }
     }
     printf("Selected kernel: %s\n",kernel_name_to_run);
 
-    ret_kernel = clCreateKernel(dev_info->program, kernel_name_to_run, &cl_error);
+    if (NULL == kernel_ptr[0])
+        *kernel_ptr = clCreateKernel(ocl_nb->dev_info->program, kernel_name_to_run, &cl_error);
     // TO DO: handle errors
 
-    return ret_kernel;
+    return *kernel_ptr;
 }
 
 /*! Returns the number of blocks to be used for the nonbonded GPU kernel. */
@@ -517,7 +519,7 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
     }
 
     /* get the pointer to the kernel flavor we need to use */
-    nb_kernel = select_nbnxn_kernel(ocl_nb->dev_info,
+    nb_kernel = select_nbnxn_kernel(ocl_nb,
                                     nbp->eeltype,
                                     nbp->vdwtype,
                                     bCalcEner,
