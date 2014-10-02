@@ -757,7 +757,31 @@ void nbnxn_ocl_wait_gpu(nbnxn_opencl_ptr_t cu_nb,
                          int flags, int aloc,
                          real *e_lj, real *e_el, rvec *fshift)
 {
-    // TO DO: Implement this function for OpenCL
+    // TO DO: Implement this in a better way than just clFinish
+
+	int         iloc = -1;
+
+	/* determine interaction locality from atom locality */
+	if (LOCAL_A(aloc))
+	{
+		iloc = eintLocal;
+	}
+	else if (NONLOCAL_A(aloc))
+	{
+		iloc = eintNonlocal;
+	}
+	else
+	{
+		char stmp[STRLEN];
+		sprintf(stmp, "Invalid atom locality passed (%d); valid here is only "
+			"local (%d) or nonlocal (%d)", aloc, eatLocal, eatNonlocal);
+
+		// TO DO: fix for OpenCL
+		//gmx_incons(stmp);
+	}
+
+	clFinish(cu_nb->stream[iloc]);
+
 }
 ////void nbnxn_cuda_wait_gpu(nbnxn_cuda_ptr_t cu_nb,
 ////                         const nbnxn_atomdata_t *nbatom,
