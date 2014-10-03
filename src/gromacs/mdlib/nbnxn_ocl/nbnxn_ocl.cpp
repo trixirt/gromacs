@@ -160,10 +160,9 @@ static unsigned int poll_wait_pattern = (0x7FU << 23);
 ////}
 
 
-/* Constant arrays listing all kernel function pointers and enabling selection
-   of a kernel in an elegant manner. */
+/* Constant arrays listing all kernel function names. */
 
-/*! Pointers to the non-bonded kernels organized in 2-dim arrays by:
+/*! Pointers to the non-bonded kernel names organized in 2-dim arrays by:
  *  electrostatics and VDW type.
  *
  *  Note that the row- and column-order of function pointers has to match the
@@ -276,30 +275,30 @@ static const char* nb_kfunc_ener_prune_ptr[eelOclNR][evdwOclNR] =
 ////}
 
 /*! Return a pointer to the kernel version to be executed at the current step. */
-static inline cl_kernel select_nbnxn_kernel(ocl_gpu_info_t *dev_info,
+static inline cl_kernel select_nbnxn_kernel(nbnxn_opencl_ptr_t ocl_nb,
                                             int  eeltype,
                                                        int  evdwtype,
                                                        bool bDoEne,
                                                        bool bDoPrune)
 {
     const char* kernel_name_to_run;
-    cl_kernel ret_kernel;
+    cl_kernel *kernel_ptr;
     cl_int cl_error;
 
     assert(eeltype < eelOclNR);
     assert(evdwtype < eelOclNR);
-
-    ret_kernel = NULL;
 
     if (bDoEne)
     {
         if (bDoPrune)
         {
             kernel_name_to_run = nb_kfunc_ener_prune_ptr[eeltype][evdwtype];
+            kernel_ptr = &(ocl_nb->kernel_ener_prune_ptr[eeltype][evdwtype]);
         }
         else
         {
             kernel_name_to_run = nb_kfunc_ener_noprune_ptr[eeltype][evdwtype];
+            kernel_ptr = &(ocl_nb->kernel_ener_noprune_ptr[eeltype][evdwtype]);
         }
     }
     else
@@ -307,18 +306,21 @@ static inline cl_kernel select_nbnxn_kernel(ocl_gpu_info_t *dev_info,
         if (bDoPrune)
         {
             kernel_name_to_run = nb_kfunc_noener_prune_ptr[eeltype][evdwtype];
+            kernel_ptr = &(ocl_nb->kernel_noener_prune_ptr[eeltype][evdwtype]);
         }
         else
         {
             kernel_name_to_run = nb_kfunc_noener_noprune_ptr[eeltype][evdwtype];
+            kernel_ptr = &(ocl_nb->kernel_noener_noprune_ptr[eeltype][evdwtype]);
         }
     }
     printf("Selected kernel: %s\n",kernel_name_to_run);
 
-    ret_kernel = clCreateKernel(dev_info->program, kernel_name_to_run, &cl_error);
+    if (NULL == kernel_ptr[0])
+        *kernel_ptr = clCreateKernel(ocl_nb->dev_info->program, kernel_name_to_run, &cl_error);
     // TO DO: handle errors
 
-    return ret_kernel;
+    return *kernel_ptr;
 }
 
 /*! Returns the number of blocks to be used for the nonbonded GPU kernel. */
@@ -517,7 +519,7 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
     }
 
     /* get the pointer to the kernel flavor we need to use */
-    nb_kernel = select_nbnxn_kernel(ocl_nb->dev_info,
+    nb_kernel = select_nbnxn_kernel(ocl_nb,
                                     nbp->eeltype,
                                     nbp->vdwtype,
                                     bCalcEner,
@@ -570,7 +572,7 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
 
     cl_error = clEnqueueNDRangeKernel(stream, nb_kernel, 3, NULL, dim_grid, dim_block, 0, NULL, NULL);
 
-    cl_error = clFinish(stream);
+    //cl_error = clFinish(stream);
 
 
     ////nb_kernel<<< dim_grid, dim_block, shmem, stream>>> (*adat, *nbp, *plist, bCalcFshift);
@@ -749,6 +751,64 @@ static inline bool atomic_cas(volatile unsigned int *ptr,
 #endif
 }
 
+void nbnxn_ocl_wait_gpu(nbnxn_opencl_ptr_t cu_nb,
+                         const nbnxn_atomdata_t *nbatom,
+                         int flags, int aloc,
+                         real *e_lj, real *e_el, rvec *fshift)
+{
+	int              iloc = -1, i;
+	bool             bCalcEner   = flags & GMX_FORCE_VIRIAL;
+	bool             bCalcFshift = flags & GMX_FORCE_VIRIAL;
+	cl_nb_staging    nbst = cu_nb->nbst;
+	
+
+	/* determine interaction locality from atom locality */
+	if (LOCAL_A(aloc))
+	{
+		iloc = eintLocal;
+	}
+	else if (NONLOCAL_A(aloc))
+	{
+		iloc = eintNonlocal;
+	}
+	else
+	{
+		char stmp[STRLEN];
+		sprintf(stmp, "Invalid atom locality passed (%d); valid here is only "
+			"local (%d) or nonlocal (%d)", aloc, eatLocal, eatNonlocal);
+
+		// TO DO: fix for OpenCL
+		//gmx_incons(stmp);
+	}
+	cl_plist_t *plist = cu_nb->plist[iloc];
+
+	/* Actual sync point. Waits for everything to be finished in the command queue. TODO: Find out if a more fine grained solution is needed */
+	clFinish(cu_nb->stream[iloc]);
+
+	/* add up energies and shift forces (only once at local F wait) */
+	if (LOCAL_I(iloc))
+	{
+	    if (bCalcEner)
+	    {
+	        *e_lj += *nbst.e_lj;
+	        *e_el += *nbst.e_el;
+	    }
+	
+	    if (bCalcFshift)
+	    {
+	        for (i = 0; i < SHIFTS; i++)
+	        {
+	            fshift[i][0] += nbst.fshift[i*3];
+				fshift[i][1] += nbst.fshift[i*3+1];
+	            fshift[i][2] += nbst.fshift[i*3+2 ];
+	        }
+	    }
+	}
+	
+	/* turn off pruning (doesn't matter if this is pair-search step or not) */
+	plist->bDoPrune = false;
+
+}
 ////void nbnxn_cuda_wait_gpu(nbnxn_cuda_ptr_t cu_nb,
 ////                         const nbnxn_atomdata_t *nbatom,
 ////                         int flags, int aloc,

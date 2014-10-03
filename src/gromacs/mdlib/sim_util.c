@@ -1421,12 +1421,11 @@ void do_force_cutsVERLET(FILE *fplog, t_commrec *cr,
                                     enerd->grpp.ener[egLJSR], enerd->grpp.ener[egCOULSR],
                                     fr->fshift);
 #elif defined(GMX_GPU) && defined(GMX_USE_OPENCL)    
-#pragma message "WARNING Not implementet yet"                
-                //nbnxn_ocl_wait_gpu(nbv->cu_nbv,
-                //                    nbv->grp[eintNonlocal].nbat,
-                //                    flags, eatNonlocal,
-                //                    enerd->grpp.ener[egLJSR], enerd->grpp.ener[egCOULSR],
-                //                    fr->fshift);
+                nbnxn_ocl_wait_gpu(nbv->ocl_nbv,
+                                    nbv->grp[eintNonlocal].nbat,
+                                    flags, eatNonlocal,
+                                    enerd->grpp.ener[egLJSR], enerd->grpp.ener[egCOULSR],
+                                    fr->fshift);
 #endif                
                 cycles_tmp       = wallcycle_stop(wcycle, ewcWAIT_GPU_NB_NL);
                 cycles_wait_gpu += cycles_tmp;
@@ -1499,8 +1498,12 @@ void do_force_cutsVERLET(FILE *fplog, t_commrec *cr,
             nbnxn_cuda_clear_outputs(nbv->cu_nbv, flags);
             wallcycle_stop(wcycle, ewcLAUNCH_GPU_NB);
 #elif defined(GMX_GPU) && defined(GMX_USE_OPENCL)    
-#pragma message "WARNING Not implemented yet"    
-
+			nbnxn_ocl_wait_gpu(nbv->ocl_nbv,
+				nbv->grp[eintLocal].nbat,
+				flags, eatLocal,
+				enerd->grpp.ener[egLJSR], enerd->grpp.ener[egCOULSR],
+				fr->fshift);
+			cycles_wait_gpu += wallcycle_stop(wcycle, ewcWAIT_GPU_NB_L);
 #endif            
         }
         else

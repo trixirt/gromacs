@@ -39,6 +39,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <string.h>
 
 #include "tables.h"
 #include "typedefs.h"
@@ -171,7 +172,7 @@ int ocl_copy_D2H_generic(void * h_dest, cl_mem d_src, size_t offset, size_t byte
 
 int ocl_copy_D2H_async(void * h_dest, cl_mem d_src, size_t offset, size_t bytes, cl_command_queue command_queue, cl_event *copy_event)
 {
-    return ocl_copy_D2H_generic(h_dest, d_src, offset, bytes, true, command_queue, copy_event);
+    return ocl_copy_D2H_generic(h_dest, d_src, offset, bytes, true, command_queue, copy_event); 
 }
 
 /*!
@@ -308,6 +309,8 @@ static void init_ewald_coulomb_force_table(//cu_nbparam_t          *nbp,
         // TO DO: handle errors
 
         nbp->coulomb_tab_climg2d = coul_tab;
+        nbp->coulomb_tab_size     = tabsize;
+        nbp->coulomb_tab_scale    = tabscale; 
 
 ////#ifdef TEXOBJ_SUPPORTED
 ////        /* Only device CC >= 3.0 (Kepler and later) support texture objects */
@@ -475,7 +478,8 @@ static void init_nbparam(/*cu_nbparam_t*/cl_nbparam_t  *nbp,
 {
     int         ntypes, nnbfp, nnbfp_comb;
     cl_int      cl_error;
-    
+
+
     ntypes  = nbat->ntype;
 
     set_cutoff_parameters(nbp, ic);
@@ -602,7 +606,6 @@ static void init_nbparam(/*cu_nbparam_t*/cl_nbparam_t  *nbp,
             &array_format, nnbfp, 1, 0, nbat->nbfp, &cl_error);
         assert(cl_error == CL_SUCCESS);
         // TO DO: handle errors
-
 
         if (ic->vdwtype == evdwPME)
         {
@@ -773,6 +776,31 @@ static void init_timings(wallclock_gpu_t *t)
     }
 }
 
+void nbnxn_init_kernels(nbnxn_opencl_ptr_t  nb)
+{
+    cl_int cl_error;
+
+    /* Init to 0 main kernel arrays */
+    /* They will be later on initialized in select_nbnxn_kernel */
+    memset(nb->kernel_ener_noprune_ptr, 0, sizeof(nb->kernel_ener_noprune_ptr));
+    memset(nb->kernel_ener_prune_ptr, 0, sizeof(nb->kernel_ener_prune_ptr));
+    memset(nb->kernel_noener_noprune_ptr, 0, sizeof(nb->kernel_noener_noprune_ptr));
+    memset(nb->kernel_noener_prune_ptr, 0, sizeof(nb->kernel_noener_prune_ptr));
+
+    /* Init auxiliary kernels */
+    nb->kernel_memset_f = clCreateKernel(nb->dev_info->program,"memset_f", &cl_error);
+    assert(cl_error == CL_SUCCESS); 
+
+    nb->kernel_memset_f2 = clCreateKernel(nb->dev_info->program,"memset_f2", &cl_error);
+    assert(cl_error == CL_SUCCESS); 
+
+    nb->kernel_memset_f3 = clCreateKernel(nb->dev_info->program,"memset_f3", &cl_error);
+    assert(cl_error == CL_SUCCESS); 
+
+    nb->kernel_zero_e_fshift = clCreateKernel(nb->dev_info->program,"zero_e_fshift", &cl_error);
+    assert(cl_error == CL_SUCCESS);    
+}
+
 void nbnxn_ocl_init(FILE                 *fplog,
                      nbnxn_opencl_ptr_t     *p_cu_nb,
                      const gmx_gpu_info_t *gpu_info,
@@ -808,16 +836,19 @@ void nbnxn_ocl_init(FILE                 *fplog,
     snew(nb->timers, 1);
     snew(nb->timings, 1);
 
+    /* set device info, just point it to the right GPU among the detected ones */    
+    nb->dev_info = &gpu_info->ocl_dev[my_gpu_index];
+        //&gpu_info->cuda_dev[get_gpu_device_id(gpu_info, gpu_opt, my_gpu_index)];
+
+    /* init the kernels */
+    nbnxn_init_kernels(nb);
+
     /* init nbst */
     ocl_pmalloc((void**)&nb->nbst.e_lj, sizeof(*nb->nbst.e_lj));
     ocl_pmalloc((void**)&nb->nbst.e_el, sizeof(*nb->nbst.e_el));
     ocl_pmalloc((void**)&nb->nbst.fshift, SHIFTS * sizeof(*nb->nbst.fshift));
 
     init_plist(nb->plist[eintLocal]);
-
-    /* set device info, just point it to the right GPU among the detected ones */    
-    nb->dev_info = &gpu_info->ocl_dev[my_gpu_index];
-        //&gpu_info->cuda_dev[get_gpu_device_id(gpu_info, gpu_opt, my_gpu_index)];
 
     if (nb->bDoTime)
         queue_properties = CL_QUEUE_PROFILING_ENABLE;
@@ -1022,13 +1053,9 @@ nbnxn_ocl_clear_e_fshift(nbnxn_opencl_ptr_t ocl_nb)
     size_t               dim_grid[3]  = {1,1,1};
     cl_int               shifts       = SHIFTS*3;
     
-    cl_int               arg_no;
-    cl_int               kernel_id = 
-        ocl_nb->dev_info->_aux_kernel_zero_e_fshift_;
+    cl_int               arg_no;    
     
-    cl_kernel            zero_e_fshift = 
-        ocl_nb->dev_info->auxiliary_kernels[kernel_id];
-    
+    cl_kernel            zero_e_fshift = ocl_nb->kernel_zero_e_fshift;    
     
     dim_block[0] = 64;
     dim_grid[0]  = ((shifts/64)*64) + ((shifts%64)?64:0) ;
@@ -1041,7 +1068,7 @@ nbnxn_ocl_clear_e_fshift(nbnxn_opencl_ptr_t ocl_nb)
     assert(cl_error == CL_SUCCESS);
     
     cl_error = clEnqueueNDRangeKernel(ls, zero_e_fshift, 3, NULL, dim_grid, dim_block, 0, NULL, NULL);    
-    cl_error |= clFinish(ls);        
+    //cl_error |= clFinish(ls);        
     assert(cl_error == CL_SUCCESS);    
     
 }
@@ -1060,11 +1087,8 @@ static void nbnxn_ocl_clear_f(nbnxn_opencl_ptr_t ocl_nb, int natoms_clear)
     size_t               dim_grid[3]  = {1,1,1};
     
     cl_int               arg_no;
-    cl_int               kernel_id = 
-        ocl_nb->dev_info->_aux_kernel_memset_f3_;
     
-    cl_kernel            memset_f = 
-        ocl_nb->dev_info->auxiliary_kernels[kernel_id];
+    cl_kernel            memset_f = ocl_nb->kernel_memset_f3;       
     
     dim_block[0] = 64;
     dim_grid[0]  = ((natoms_clear/64)*64) + ((natoms_clear%64)?64:0) ;
@@ -1076,7 +1100,7 @@ static void nbnxn_ocl_clear_f(nbnxn_opencl_ptr_t ocl_nb, int natoms_clear)
     assert(cl_error == CL_SUCCESS);
     
     cl_error = clEnqueueNDRangeKernel(ls, memset_f, 3, NULL, dim_grid, dim_block, 0, NULL, NULL);    
-    cl_error |= clFinish(ls);        
+    //cl_error |= clFinish(ls);        
     assert(cl_error == CL_SUCCESS);
 
     //stat = cudaMemsetAsync(adat->f, 0, natoms_clear * sizeof(*adat->f), ls);
@@ -1243,7 +1267,7 @@ void nbnxn_ocl_init_atomdata(nbnxn_opencl_ptr_t        ocl_nb,
 
         //stat = cudaMalloc((void **)&d_atdat->f, nalloc*sizeof(*d_atdat->f));
         //CU_RET_ERR(stat, "cudaMalloc failed on d_atdat->f");
-        d_atdat->f = clCreateBuffer(ocl_nb->dev_info->context, CL_MEM_READ_WRITE, nalloc * sizeof(cl_float3), NULL, &cl_error);
+        d_atdat->f = clCreateBuffer(ocl_nb->dev_info->context, CL_MEM_READ_WRITE, nalloc * sizeof(rvec), NULL, &cl_error);
         // TO DO: handle errors, check clCreateBuffer flags
 
         //stat = cudaMalloc((void **)&d_atdat->xq, nalloc*sizeof(*d_atdat->xq));
@@ -1287,6 +1311,52 @@ void nbnxn_ocl_init_atomdata(nbnxn_opencl_ptr_t        ocl_nb,
         cl_error = clGetEventProfilingInfo(timers->atdat, CL_PROFILING_COMMAND_END,
             sizeof(cl_ulong), &(timers->stop_atdat), NULL);
     }
+}
+void free_kernel(cl_kernel *kernel_ptr)
+{
+    cl_int cl_error;
+
+    assert(NULL != kernel_ptr);
+
+    if (*kernel_ptr)
+    {
+        cl_error = clReleaseKernel(*kernel_ptr);
+        assert(cl_error == CL_SUCCESS);
+
+        *kernel_ptr = NULL;
+    }
+}
+
+void free_kernels(cl_kernel *kernels, int count)
+{
+    int i;    
+
+    for (i = 0; i < count; i++)
+        free_kernel(kernels + i);
+}
+
+void nbnxn_ocl_free(nbnxn_opencl_ptr_t ocl_nb)
+{
+    // TO DO: Implement this functions for OpenCL
+    int kernel_count;
+
+    /* Free kernels */
+    kernel_count = sizeof(ocl_nb->kernel_ener_noprune_ptr) / sizeof(ocl_nb->kernel_ener_noprune_ptr[0][0]);
+    free_kernels((cl_kernel*)ocl_nb->kernel_ener_noprune_ptr, kernel_count);
+
+    kernel_count = sizeof(ocl_nb->kernel_ener_prune_ptr) / sizeof(ocl_nb->kernel_ener_prune_ptr[0][0]);
+    free_kernels((cl_kernel*)ocl_nb->kernel_ener_prune_ptr, kernel_count);
+
+    kernel_count = sizeof(ocl_nb->kernel_noener_noprune_ptr) / sizeof(ocl_nb->kernel_noener_noprune_ptr[0][0]);
+    free_kernels((cl_kernel*)ocl_nb->kernel_noener_noprune_ptr, kernel_count);
+
+    kernel_count = sizeof(ocl_nb->kernel_noener_prune_ptr) / sizeof(ocl_nb->kernel_noener_prune_ptr[0][0]);
+    free_kernels((cl_kernel*)ocl_nb->kernel_noener_prune_ptr, kernel_count);
+
+    free_kernel(&(ocl_nb->kernel_memset_f));
+    free_kernel(&(ocl_nb->kernel_memset_f2));
+    free_kernel(&(ocl_nb->kernel_memset_f3));
+    free_kernel(&(ocl_nb->kernel_zero_e_fshift));
 }
 
 ////void nbnxn_cuda_free(nbnxn_cuda_ptr_t cu_nb)

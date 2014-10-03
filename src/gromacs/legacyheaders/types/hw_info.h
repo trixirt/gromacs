@@ -90,21 +90,9 @@ typedef struct
     int                 compute_units;
     int                 stat;
 
-    cl_context          context;
-    cl_command_queue    command_queue;
+    cl_context          context;    
     cl_program          program;
 
-     /* This causes a mayhem of warnings, TODO fix it */
-     enum { _aux_kernel_memset_f_ =0,
-            _aux_kernel_memset_f2_,
-            _aux_kernel_memset_f3_,
-            _aux_kernel_zero_e_fshift_,
-           _num_aux_kernels_} dummy;
-           
-    cl_kernel           auxiliary_kernels[_num_aux_kernels_]; 
-          
-    //cl_uint             num_kernels;
-    //cl_kernel           *kernels;
 } ocl_gpu_info_t, *ocl_gpu_info_ptr_t;
 #endif
 

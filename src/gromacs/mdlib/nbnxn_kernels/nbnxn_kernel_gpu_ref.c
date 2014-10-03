@@ -161,7 +161,20 @@ nbnxn_kernel_gpu_ref(const nbnxn_pairlist_t     *nbl,
             /* we have the diagonal:
              * add the charge self interaction energy term
              */
-/*            for (im = 0; im < NCL_PER_SUPERCL; im++)
+#ifdef DEBUG_E_EL_SUM_PHASE_1
+            for (ic = 0; ic < CL_SIZE; ic++)
+            {
+                vctot = 0;
+                for (im = 0; im < NCL_PER_SUPERCL; im++)
+                {
+                    ci = sci*NCL_PER_SUPERCL + im;
+                    ia     = ci*CL_SIZE + ic;
+                    iq     = x[ia*nbat->xstride+3];
+                    vctot += iq*iq;
+                }
+             }
+#else
+            for (im = 0; im < NCL_PER_SUPERCL; im++)
             {
                 ci = sci*NCL_PER_SUPERCL + im;
                 for (ic = 0; ic < CL_SIZE; ic++)
@@ -170,17 +183,8 @@ nbnxn_kernel_gpu_ref(const nbnxn_pairlist_t     *nbl,
                     iq     = x[ia*nbat->xstride+3];
                     vctot += iq*iq;
                 }
-            }*/
-            for (ic = 0; ic < CL_SIZE; ic++)
-            {
-                for (im = 0; im < NCL_PER_SUPERCL; im++)
-                {
-                    ci = sci*NCL_PER_SUPERCL + im;
-                    ia     = ci*CL_SIZE + ic;
-                    iq     = x[ia*nbat->xstride+3];
-                    vctot += iq*iq;
-                }
             }
+#endif
             if (!bEwald)
             {
                 vctot *= -facel*0.5*iconst->c_rf;

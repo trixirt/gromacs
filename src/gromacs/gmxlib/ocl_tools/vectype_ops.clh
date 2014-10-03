@@ -113,9 +113,9 @@ _INLINE_ void atomicAdd_g_f(volatile __global float *addr, float val)
 /* On the host float3, on the device float1 because f3 translates to f4 and messes up memory indexing */
 _INLINE_ void atomicAdd_g_f3(__global float *addr, const float3 val)
 {
-    atomicAdd_g_f( addr     , val.x);
-    atomicAdd_g_f( addr + 1 , val.y);
-    atomicAdd_g_f( addr + 2 , val.z);
+    atomicAdd_g_f(addr, val.x);
+    atomicAdd_g_f(addr + 1, val.y);
+    atomicAdd_g_f(addr + 2, val.z);
 }
 /*
 _INLINE_ void atomicAdd(volatile float *addr, float val)
@@ -139,9 +139,9 @@ _INLINE_ void atomicAdd( float3 *addr, float3 val)
 /****************************************************************/
 
 /**** float4 ****/
-_INLINE_ float4 make_float4(float3 a)
+_INLINE_ float4 make_float4(float x, float y, float z, float w)
 {
-    return (float4)(a.x, a.y, a.z, 0.0f);
+    return (float4)(x, y, z, w);
 }
 
 _INLINE_ float norm_f4(float4 a)

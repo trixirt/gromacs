@@ -69,7 +69,7 @@ int detect_ocl_gpus(gmx_gpu_info_t *gpu_info, char *err_str)
 
             CALLOCLFUNC_LOGERROR(clGetDeviceIDs(ocl_platform_ids[i], req_dev_type, 0, NULL, &ocl_device_count), err_str, retval)
             if (0 != retval)
-                break;
+                continue;
 
             if (1 <= ocl_device_count)
                 gpu_info->nocl_dev += ocl_device_count;
@@ -93,7 +93,7 @@ int detect_ocl_gpus(gmx_gpu_info_t *gpu_info, char *err_str)
 
                 CALLOCLFUNC_LOGERROR(clGetDeviceIDs(ocl_platform_ids[i], req_dev_type, gpu_info->nocl_dev, ocl_device_ids, &ocl_device_count), err_str, retval)
                 if (0 != retval)
-                    break;
+                    continue;
 
                 if (1 > ocl_device_count)
                     break;
@@ -248,8 +248,7 @@ gmx_bool init_ocl_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
     cl_device_id device_id;
     cl_context context;
     cl_program program;
-    cl_int cl_error;
-    cl_command_queue command_queue;
+    cl_int cl_error;    
     cl_uint num_kernels;
     cl_kernel *kernels;
 
@@ -278,11 +277,6 @@ gmx_bool init_ocl_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
         if (0 != retval)
             break;
 
-        command_queue = clCreateCommandQueue(context, device_id, 0, &cl_error);
-        CALLOCLFUNC_LOGERROR(cl_error, result_str, retval)
-        if (0 != retval)
-            break;
-
         cl_error = 
             ocl_compile_program(_default_kernel_source_,
                                 result_str,
@@ -295,46 +289,6 @@ gmx_bool init_ocl_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
             retval=-1; 
             break;                      
         }
-        
-        cl_kernel aux_kernel;
-        
-        aux_kernel = clCreateKernel(program,"memset_f",&cl_error);
-        assert(cl_error == CL_SUCCESS);       
-        selected_ocl_gpu->auxiliary_kernels[selected_ocl_gpu->_aux_kernel_memset_f_] = aux_kernel;          
-        
-        aux_kernel = clCreateKernel(program,"memset_f2",&cl_error);
-        assert(cl_error == CL_SUCCESS);       
-        selected_ocl_gpu->auxiliary_kernels[selected_ocl_gpu->_aux_kernel_memset_f2_] = aux_kernel;           
-        
-        aux_kernel = clCreateKernel(program,"memset_f3",&cl_error);
-        assert(cl_error == CL_SUCCESS);        
-        selected_ocl_gpu->auxiliary_kernels[selected_ocl_gpu->_aux_kernel_memset_f3_] = aux_kernel;        
-        
-        aux_kernel = clCreateKernel(program,"zero_e_fshift",&cl_error);
-        assert(cl_error == CL_SUCCESS);        
-        selected_ocl_gpu->auxiliary_kernels[selected_ocl_gpu->_aux_kernel_zero_e_fshift_] = aux_kernel;                       
-        
-        //{
-        //    //cl_kernel k = clCreateKernel(program, "nbnxn_kernel_ElecCut_VdwLJ_F_prune_opencl", &cl_error);
-        //    char kernel_name[256];
-        //    cl_int num_args;
-
-        //    cl_error = clCreateKernelsInProgram(program, 0, NULL, &num_kernels);
-
-        //    kernels = (cl_kernel*)malloc(num_kernels * sizeof(cl_kernel));
-        //    cl_error = clCreateKernelsInProgram(program, num_kernels, kernels, NULL);
-
-        //    for (cl_uint i = 0; i < num_kernels; i++)
-        //    {                
-        //        cl_error = clGetKernelInfo(kernels[i], CL_KERNEL_FUNCTION_NAME,
-        //            sizeof(kernel_name), &kernel_name, NULL);
-
-        //        cl_error = clGetKernelInfo(kernels[i], CL_KERNEL_NUM_ARGS,
-        //            sizeof(num_args), &num_args, NULL);
-        //    }
-
-        //    //free(kernels);
-        //}
 
         retval = 0;
         break;
@@ -342,11 +296,8 @@ gmx_bool init_ocl_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
 
     if (0 == retval)
     {
-        selected_ocl_gpu->context = context;
-        selected_ocl_gpu->command_queue = command_queue;
+        selected_ocl_gpu->context = context;        
         selected_ocl_gpu->program = program;
-        //selected_ocl_gpu->num_kernels = num_kernels;
-        //selected_ocl_gpu->kernels = kernels;
     }
 
     return (0 == retval);
