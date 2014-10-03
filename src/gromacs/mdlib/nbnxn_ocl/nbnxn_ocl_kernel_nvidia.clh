@@ -371,7 +371,11 @@ __global float *fshift, // __global float3 *fshift,
     /* Pre-load i-atom x and q into shared memory */
     ci = sci * NCL_PER_SUPERCL + tidxj;
     ai = ci * CL_SIZE + tidxi;
+#ifdef DEBUG_E_EL_SUM_PHASE_1
+    xqib[tidxj * CL_SIZE + tidxi] = xq[ai];
+#else
     xqib[tidxj * CL_SIZE + tidxi] = xq[ai] + make_float4(shift_vec[3 * nb_sci.shift], shift_vec[3 * nb_sci.shift + 1], shift_vec[3 * nb_sci.shift + 2], 0.0f);
+#endif
 #ifdef IATYPE_SHMEM //Should not be defined! CUDA > 300
     /* Pre-load the i-atom types into shared memory */
     atib[tidxj * CL_SIZE + tidxi] = atom_types[ai];
@@ -408,12 +412,16 @@ __global float *fshift, // __global float3 *fshift,
             qi    = xqib[i * CL_SIZE + tidxi].w;
             E_el += qi*qi;
 #endif
-
+#ifdef DEBUG_E_EL_SUM_PHASE_1
+#else
 #if defined LJ_EWALD
             E_lj += read_imagef(nbfp_climg2d, generic_sampler, (int2)(atom_types[(sci*NCL_PER_SUPERCL + i)*CL_SIZE + tidxi]*(ntypes + 1)*2,0)).x;
 #endif /* LJ_EWALD */
+#endif /* DEBUG_E_EL_SUM_PHASE_1 */
         }
 
+#ifdef DEBUG_E_EL_SUM_PHASE_1
+#else
         /* divide the self term(s) equally over the j-threads, then multiply with the coefficients. */
 #ifdef LJ_EWALD
         E_lj /= CL_SIZE;
@@ -428,11 +436,14 @@ __global float *fshift, // __global float3 *fshift,
         E_el *= -nbparam->epsfac*beta*M_FLOAT_1_SQRTPI; /* last factor 1/sqrt(pi) */
 #endif
 #endif                                                 /* EL_EWALD_ANY || defined EL_RF || defined EL_CUTOFF */
+#endif /* DEBUG_E_EL_SUM_PHASE_1 */
     }
 #endif                                                 /* EXCLUSION_FORCES */
 
 #endif                                                 /* CALC_ENERGIES */
 
+#ifdef DEBUG_E_EL_SUM_PHASE_1
+#else
     /* skip central shifts when summing shift forces */
     if (nb_sci.shift == CENTRAL)
     {
@@ -698,13 +709,14 @@ __global float *fshift, // __global float3 *fshift,
         //atomicAdd(&(atdat->fshift[nb_sci.shift]),fshift_buf);
         atomicAdd_g_f3(&(fshift[3 * nb_sci.shift]),fshift_buf);
     }
-
 #ifdef CALC_ENERGIES
     /* flush the energies to shmem and reduce them */
     f_buf[              tidx] = E_lj;
     f_buf[FBUF_STRIDE + tidx] = E_el;
     reduce_energy_pow2(f_buf + (tidx & WARP_SIZE), e_lj, e_el, tidx & ~WARP_SIZE);
 #endif
+
+#endif /* DEBUG_E_EL_SUM_PHASE_1 */
 }
 
 #undef EL_EWALD_ANY
