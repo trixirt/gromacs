@@ -1088,15 +1088,17 @@ static void nbnxn_ocl_clear_f(nbnxn_opencl_ptr_t ocl_nb, int natoms_clear)
     
     cl_int               arg_no;
     
-    cl_kernel            memset_f = ocl_nb->kernel_memset_f3;       
-    
+    cl_kernel            memset_f = ocl_nb->kernel_memset_f;       
+
+    cl_uint              natoms_flat = natoms_clear * (sizeof(rvec)/sizeof(real));
+
     dim_block[0] = 64;
-    dim_grid[0]  = ((natoms_clear/64)*64) + ((natoms_clear%64)?64:0) ;
+    dim_grid[0]  = ((natoms_flat/dim_block[0])*dim_block[0]) + ((natoms_flat%dim_block[0])?dim_block[0]:0) ;
     
     arg_no = 0;    
     cl_error = clSetKernelArg(memset_f, arg_no++, sizeof(cl_mem), &(adat->f));      
     cl_error = clSetKernelArg(memset_f, arg_no++, sizeof(cl_float), &value);      
-    cl_error |= clSetKernelArg(memset_f, arg_no++, sizeof(cl_uint), &natoms_clear);         
+    cl_error |= clSetKernelArg(memset_f, arg_no++, sizeof(cl_uint), &natoms_flat);         
     assert(cl_error == CL_SUCCESS);
     
     cl_error = clEnqueueNDRangeKernel(ls, memset_f, 3, NULL, dim_grid, dim_block, 0, NULL, NULL);    
