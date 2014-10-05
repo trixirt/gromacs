@@ -715,8 +715,13 @@ __global float *fshift, // __global float3 *fshift,                         /* O
     /* flush the energies to shmem and reduce them */
     f_buf[              tidx] = E_lj;
     f_buf[FBUF_STRIDE + tidx] = E_el;
+#if WARP_SIZE_TEST==1    
+    reduce_energy_generic(f_buf, e_lj, e_el, tidx);    
+#else    
     reduce_energy_pow2(f_buf + (tidx & WARP_SIZE), e_lj, e_el, tidx & ~WARP_SIZE);
 #endif
+    
+#endif /* CALC_ENERGIES */
 
 #endif /* DEBUG_E_EL_SUM_PHASE_1 */
 }
