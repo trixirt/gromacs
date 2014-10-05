@@ -241,7 +241,12 @@ __global float *fshift, // __global float3 *fshift,
  __read_only image2d_t coulomb_tab_climg2d,
  
  const __global nbnxn_sci_t* pl_sci,
+ 
+#ifndef PRUNE_NBL
+    const
+#endif
  __global nbnxn_cj4_t* pl_cj4,
+ 
  const __global nbnxn_excl_t* excl,
  
  int bCalcFshift,
@@ -267,9 +272,6 @@ __global float *fshift, // __global float3 *fshift,
     cl_nbparam_params_t *nbparam = &nbparam_params;
     //cl_plist_params_t *plist = &plist_params; //<--Does not seem to be needed anymore
 
-#ifndef PRUNE_NBL
-    const
-#endif
     //nbnxn_cj4_t        *pl_cj4      = plist->cj4;
     //const nbnxn_excl_t *excl        = plist->excl;
     //const int          *atom_types  = atdat->atom_types;

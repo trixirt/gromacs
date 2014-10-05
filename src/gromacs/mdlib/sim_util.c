@@ -652,9 +652,14 @@ static void do_nb_verlet(t_forcerec *fr,
     {
         enr_nbnxn_kernel_ljc = eNR_NBNXN_LJ_RF;
     }
+#if defined(GMX_GPU) && defined(GMX_USE_OPENCL)
+    else if ((!bCUDA && nbvg->ewald_excl == ewaldexclAnalytical) ||
+             (bCUDA && nbnxn_ocl_is_kernel_ewald_analytical(fr->nbv->ocl_nbv)))    
+#else    
     else if ((!bCUDA && nbvg->ewald_excl == ewaldexclAnalytical) ||
              (bCUDA && nbnxn_cuda_is_kernel_ewald_analytical(fr->nbv->cu_nbv)))
-    {
+#endif        
+    {        
         enr_nbnxn_kernel_ljc = eNR_NBNXN_LJ_EWALD;
     }
     else

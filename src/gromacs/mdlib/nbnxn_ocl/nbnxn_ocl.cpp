@@ -358,7 +358,7 @@ static inline int calc_shmem_required()
     shmem += 2 * NBNXN_GPU_JGROUP_SIZE * sizeof(int);       /* cjs  */
 #ifdef IATYPE_SHMEM // CUDA ARCH >= 300
     /* i-atom types in shared memory */
-    #pragma error "Should not be defined
+    #pragma error "Should not be defined"
     shmem += NCL_PER_SUPERCL * CL_SIZE * sizeof(int);       /* atib */
 #endif
 /* #if __CUDA_ARCH__ < 300 */

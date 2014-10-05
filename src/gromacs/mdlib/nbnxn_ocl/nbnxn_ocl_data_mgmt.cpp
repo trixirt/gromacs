@@ -1551,6 +1551,8 @@ int nbnxn_ocl_min_ci_balanced(nbnxn_opencl_ptr_t ocl_nb)
 
 gmx_bool nbnxn_ocl_is_kernel_ewald_analytical(const nbnxn_opencl_ptr_t ocl_nb)
 {
+    assert(!"Not implemented");
+#pragma message "Warning is kernel ewald analytical should not be called as Ewald Analytical was on compute >=3.0"
     return ((ocl_nb->nbparam->eeltype == eelOclEWALD_ANA) ||
             (ocl_nb->nbparam->eeltype == eelOclEWALD_ANA_TWIN));
 }
