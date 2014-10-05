@@ -754,8 +754,9 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t        ocl_nb,
         if (bCalcFshift)
         {
             // TO DO: the last parameter is not always NULL
+             // TO DO: review fshift data type and how its size is computed
             ocl_copy_D2H_async(ocl_nb->nbst.fshift, adat->fshift, 0,
-                              SHIFTS * sizeof(float), stream, NULL);
+                              3 * SHIFTS * sizeof(float), stream, NULL);
         }
 
         /* DtoH energies */
