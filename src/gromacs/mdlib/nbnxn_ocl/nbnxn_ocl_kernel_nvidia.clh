@@ -465,14 +465,12 @@ __global float *fshift, // __global float3 *fshift,                         /* O
         if (imask)
 #endif
         {
+#if WARP_SIZE_TEST >= 32            
             /* Pre-load cj into shared memory on both warps separately */
             if ((tidxj == 0 || tidxj == 4) && tidxi < NBNXN_GPU_JGROUP_SIZE)
             {
                 cjs[tidxi + tidxj * NBNXN_GPU_JGROUP_SIZE / 4] = pl_cj4[j4].cj[tidxi];
             }
-            /* CPU DEBUG..  */
-#if WARP_SIZE_TEST==1
-    barrier(CLK_LOCAL_MEM_FENCE);
 #endif            
             /* Unrolling this loop
                - with pruning leads to register spilling;
@@ -487,12 +485,13 @@ __global float *fshift, // __global float3 *fshift,                         /* O
                 if (imask & (supercl_interaction_mask << (jm * NCL_PER_SUPERCL)))
                 {
                     mask_ji = (1U << (jm * NCL_PER_SUPERCL));
-
+#if WARP_SIZE_TEST >= 32
                     cj      = cjs[jm + (tidxj & 4) * NBNXN_GPU_JGROUP_SIZE / 4];
-                    aj      = cj * CL_SIZE + tidxj;
-#if WARP_SIZE_TEST==1
-    barrier(CLK_LOCAL_MEM_FENCE);
+#else /* CPU DEBUG */
+                    cj      = pl_cj4[j4].cj[jm];
 #endif  
+                    aj      = cj * CL_SIZE + tidxj;
+                    
                     /* load j atom data */
                     xqbuf   = xq[aj];
                     xj      = make_float3(xqbuf);
