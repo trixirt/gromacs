@@ -100,7 +100,7 @@ extern "C" {
 #ifdef __IN_OPENCL_KERNEL__
 #define CONSTANT_ADDRESS_SPACE __constant
 #else
-#define CONSTANT_ADDRESS_SPACE const
+#define CONSTANT_ADDRESS_SPACE static const
 #endif
 
 
@@ -108,15 +108,15 @@ extern "C" {
  * Bit i*CJ_SIZE + j tells if atom i and j interact.
  */
 /* All interaction mask is the same for all kernels */
-static CONSTANT_ADDRESS_SPACE unsigned int NBNXN_INTERACTION_MASK_ALL       = 0xffffffffU;
+CONSTANT_ADDRESS_SPACE unsigned int NBNXN_INTERACTION_MASK_ALL       = 0xffffffffU;
 /* 4x4 kernel diagonal mask */
-static CONSTANT_ADDRESS_SPACE unsigned int NBNXN_INTERACTION_MASK_DIAG      = 0x08ceU;
+CONSTANT_ADDRESS_SPACE unsigned int NBNXN_INTERACTION_MASK_DIAG      = 0x08ceU;
 /* 4x2 kernel diagonal masks */
-static CONSTANT_ADDRESS_SPACE unsigned int NBNXN_INTERACTION_MASK_DIAG_J2_0 = 0x0002U;
-static CONSTANT_ADDRESS_SPACE unsigned int NBNXN_INTERACTION_MASK_DIAG_J2_1 = 0x002fU;
+CONSTANT_ADDRESS_SPACE unsigned int NBNXN_INTERACTION_MASK_DIAG_J2_0 = 0x0002U;
+CONSTANT_ADDRESS_SPACE unsigned int NBNXN_INTERACTION_MASK_DIAG_J2_1 = 0x002fU;
 /* 4x8 kernel diagonal masks */
-static CONSTANT_ADDRESS_SPACE unsigned int NBNXN_INTERACTION_MASK_DIAG_J8_0 = 0xf0f8fcfeU;
-static CONSTANT_ADDRESS_SPACE unsigned int NBNXN_INTERACTION_MASK_DIAG_J8_1 = 0x0080c0e0U;
+CONSTANT_ADDRESS_SPACE unsigned int NBNXN_INTERACTION_MASK_DIAG_J8_0 = 0xf0f8fcfeU;
+CONSTANT_ADDRESS_SPACE unsigned int NBNXN_INTERACTION_MASK_DIAG_J8_1 = 0x0080c0e0U;
 
 
 #ifdef __cplusplus
