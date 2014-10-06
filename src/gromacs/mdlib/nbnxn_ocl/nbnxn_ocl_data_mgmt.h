@@ -140,7 +140,7 @@ void nbnxn_ocl_free(nbnxn_opencl_ptr_t gmx_unused  cu_nb) FUNC_TERM
  *  with CUDA non-bonded kernels. */
 FUNC_QUALIFIER
 int nbnxn_ocl_min_ci_balanced(nbnxn_opencl_ptr_t gmx_unused ocl_nb)
-#ifdef GMX_GPU
+#if defined(GMX_GPU) && defined(GMX_USE_OPENCL)
 ;
 #else
 {

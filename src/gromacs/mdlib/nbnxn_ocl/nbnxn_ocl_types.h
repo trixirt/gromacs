@@ -121,6 +121,7 @@ typedef struct cl_nb_staging
     float   *e_el;      /**< electrostatic energy */
     // TO DO: see how this field is used and fix its data type
     //float3  *fshift;    /**< shift forces         */
+    // TO DO: review fshift data type and how its size is computed
     float *fshift;
 }cl_nb_staging_t;
 

@@ -391,6 +391,23 @@ void nbnxn_cuda_launch_kernel(nbnxn_cuda_ptr_t        cu_nb,
     }
 }
 
+void dump_results(float* results, int cnt, char* out_file)
+{    
+    FILE *pf;        
+
+    pf = fopen(out_file, "wt");
+    assert(pf != NULL);
+                
+    for (int index = 0; index < cnt; index++)
+    {
+        fprintf(pf, "%15.5f\n", results[index]);
+    }
+
+    fclose(pf);
+
+    printf("\nWrote results to %s", out_file);
+}
+
 void nbnxn_cuda_launch_cpyback(nbnxn_cuda_ptr_t        cu_nb,
                                const nbnxn_atomdata_t *nbatom,
                                int                     flags,
@@ -521,6 +538,42 @@ void nbnxn_cuda_launch_cpyback(nbnxn_cuda_ptr_t        cu_nb,
                               sizeof(*cu_nb->nbst.e_el), stream);
         }
     }
+
+/* Uncomment this define to enable f debugging for the first kernel run */
+// #define DEBUG_DUMP_F_CUDA
+#ifdef DEBUG_DUMP_F_CUDA
+    {
+        static int first_run = 1;
+
+        if (first_run)
+        {
+            first_run = 0;
+
+            // Make sure all data has been transfered back from device
+            cudaStreamSynchronize(stream);
+
+            dump_results(nbatom->out[0].f + adat_begin * 3, (adat_len) * 3, "cuda_f.txt");
+        }
+    }
+#endif
+
+/* Uncomment this define to enable fshift debugging for the first kernel run */
+//#define DEBUG_DUMP_FSHIFT_CUDA
+#ifdef DEBUG_DUMP_FSHIFT_CUDA
+    {
+        static int first_run = 1;
+
+        if (first_run)
+        {
+            first_run = 0;
+
+            // Make sure all data has been transfered back from device
+            cudaStreamSynchronize(stream);
+
+            dump_results((float*)(cu_nb->nbst.fshift), 3 * SHIFTS, "cuda_fshift.txt");
+        }
+    }
+#endif
 
     if (bDoTime)
     {

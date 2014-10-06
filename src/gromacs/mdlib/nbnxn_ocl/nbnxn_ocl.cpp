@@ -358,7 +358,7 @@ static inline int calc_shmem_required()
     shmem += 2 * NBNXN_GPU_JGROUP_SIZE * sizeof(int);       /* cjs  */
 #ifdef IATYPE_SHMEM // CUDA ARCH >= 300
     /* i-atom types in shared memory */
-    #pragma error "Should not be defined
+    #pragma error "Should not be defined"
     shmem += NCL_PER_SUPERCL * CL_SIZE * sizeof(int);       /* atib */
 #endif
 /* #if __CUDA_ARCH__ < 300 */
@@ -586,6 +586,49 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
     ////}
 }
 
+void dump_compare_results(float* results, int cnt, char* out_file, char* ref_file)
+{    
+    FILE *pf;    
+    float cmp_eps = 0.001f;
+
+    pf = fopen(out_file, "wt");
+    assert(pf != NULL);
+                
+    for (int index = 0; index < cnt; index++)
+    {
+        fprintf(pf, "%15.5f\n", results[index]);
+    }
+
+    fclose(pf);
+
+    printf("\nWrote results to %s", out_file);
+
+    pf = fopen(ref_file, "rt");
+    if (pf)
+    {   
+        int diff = 0;
+        printf("\n%s file found. Comparing results...", ref_file);
+        for (int index = 0; index < cnt; index++)
+        {
+            float ref_val;
+            fscanf(pf, "%f", &ref_val);
+            if (((ref_val - results[index]) > cmp_eps) ||
+                ((ref_val - results[index]) < -cmp_eps))
+            {
+                printf("\nDifference at index %d computed value = %15.5f reference value = %15.5f",
+                    index, results[index], ref_val);
+
+                diff++;
+            }
+        }
+
+        printf("\nFinished comparing results. Total number of differences: %d", diff);
+        fclose(pf);
+    }
+    else
+        printf("\n%s file not found. No comparison performed.", ref_file);
+}
+
 void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t        ocl_nb,
                                const nbnxn_atomdata_t *nbatom,
                                int                     flags,
@@ -711,8 +754,9 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t        ocl_nb,
         if (bCalcFshift)
         {
             // TO DO: the last parameter is not always NULL
+             // TO DO: review fshift data type and how its size is computed
             ocl_copy_D2H_async(ocl_nb->nbst.fshift, adat->fshift, 0,
-                              SHIFTS * sizeof(float), stream, NULL);
+                              3 * SHIFTS * sizeof(float), stream, NULL);
         }
 
         /* DtoH energies */
@@ -723,9 +767,47 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t        ocl_nb,
                               sizeof(float), stream, NULL);
             // TO DO: the last parameter is not always NULL
             ocl_copy_D2H_async(ocl_nb->nbst.e_el, adat->e_el, 0,
-                              sizeof(float), stream, NULL);
+                              sizeof(float), stream, NULL);            
         }
     }
+
+/* Uncomment this define to enable f debugging for the first kernel run */
+//#define DEBUG_DUMP_F_OCL
+#ifdef DEBUG_DUMP_F_OCL
+    {
+        static int first_run = 1;        
+
+        if (first_run)
+        {         
+            first_run = 0;
+
+            // Make sure all data has been transfered back from device
+            clFinish(stream);
+
+            dump_compare_results(nbatom->out[0].f + adat_begin * 3, (adat_len) * 3,
+                "ocl_f.txt", "cuda_f.txt");
+        }
+    }
+#endif
+
+/* Uncomment this define to enable fshift debugging for the first kernel run */
+//#define DEBUG_DUMP_FSHIFT_OCL
+#ifdef DEBUG_DUMP_FSHIFT_OCL
+    {
+        static int first_run = 1;
+
+        if (first_run)
+        {         
+            first_run = 0;
+
+            // Make sure all data has been transfered back from device
+            clFinish(stream);
+
+            dump_compare_results(ocl_nb->nbst.fshift, SHIFTS * 3,
+                "ocl_fshift.txt", "cuda_fshift.txt");
+        }
+    }
+#endif
 
     if (bDoTime)
     {

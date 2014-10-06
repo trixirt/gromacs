@@ -846,7 +846,9 @@ void nbnxn_ocl_init(FILE                 *fplog,
     /* init nbst */
     ocl_pmalloc((void**)&nb->nbst.e_lj, sizeof(*nb->nbst.e_lj));
     ocl_pmalloc((void**)&nb->nbst.e_el, sizeof(*nb->nbst.e_el));
-    ocl_pmalloc((void**)&nb->nbst.fshift, SHIFTS * sizeof(*nb->nbst.fshift));
+
+    // TO DO: review fshift data type and how its size is computed
+    ocl_pmalloc((void**)&nb->nbst.fshift, 3 * SHIFTS * sizeof(*nb->nbst.fshift));
 
     init_plist(nb->plist[eintLocal]);
 
@@ -1088,15 +1090,17 @@ static void nbnxn_ocl_clear_f(nbnxn_opencl_ptr_t ocl_nb, int natoms_clear)
     
     cl_int               arg_no;
     
-    cl_kernel            memset_f = ocl_nb->kernel_memset_f3;       
-    
+    cl_kernel            memset_f = ocl_nb->kernel_memset_f;       
+
+    cl_uint              natoms_flat = natoms_clear * (sizeof(rvec)/sizeof(real));
+
     dim_block[0] = 64;
-    dim_grid[0]  = ((natoms_clear/64)*64) + ((natoms_clear%64)?64:0) ;
+    dim_grid[0]  = ((natoms_flat/dim_block[0])*dim_block[0]) + ((natoms_flat%dim_block[0])?dim_block[0]:0) ;
     
     arg_no = 0;    
     cl_error = clSetKernelArg(memset_f, arg_no++, sizeof(cl_mem), &(adat->f));      
     cl_error = clSetKernelArg(memset_f, arg_no++, sizeof(cl_float), &value);      
-    cl_error |= clSetKernelArg(memset_f, arg_no++, sizeof(cl_uint), &natoms_clear);         
+    cl_error |= clSetKernelArg(memset_f, arg_no++, sizeof(cl_uint), &natoms_flat);         
     assert(cl_error == CL_SUCCESS);
     
     cl_error = clEnqueueNDRangeKernel(ls, memset_f, 3, NULL, dim_grid, dim_block, 0, NULL, NULL);    
@@ -1549,6 +1553,8 @@ int nbnxn_ocl_min_ci_balanced(nbnxn_opencl_ptr_t ocl_nb)
 
 gmx_bool nbnxn_ocl_is_kernel_ewald_analytical(const nbnxn_opencl_ptr_t ocl_nb)
 {
+    assert(!"Not implemented");
+#pragma message "Warning is kernel ewald analytical should not be called as Ewald Analytical was on compute >=3.0"
     return ((ocl_nb->nbparam->eeltype == eelOclEWALD_ANA) ||
             (ocl_nb->nbparam->eeltype == eelOclEWALD_ANA_TWIN));
 }

@@ -223,26 +223,31 @@
         //__kernel void test
     #endif
 #endif
-(cl_atomdata_params_t atomdata_params,
- cl_nbparam_params_t nbparam_params,
- cl_plist_params_t plist_params,
+(cl_atomdata_params_t atomdata_params,                                      /* IN */
+ cl_nbparam_params_t nbparam_params,                                        /* IN */
+ cl_plist_params_t plist_params,                                            /* IN */
 
 
- const __global float4 *xq,
- __global float *f, //__global float3 *f,
- __global float *e_lj,
- __global float *e_el,
+ const __global float4 *xq,                                                 /* IN */
+ __global float *f, //__global float3 *f,                                   /* OUT */
+ __global float *e_lj,                                                      /* OUT */
+ __global float *e_el,                                                      /* OUT */
  //const __global float3 *fshift, 
-__global float *fshift, // __global float3 *fshift, 
- const __global int *atom_types,
- const __global float *shift_vec,//const __global float3 *shift_vec,
- __read_only image2d_t nbfp_climg2d, 
- __read_only image2d_t nbfp_comb_climg2d,
- __read_only image2d_t coulomb_tab_climg2d,
+__global float *fshift, // __global float3 *fshift,                         /* OUT */
+ const __global int *atom_types,                                            /* IN */
+ const __global float *shift_vec,//const __global float3 *shift_vec,        /* IN */
+ __read_only image2d_t nbfp_climg2d,                                        /* IN */
+ __read_only image2d_t nbfp_comb_climg2d,                                   /* IN */
+ __read_only image2d_t coulomb_tab_climg2d,                                 /* IN */
  
- const __global nbnxn_sci_t* pl_sci,
- __global nbnxn_cj4_t* pl_cj4,
- const __global nbnxn_excl_t* excl,
+ const __global nbnxn_sci_t* pl_sci,                                        /* IN */
+ 
+#ifndef PRUNE_NBL
+    const
+#endif
+ __global nbnxn_cj4_t* pl_cj4,                                              /* OUT / IN */
+ 
+ const __global nbnxn_excl_t* excl,                                         /* IN */
  
  int bCalcFshift,
  
@@ -267,9 +272,6 @@ __global float *fshift, // __global float3 *fshift,
     cl_nbparam_params_t *nbparam = &nbparam_params;
     //cl_plist_params_t *plist = &plist_params; //<--Does not seem to be needed anymore
 
-#ifndef PRUNE_NBL
-    const
-#endif
     //nbnxn_cj4_t        *pl_cj4      = plist->cj4;
     //const nbnxn_excl_t *excl        = plist->excl;
     //const int          *atom_types  = atdat->atom_types;
