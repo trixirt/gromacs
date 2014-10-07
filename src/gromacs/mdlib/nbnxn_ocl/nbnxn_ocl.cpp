@@ -586,7 +586,88 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
     ////}
 }
 
-void dump_compare_results(float* results, int cnt, char* out_file, char* ref_file)
+void dump_compare_results_cj4(nbnxn_cj4_t* results, int cnt, char* out_file, char* ref_file)
+{    
+    FILE *pf;    
+
+    pf = fopen(out_file, "wt");
+    assert(pf != NULL);
+                
+    fprintf(pf, "%20s%20s%20s%20s%20s%20s%20s%20s\n",
+        "cj[0]", "cj[1]", "cj[2]", "cj[3]",
+        "imei[0].imask", "imei[0].excl_ind",
+        "imei[1].imask", "imei[1].excl_ind");
+
+    for (int index = 0; index < cnt; index++)
+    {
+        fprintf(pf, "%20d%20d%20d%20d%20d%20u%20d%20u\n",
+            results[index].cj[0], results[index].cj[1], results[index].cj[2], results[index].cj[3],
+            results[index].imei[0].excl_ind, results[index].imei[0].imask,
+            results[index].imei[1].excl_ind, results[index].imei[1].imask);
+    }
+
+    fclose(pf);
+
+    printf("\nWrote results to %s", out_file);
+
+    pf = fopen(ref_file, "rt");
+    if (pf)
+    {   
+        char c;
+        int diff = 0;
+        printf("\n%s file found. Comparing results...", ref_file);
+
+        /* Skip the first line */
+        c = 0;
+        while (c != '\n') fscanf(pf, "%c", &c);
+
+        for (int index = 0; index < cnt; index++)
+        {
+            int ref_val;
+            
+            for (int j = 0; j < 4; j++)
+            {
+                fscanf(pf, "%d", &ref_val);            
+                if (ref_val != results[index].cj[j])
+                {
+                    printf("\nDifference for cj[%d] at index %d computed value = %d reference value = %d",
+                        j, index, results[index].cj[j], ref_val);
+
+                    diff++;
+                }
+            }
+
+            for (int j = 0; j < 2; j++)
+            {
+                fscanf(pf, "%d", &ref_val);            
+                if (ref_val != results[index].imei[j].excl_ind)
+                {
+                    printf("\nDifference for imei[%d].excl_ind at index %d computed value = %d reference value = %d",
+                        j, index, results[index].imei[j].excl_ind, ref_val);
+
+                    diff++;
+                }
+
+                fscanf(pf, "%u", &ref_val);            
+                if (ref_val != results[index].imei[j].imask)
+                {
+                    printf("\nDifference for imei[%d].imask at index %d computed value = %u reference value = %u",
+                        j, index, results[index].imei[j].imask, ref_val);
+
+                    diff++;
+                }
+
+            }
+        }
+
+        printf("\nFinished comparing results. Total number of differences: %d", diff);
+        fclose(pf);
+    }
+    else
+        printf("\n%s file not found. No comparison performed.", ref_file);
+}
+
+void dump_compare_results_f(float* results, int cnt, char* out_file, char* ref_file)
 {    
     FILE *pf;    
     float cmp_eps = 0.001f;
@@ -771,6 +852,37 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t        ocl_nb,
         }
     }
 
+/* Uncomment this define to enable cj4 debugging for the first kernel run */
+//#define DEBUG_DUMP_CJ4_OCL
+#ifdef DEBUG_DUMP_CJ4_OCL
+    {
+        static int first_run = 1;        
+
+        if (first_run)
+        {         
+            nbnxn_cj4_t *temp_cj4;
+            int cnt;
+            size_t size;
+
+            first_run = 0;        
+
+            cnt = ocl_nb->plist[0]->ncj4;
+            size = cnt * sizeof(nbnxn_cj4_t);
+            temp_cj4 = (nbnxn_cj4_t*)malloc(size);
+
+            ocl_copy_D2H_async(temp_cj4, ocl_nb->plist[0]->cj4, 0,
+                size, stream, NULL);
+
+            // Make sure all data has been transfered back from device
+            clFinish(stream);
+
+            dump_compare_results_cj4(temp_cj4, cnt, "ocl_cj4.txt", "cuda_cj4.txt");
+
+            free(temp_cj4);
+        }
+    }
+#endif
+
 /* Uncomment this define to enable f debugging for the first kernel run */
 //#define DEBUG_DUMP_F_OCL
 #ifdef DEBUG_DUMP_F_OCL
@@ -784,7 +896,7 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t        ocl_nb,
             // Make sure all data has been transfered back from device
             clFinish(stream);
 
-            dump_compare_results(nbatom->out[0].f + adat_begin * 3, (adat_len) * 3,
+            dump_compare_results_f(nbatom->out[0].f + adat_begin * 3, (adat_len) * 3,
                 "ocl_f.txt", "cuda_f.txt");
         }
     }
@@ -803,7 +915,7 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t        ocl_nb,
             // Make sure all data has been transfered back from device
             clFinish(stream);
 
-            dump_compare_results(ocl_nb->nbst.fshift, SHIFTS * 3,
+            dump_compare_results_f(ocl_nb->nbst.fshift, SHIFTS * 3,
                 "ocl_fshift.txt", "cuda_fshift.txt");
         }
     }
