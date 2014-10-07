@@ -405,7 +405,7 @@ void dump_cj4(nbnxn_cj4_t *results, int cnt, char* out_file)
 
     for (int index = 0; index < cnt; index++)
     {
-        fprintf(pf, "%20d%20d%20d%20d%20d%20d%20d%20d\n",
+        fprintf(pf, "%20d%20d%20d%20d%20d%20u%20d%20u\n",
             results[index].cj[0], results[index].cj[1], results[index].cj[2], results[index].cj[3],
             results[index].imei[0].excl_ind, results[index].imei[0].imask,
             results[index].imei[1].excl_ind, results[index].imei[1].imask);
