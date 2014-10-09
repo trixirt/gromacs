@@ -391,7 +391,32 @@ void nbnxn_cuda_launch_kernel(nbnxn_cuda_ptr_t        cu_nb,
     }
 }
 
-void dump_results(float* results, int cnt, char* out_file)
+void dump_cj4(nbnxn_cj4_t *results, int cnt, char* out_file)
+{    
+    FILE *pf;        
+
+    pf = fopen(out_file, "wt");
+    assert(pf != NULL);
+       
+    fprintf(pf, "%20s%20s%20s%20s%20s%20s%20s%20s\n",
+        "cj[0]", "cj[1]", "cj[2]", "cj[3]",
+        "imei[0].imask", "imei[0].excl_ind",
+        "imei[1].imask", "imei[1].excl_ind");
+
+    for (int index = 0; index < cnt; index++)
+    {
+        fprintf(pf, "%20d%20d%20d%20d%20d%20u%20d%20u\n",
+            results[index].cj[0], results[index].cj[1], results[index].cj[2], results[index].cj[3],
+            results[index].imei[0].excl_ind, results[index].imei[0].imask,
+            results[index].imei[1].excl_ind, results[index].imei[1].imask);
+    }
+
+    fclose(pf);
+
+    printf("\nWrote results to %s", out_file);
+}
+
+void dump_results_f(float* results, int cnt, char* out_file)
 {    
     FILE *pf;        
 
@@ -539,6 +564,37 @@ void nbnxn_cuda_launch_cpyback(nbnxn_cuda_ptr_t        cu_nb,
         }
     }
 
+/* Uncomment this define to enable cj4 debugging for the first kernel run */
+//#define DEBUG_DUMP_CJ4_CUDA
+#ifdef DEBUG_DUMP_CJ4_CUDA
+    {
+        static int first_run = 1;        
+
+        if (first_run)
+        {         
+            nbnxn_cj4_t *temp_cj4;
+            int cnt;
+            size_t size;
+
+            first_run = 0;        
+
+            cnt = cu_nb->plist[0]->ncj4;
+            size = cnt * sizeof(nbnxn_cj4_t);
+            temp_cj4 = (nbnxn_cj4_t*)malloc(size);
+
+            cu_copy_D2H_async(temp_cj4, cu_nb->plist[0]->cj4,
+                size, stream);
+
+            // Make sure all data has been transfered back from device
+            cudaStreamSynchronize(stream);
+
+            dump_cj4(temp_cj4, cnt, "cuda_cj4.txt");
+
+            free(temp_cj4);
+        }
+    }
+#endif
+
 /* Uncomment this define to enable f debugging for the first kernel run */
 // #define DEBUG_DUMP_F_CUDA
 #ifdef DEBUG_DUMP_F_CUDA
@@ -552,7 +608,7 @@ void nbnxn_cuda_launch_cpyback(nbnxn_cuda_ptr_t        cu_nb,
             // Make sure all data has been transfered back from device
             cudaStreamSynchronize(stream);
 
-            dump_results(nbatom->out[0].f + adat_begin * 3, (adat_len) * 3, "cuda_f.txt");
+            dump_results_f(nbatom->out[0].f + adat_begin * 3, (adat_len) * 3, "cuda_f.txt");
         }
     }
 #endif
@@ -570,7 +626,7 @@ void nbnxn_cuda_launch_cpyback(nbnxn_cuda_ptr_t        cu_nb,
             // Make sure all data has been transfered back from device
             cudaStreamSynchronize(stream);
 
-            dump_results((float*)(cu_nb->nbst.fshift), 3 * SHIFTS, "cuda_fshift.txt");
+            dump_results_f((float*)(cu_nb->nbst.fshift), 3 * SHIFTS, "cuda_fshift.txt");
         }
     }
 #endif
