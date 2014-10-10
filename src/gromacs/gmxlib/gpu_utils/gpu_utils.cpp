@@ -343,8 +343,12 @@ void ocl_pmalloc(void **h_ptr, size_t nbytes)
 
     //CU_CHECK_PREV_ERR();
 
-    //stat = cudaMallocHost(h_ptr, nbytes, flag);
-    *h_ptr = malloc(nbytes);
+    //stat = cudaMallocHost(h_ptr, nbytes, flag);    
+    //*h_ptr = malloc(nbytes);
+    // Replaced malloc with calloc as cudaMallocHost seems to also
+    // set all bytes to 0. 
+    *h_ptr = calloc(1, nbytes);    
+    
     if(! *h_ptr)
     {
         sprintf(strbuf, "cudaMallocHost of size %d bytes failed", (int)nbytes);
