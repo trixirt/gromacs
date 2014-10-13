@@ -105,11 +105,15 @@ texture<float, 1, cudaReadModeElementType> coulomb_tab_texref;
 #undef CALC_ENERGIES
 #undef PRUNE_NBL
 
+
+//#define DEBUG_CUDA
+
 /*! Nonbonded kernel function pointer type */
 typedef void (*nbnxn_cu_kfunc_ptr_t)(const cu_atomdata_t,
                                      const cu_nbparam_t,
                                      const cu_plist_t,
-                                     bool);
+                                     bool,
+                                     float*);
 
 /*********************************/
 
@@ -299,6 +303,12 @@ void nbnxn_cuda_launch_kernel(nbnxn_cuda_ptr_t        cu_nb,
     bool                 bCalcFshift = flags & GMX_FORCE_VIRIAL;
     bool                 bDoTime     = cu_nb->bDoTime;
 
+#ifdef DEBUG_CUDA
+        float* debug_buffer_h;
+        size_t debug_buffer_size;
+#endif
+    float* debug_buffer_d;
+
     /* turn energy calculation always on/off (for debugging/testing only) */
     bCalcEner = (bCalcEner || always_ener) && !never_ener;
 
@@ -381,7 +391,16 @@ void nbnxn_cuda_launch_kernel(nbnxn_cuda_ptr_t        cu_nb,
                 NCL_PER_SUPERCL, plist->na_c);
     }
 
-    nb_kernel<<< dim_grid, dim_block, shmem, stream>>> (*adat, *nbp, *plist, bCalcFshift);
+#ifdef DEBUG_CUDA
+    debug_buffer_size = dim_grid.x * dim_block.x * dim_grid.y * dim_block.y * dim_grid.z * sizeof(float);
+    debug_buffer_h = (float*)calloc(1, debug_buffer_size);
+    assert(NULL != debug_buffer_h);
+
+    cudaMalloc(&debug_buffer_d, debug_buffer_size);
+    cu_copy_H2D_async(debug_buffer_d, debug_buffer_h, debug_buffer_size, stream);
+#endif
+
+    nb_kernel<<< dim_grid, dim_block, shmem, stream>>> (*adat, *nbp, *plist, bCalcFshift, debug_buffer_d);
     CU_LAUNCH_ERR("k_calc_nb");
 
     if (bDoTime)
@@ -389,6 +408,53 @@ void nbnxn_cuda_launch_kernel(nbnxn_cuda_ptr_t        cu_nb,
         stat = cudaEventRecord(t->stop_nb_k[iloc], stream);
         CU_RET_ERR(stat, "cudaEventRecord failed");
     }
+
+#ifdef DEBUG_CUDA
+    {
+        FILE *pf;        
+
+        cu_copy_D2H_async(debug_buffer_h, debug_buffer_d,
+                debug_buffer_size, stream);
+
+        // Make sure all data has been transfered back from device
+        cudaStreamSynchronize(stream); 
+
+        printf("\nWriting debug_buffer to debug_buffer_cuda.txt...");
+        
+        pf = fopen("debug_buffer_cuda.txt", "wt");
+        assert(pf != NULL);
+
+        fprintf(pf,"%20s", "");
+        for (int j = 0; j < dim_grid.x * dim_block.x; j++)
+        {
+            char label[20];
+            sprintf(label, "(wIdx=%2d thIdx=%2d)", j / dim_block.x, j % dim_block.x);
+            fprintf(pf, "%20s", label);
+        }
+
+        for (int i = 0; i < dim_grid.y * dim_block.y; i++)
+        {
+            char label[20];
+            sprintf(label, "(wIdy=%2d thIdy=%2d)", i / dim_block.y, i % dim_block.y);
+            fprintf(pf, "\n%20s", label);
+
+            for (int j = 0; j < dim_grid.x * dim_block.x; j++)
+                fprintf(pf, "%20.5f", debug_buffer_h[i * dim_grid.x * dim_block.x + j]);
+
+            //fprintf(pf, "\n");
+        }
+
+        fclose(pf);
+
+        printf(" done.\n");
+
+        free(debug_buffer_h);
+        debug_buffer_h = NULL;
+
+        cudaFree(debug_buffer_d);
+        debug_buffer_d = NULL;
+    }
+#endif
 }
 
 void dump_cj4(nbnxn_cj4_t *results, int cnt, char* out_file)

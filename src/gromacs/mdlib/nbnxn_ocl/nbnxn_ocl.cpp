@@ -548,6 +548,7 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
 #ifdef DEBUG_OCL
     debug_buffer_size = dim_grid[0] * dim_grid[1] * dim_grid[2] * sizeof(float);
     debug_buffer_h = (float*)calloc(1, debug_buffer_size);
+    assert(NULL != debug_buffer_h);
 
     if (NULL == ocl_nb->debug_buffer)
     {   
@@ -614,9 +615,9 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
         // Make sure all data has been transfered back from device
         clFinish(stream);    
 
-        printf("\nWriting debug_buffer to debug_buffer.txt...");
+        printf("\nWriting debug_buffer to debug_buffer_ocl.txt...");
         
-        pf = fopen("debug_buffer.txt", "wt");
+        pf = fopen("debug_buffer_ocl.txt", "wt");
         assert(pf != NULL);
 
         fprintf(pf,"%20s", "");
@@ -643,11 +644,9 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
 
         printf(" done.\n");
 
-        if (NULL == debug_buffer_h)
-        {
-            free(debug_buffer_h);
-            debug_buffer_h = NULL;
-        }
+
+        free(debug_buffer_h);
+        debug_buffer_h = NULL;
     }
 #endif
 }
