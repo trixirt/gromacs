@@ -132,6 +132,8 @@ static bool always_ener  = (getenv("GMX_GPU_ALWAYS_ENER") != NULL);
 static bool never_ener   = (getenv("GMX_GPU_NEVER_ENER") != NULL);
 static bool always_prune = (getenv("GMX_GPU_ALWAYS_PRUNE") != NULL);
 
+/* Uncomment this define to enable kernel debugging */
+//#define DEBUG_OCL
 
 /* Bit-pattern used for polling-based GPU synchronization. It is used as a float
  * and corresponds to having the exponent set to the maximum (127 -- single
@@ -454,6 +456,10 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
     cl_atomdata_params_t atomdata_params;    
     cl_nbparam_params_t nbparams_params;
     cl_plist_params_t plist_params;
+#ifdef DEBUG_OCL
+        float* debug_buffer_h;
+        size_t debug_buffer_size;
+#endif
 
     /* turn energy calculation always on/off (for debugging/testing only) */
     bCalcEner = (bCalcEner || always_ener) && !never_ener;
@@ -539,6 +545,18 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
 
     shmem     = calc_shmem_required();
 
+#ifdef DEBUG_OCL
+    debug_buffer_size = dim_grid[0] * dim_grid[1] * dim_grid[2] * sizeof(float);
+    debug_buffer_h = (float*)calloc(1, debug_buffer_size);
+
+    if (NULL == ocl_nb->debug_buffer)
+    {   
+        ocl_nb->debug_buffer = clCreateBuffer(ocl_nb->dev_info->context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+            debug_buffer_size, debug_buffer_h, &cl_error);
+
+        assert(CL_SUCCESS == cl_error);
+    }
+#endif
     ////if (debug)
     ////{
     ////    fprintf(debug, "GPU launch configuration:\n\tThread block: %dx%dx%d\n\t"
@@ -569,6 +587,7 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
     cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(plist->excl));
     cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(int), &bCalcFshift);
     cl_error = clSetKernelArg(nb_kernel, arg_no++, shmem, NULL);
+    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(ocl_nb->debug_buffer));
 
 
     cl_error = clEnqueueNDRangeKernel(stream, nb_kernel, 3, NULL, dim_grid, dim_block, 0, NULL, NULL);
@@ -584,6 +603,53 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
     ////    stat = cudaEventRecord(t->stop_nb_k[iloc], stream);
     ////    CU_RET_ERR(stat, "cudaEventRecord failed");
     ////}
+
+#ifdef DEBUG_OCL
+    {
+        FILE *pf;
+
+        ocl_copy_D2H_async(debug_buffer_h, ocl_nb->debug_buffer, 0,
+            debug_buffer_size, stream, NULL);
+
+        // Make sure all data has been transfered back from device
+        clFinish(stream);    
+
+        printf("\nWriting debug_buffer to debug_buffer.txt...");
+        
+        pf = fopen("debug_buffer.txt", "wt");
+        assert(pf != NULL);
+
+        fprintf(pf,"%20s", "");
+        for (int j = 0; j < dim_grid[0]; j++)
+        {
+            char label[20];
+            sprintf(label, "(wIdx=%2d thIdx=%2d)", j / dim_block[0], j % dim_block[0]);
+            fprintf(pf, "%20s", label);
+        }
+
+        for (int i = 0; i < dim_grid[1]; i++)
+        {
+            char label[20];
+            sprintf(label, "(wIdy=%2d thIdy=%2d)", i / dim_block[1], i % dim_block[1]);
+            fprintf(pf, "\n%20s", label);
+
+            for (int j = 0; j < dim_grid[0]; j++)
+                fprintf(pf, "%20.5f", debug_buffer_h[i * dim_grid[0] + j]);
+
+            //fprintf(pf, "\n");
+        }
+
+        fclose(pf);
+
+        printf(" done.\n");
+
+        if (NULL == debug_buffer_h)
+        {
+            free(debug_buffer_h);
+            debug_buffer_h = NULL;
+        }
+    }
+#endif
 }
 
 void dump_compare_results_cj4(nbnxn_cj4_t* results, int cnt, char* out_file, char* ref_file)
@@ -851,6 +917,7 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t        ocl_nb,
                               sizeof(float), stream, NULL);            
         }
     }
+
 
 /* Uncomment this define to enable cj4 debugging for the first kernel run */
 //#define DEBUG_DUMP_CJ4_OCL

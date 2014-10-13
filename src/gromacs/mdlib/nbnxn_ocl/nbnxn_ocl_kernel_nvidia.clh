@@ -254,7 +254,8 @@ __global float *fshift, // __global float3 *fshift,                         /* O
  
  int bCalcFshift,
  
- __local  float4   *xqib   /* Pointer to dyn alloc'ed shmem */
+ __local  float4   *xqib,   /* Pointer to dyn alloc'ed shmem */
+ __global float *debug_buffer
  )
 
  ////
@@ -367,7 +368,7 @@ __global float *fshift, // __global float3 *fshift,                         /* O
 #endif    
     __local uint *warp_any = (__local uint*)(LOCAL_OFFSET);
 #undef LOCAL_OFFSET
-    
+
     nb_sci      = pl_sci[bidx];         /* my i super-cluster's index = current bidx */
     sci         = nb_sci.sci;           /* super-cluster */
     cij4_start  = nb_sci.cj4_ind_start; /* first ...*/

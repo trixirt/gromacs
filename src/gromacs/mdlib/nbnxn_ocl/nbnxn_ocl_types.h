@@ -351,6 +351,8 @@ struct nbnxn_opencl
     cl_plist_t      *plist[2];       /**< pair-list data structures (local and non-local)      */
     cl_nb_staging_t     nbst;           /**< staging area where fshift/energies get downloaded    */
 
+    cl_mem              debug_buffer;
+
     cl_command_queue     stream[2];      /**< local and non-local GPU streams                      */
 
     /** events used for synchronization */

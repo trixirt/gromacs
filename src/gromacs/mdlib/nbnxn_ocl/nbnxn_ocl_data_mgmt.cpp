@@ -843,6 +843,9 @@ void nbnxn_ocl_init(FILE                 *fplog,
     /* init the kernels */
     nbnxn_init_kernels(nb);
 
+    /* init to NULL the debug buffer */
+    nb->debug_buffer = NULL;
+
     /* init nbst */
     ocl_pmalloc((void**)&nb->nbst.e_lj, sizeof(*nb->nbst.e_lj));
     ocl_pmalloc((void**)&nb->nbst.e_el, sizeof(*nb->nbst.e_el));
@@ -1342,6 +1345,7 @@ void free_kernels(cl_kernel *kernels, int count)
 void nbnxn_ocl_free(nbnxn_opencl_ptr_t ocl_nb)
 {
     // TO DO: Implement this functions for OpenCL
+    cl_int cl_error;
     int kernel_count;
 
     /* Free kernels */
@@ -1361,6 +1365,14 @@ void nbnxn_ocl_free(nbnxn_opencl_ptr_t ocl_nb)
     free_kernel(&(ocl_nb->kernel_memset_f2));
     free_kernel(&(ocl_nb->kernel_memset_f3));
     free_kernel(&(ocl_nb->kernel_zero_e_fshift));
+
+    /* Free debug buffer */
+    if (NULL != ocl_nb->debug_buffer)
+    {
+        cl_error = clReleaseMemObject(ocl_nb->debug_buffer);
+        assert(CL_SUCCESS == cl_error);
+        ocl_nb->debug_buffer = NULL;
+    }
 }
 
 ////void nbnxn_cuda_free(nbnxn_cuda_ptr_t cu_nb)
