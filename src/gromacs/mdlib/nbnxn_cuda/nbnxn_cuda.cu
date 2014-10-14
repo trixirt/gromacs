@@ -307,7 +307,7 @@ void nbnxn_cuda_launch_kernel(nbnxn_cuda_ptr_t        cu_nb,
         float* debug_buffer_h;
         size_t debug_buffer_size;
 #endif
-    float* debug_buffer_d;
+    float* debug_buffer_d = NULL;
 
     /* turn energy calculation always on/off (for debugging/testing only) */
     bCalcEner = (bCalcEner || always_ener) && !never_ener;
