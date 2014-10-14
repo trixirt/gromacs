@@ -529,7 +529,7 @@ void reduce_force_j_generic(__local float *f_buf, __global float *fout,//__globa
 {
     if (tidxi == 0)
     {
-        float3 f = make_float3(0.0f);
+        float3 f = (float3)(0.0f);
         for (int j = tidxj * CL_SIZE; j < (tidxj + 1) * CL_SIZE; j++)
         {
             f.x += f_buf[                  j];
@@ -606,7 +606,7 @@ void reduce_force_i_pow2(volatile __local float *f_buf, __global float *fout,//_
                          int tidxi, int tidxj, int aidx)
 {
     int     i, j;
-    float3  f = make_float3(0.0f);
+    float3  f = (float3)(0.0f);
 
     /* Reduce the initial CL_SIZE values for each i atom to half
      * every step by using CL_SIZE * i threads.

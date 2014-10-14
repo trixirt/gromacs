@@ -380,7 +380,7 @@ __global float *fshift, // __global float3 *fshift,                         /* O
 #ifdef DEBUG_E_EL_SUM_PHASE_1
     xqib[tidxj * CL_SIZE + tidxi] = xq[ai];
 #else
-    xqib[tidxj * CL_SIZE + tidxi] = xq[ai] + make_float4(shift_vec[3 * nb_sci.shift], shift_vec[3 * nb_sci.shift + 1], shift_vec[3 * nb_sci.shift + 2], 0.0f);
+    xqib[tidxj * CL_SIZE + tidxi] = xq[ai] + (float4)(shift_vec[3 * nb_sci.shift], shift_vec[3 * nb_sci.shift + 1], shift_vec[3 * nb_sci.shift + 2], 0.0f);
 #endif
 #ifdef IATYPE_SHMEM //Should not be defined! CUDA > 300
     /* Pre-load the i-atom types into shared memory */
@@ -394,7 +394,7 @@ __global float *fshift, // __global float3 *fshift,                         /* O
 
     for (ci_offset = 0; ci_offset < NCL_PER_SUPERCL; ci_offset++)
     {
-        fci_buf[ci_offset] = make_float3(0.0f);
+        fci_buf[ci_offset] = (float3)(0.0f);
     }
 
 #ifdef LJ_EWALD
@@ -475,9 +475,9 @@ __global float *fshift, // __global float3 *fshift,                         /* O
                 cjs[tidxi + tidxj * NBNXN_GPU_JGROUP_SIZE / 4] = pl_cj4[j4].cj[tidxi];
             }
             /* CPU DEBUG..  */
-#if WARP_SIZE_TEST==1
+
     barrier(CLK_LOCAL_MEM_FENCE);
-#endif            
+        
             /* Unrolling this loop
                - with pruning leads to register spilling;
                - on Kepler is much slower;
@@ -494,12 +494,12 @@ __global float *fshift, // __global float3 *fshift,                         /* O
 
                     cj      = cjs[jm + (tidxj & 4) * NBNXN_GPU_JGROUP_SIZE / 4];
                     aj      = cj * CL_SIZE + tidxj;
-#if WARP_SIZE_TEST==1
+
     barrier(CLK_LOCAL_MEM_FENCE);
-#endif  
+
                     /* load j atom data */
                     xqbuf   = xq[aj];
-                    xj      = make_float3(xqbuf);
+                    xj      = (float3)(xqbuf.xyz);
                     qj_f    = nbparam->epsfac * xqbuf.w;
                     typej   = atom_types[aj];
 
@@ -520,7 +520,7 @@ __global float *fshift, // __global float3 *fshift,                         /* O
 
                             /* all threads load an atom from i cluster ci into shmem! */
                             xqbuf   = xqib[i * CL_SIZE + tidxi];
-                            xi      = make_float3(xqbuf);
+                            xi      = (float3)(xqbuf.xyz);
 
                             /* distance between i and j atoms */
                             rv      = xi - xj;
