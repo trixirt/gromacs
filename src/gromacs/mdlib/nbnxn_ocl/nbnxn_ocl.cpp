@@ -135,6 +135,9 @@ static bool always_prune = (getenv("GMX_GPU_ALWAYS_PRUNE") != NULL);
 /* Uncomment this define to enable kernel debugging */
 //#define DEBUG_OCL
 
+/* Specifies which kernel run to debug */
+#define DEBUG_RUN_STEP 2
+
 /* Bit-pattern used for polling-based GPU synchronization. It is used as a float
  * and corresponds to having the exponent set to the maximum (127 -- single
  * precision) and the mantissa to 0.
@@ -546,16 +549,25 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
     shmem     = calc_shmem_required();
 
 #ifdef DEBUG_OCL
-    debug_buffer_size = dim_grid[0] * dim_grid[1] * dim_grid[2] * sizeof(float);
-    debug_buffer_h = (float*)calloc(1, debug_buffer_size);
-    assert(NULL != debug_buffer_h);
+    {
+        static int run_step = 1;        
 
-    if (NULL == ocl_nb->debug_buffer)
-    {   
-        ocl_nb->debug_buffer = clCreateBuffer(ocl_nb->dev_info->context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-            debug_buffer_size, debug_buffer_h, &cl_error);
+        if (DEBUG_RUN_STEP == run_step)
+        {
+            debug_buffer_size = dim_grid[0] * dim_grid[1] * dim_grid[2] * sizeof(float);
+            debug_buffer_h = (float*)calloc(1, debug_buffer_size);
+            assert(NULL != debug_buffer_h);
 
-        assert(CL_SUCCESS == cl_error);
+            if (NULL == ocl_nb->debug_buffer)
+            {   
+                ocl_nb->debug_buffer = clCreateBuffer(ocl_nb->dev_info->context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+                    debug_buffer_size, debug_buffer_h, &cl_error);
+
+                assert(CL_SUCCESS == cl_error);
+            }
+         }
+
+        run_step++;
     }
 #endif
     ////if (debug)
@@ -607,46 +619,53 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
 
 #ifdef DEBUG_OCL
     {
-        FILE *pf;
+        static int run_step = 1;        
 
-        ocl_copy_D2H_async(debug_buffer_h, ocl_nb->debug_buffer, 0,
-            debug_buffer_size, stream, NULL);
+        if (DEBUG_RUN_STEP == run_step)
+        {
+            FILE *pf;
 
-        // Make sure all data has been transfered back from device
-        clFinish(stream);    
+            ocl_copy_D2H_async(debug_buffer_h, ocl_nb->debug_buffer, 0,
+                debug_buffer_size, stream, NULL);
 
-        printf("\nWriting debug_buffer to debug_buffer_ocl.txt...");
+            // Make sure all data has been transfered back from device
+            clFinish(stream);    
+
+            printf("\nWriting debug_buffer to debug_buffer_ocl.txt...");
         
-        pf = fopen("debug_buffer_ocl.txt", "wt");
-        assert(pf != NULL);
+            pf = fopen("debug_buffer_ocl.txt", "wt");
+            assert(pf != NULL);
 
-        fprintf(pf,"%20s", "");
-        for (int j = 0; j < dim_grid[0]; j++)
-        {
-            char label[20];
-            sprintf(label, "(wIdx=%2d thIdx=%2d)", j / dim_block[0], j % dim_block[0]);
-            fprintf(pf, "%20s", label);
-        }
-
-        for (int i = 0; i < dim_grid[1]; i++)
-        {
-            char label[20];
-            sprintf(label, "(wIdy=%2d thIdy=%2d)", i / dim_block[1], i % dim_block[1]);
-            fprintf(pf, "\n%20s", label);
-
+            fprintf(pf,"%20s", "");
             for (int j = 0; j < dim_grid[0]; j++)
-                fprintf(pf, "%20.5f", debug_buffer_h[i * dim_grid[0] + j]);
+            {
+                char label[20];
+                sprintf(label, "(wIdx=%2d thIdx=%2d)", j / dim_block[0], j % dim_block[0]);
+                fprintf(pf, "%20s", label);
+            }
 
-            //fprintf(pf, "\n");
+            for (int i = 0; i < dim_grid[1]; i++)
+            {
+                char label[20];
+                sprintf(label, "(wIdy=%2d thIdy=%2d)", i / dim_block[1], i % dim_block[1]);
+                fprintf(pf, "\n%20s", label);
+
+                for (int j = 0; j < dim_grid[0]; j++)
+                    fprintf(pf, "%20.5f", debug_buffer_h[i * dim_grid[0] + j]);
+
+                //fprintf(pf, "\n");
+            }
+
+            fclose(pf);
+
+            printf(" done.\n");
+
+
+            free(debug_buffer_h);
+            debug_buffer_h = NULL;
         }
 
-        fclose(pf);
-
-        printf(" done.\n");
-
-
-        free(debug_buffer_h);
-        debug_buffer_h = NULL;
+        run_step++;
     }
 #endif
 }
@@ -917,20 +936,17 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t        ocl_nb,
         }
     }
 
-
 /* Uncomment this define to enable cj4 debugging for the first kernel run */
 //#define DEBUG_DUMP_CJ4_OCL
 #ifdef DEBUG_DUMP_CJ4_OCL
     {
-        static int first_run = 1;        
+        static int run_step = 1;        
 
-        if (first_run)
+        if (DEBUG_RUN_STEP == run_step)
         {         
             nbnxn_cj4_t *temp_cj4;
             int cnt;
             size_t size;
-
-            first_run = 0;        
 
             cnt = ocl_nb->plist[0]->ncj4;
             size = cnt * sizeof(nbnxn_cj4_t);
@@ -946,6 +962,8 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t        ocl_nb,
 
             free(temp_cj4);
         }
+
+        run_step++;
     }
 #endif
 
@@ -953,18 +971,18 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t        ocl_nb,
 //#define DEBUG_DUMP_F_OCL
 #ifdef DEBUG_DUMP_F_OCL
     {
-        static int first_run = 1;        
+        static int run_step = 1;        
 
-        if (first_run)
-        {         
-            first_run = 0;
-
+        if (DEBUG_RUN_STEP == run_step)
+        {
             // Make sure all data has been transfered back from device
             clFinish(stream);
 
             dump_compare_results_f(nbatom->out[0].f + adat_begin * 3, (adat_len) * 3,
                 "ocl_f.txt", "cuda_f.txt");
         }
+
+        run_step++;
     }
 #endif
 
@@ -972,18 +990,18 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t        ocl_nb,
 //#define DEBUG_DUMP_FSHIFT_OCL
 #ifdef DEBUG_DUMP_FSHIFT_OCL
     {
-        static int first_run = 1;
+        static int run_step = 1;
 
-        if (first_run)
-        {         
-            first_run = 0;
-
+        if (DEBUG_RUN_STEP == run_step)
+        {     
             // Make sure all data has been transfered back from device
             clFinish(stream);
 
             dump_compare_results_f(ocl_nb->nbst.fshift, SHIFTS * 3,
                 "ocl_fshift.txt", "cuda_fshift.txt");
         }
+
+        run_step++;
     }
 #endif
 
