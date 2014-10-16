@@ -679,8 +679,8 @@ void dump_compare_results_cj4(nbnxn_cj4_t* results, int cnt, char* out_file, cha
                 
     fprintf(pf, "%20s%20s%20s%20s%20s%20s%20s%20s\n",
         "cj[0]", "cj[1]", "cj[2]", "cj[3]",
-        "imei[0].imask", "imei[0].excl_ind",
-        "imei[1].imask", "imei[1].excl_ind");
+        "imei[0].excl_ind", "imei[0].imask",
+        "imei[1].excl_ind", "imei[1].imask");
 
     for (int index = 0; index < cnt; index++)
     {

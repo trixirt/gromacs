@@ -42,7 +42,7 @@
  * is inlined (nbnxnx_ocl_kernel_nvidia.clh call in line 375). 
  */
 
-//#define _VECTYPE_OPS_INLINE_
+#define _VECTYPE_OPS_INLINE_
 
 #if defined(_VECTYPE_OPS_INLINE_)
 #define _INLINE_ inline
@@ -51,10 +51,7 @@
 #endif
 
 /**** float3 ****/
-_INLINE_ float3 make_float3(float4 a)
-{
-    return (float3)(a.x, a.y, a.z);
-}
+
 
 _INLINE_ float norm_f3(float3 a)
 {
@@ -86,11 +83,13 @@ _INLINE_ void atomicAdd_l_f(volatile __local float *addr, float val)
     union{
         unsigned int u32;
         float        f32;
-    } next, expected;
+    } next, expected, current;
+	current.f32    = *addr;
     do{
-        expected.f32    = *addr;
-        next.f32        = expected.f32 + val;
-    } while( atomic_cmpxchg( (volatile __local unsigned int *)addr, expected.u32, next.u32) != expected.u32 );
+  	    expected.f32 = current.f32;
+        next.f32     = expected.f32 + val;		
+		current.u32  = atomic_cmpxchg( (volatile __local unsigned int *)addr, expected.u32, next.u32);
+    } while( current.u32 != expected.u32 );
 }
 _INLINE_ void atomicAdd_l_f3(__local float3 *addr, float3 val)
 {
@@ -103,11 +102,13 @@ _INLINE_ void atomicAdd_g_f(volatile __global float *addr, float val)
     union{
         unsigned int u32;
         float        f32;
-    } next, expected;
+    } next, expected, current;
+	current.f32    = *addr;
     do{
-        expected.f32    = *addr;
-        next.f32        = expected.f32 + val;
-    } while( atomic_cmpxchg( (volatile __global unsigned int *)addr, expected.u32, next.u32) != expected.u32 );
+	    expected.f32 = current.f32;
+        next.f32     = expected.f32 + val;		
+		current.u32  = atomic_cmpxchg( (volatile __global unsigned int *)addr, expected.u32, next.u32);
+    } while( current.u32 != expected.u32 );
 }
 
 /* On the host float3, on the device float1 because f3 translates to f4 and messes up memory indexing */
@@ -139,10 +140,7 @@ _INLINE_ void atomicAdd( float3 *addr, float3 val)
 /****************************************************************/
 
 /**** float4 ****/
-_INLINE_ float4 make_float4(float x, float y, float z, float w)
-{
-    return (float4)(x, y, z, w);
-}
+
 
 _INLINE_ float norm_f4(float4 a)
 {

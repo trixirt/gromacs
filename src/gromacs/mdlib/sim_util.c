@@ -1509,6 +1509,7 @@ void do_force_cutsVERLET(FILE *fplog, t_commrec *cr,
 				enerd->grpp.ener[egLJSR], enerd->grpp.ener[egCOULSR],
 				fr->fshift);
 			cycles_wait_gpu += wallcycle_stop(wcycle, ewcWAIT_GPU_NB_L);
+			nbnxn_ocl_clear_outputs(nbv->ocl_nbv, flags);
 #endif            
         }
         else
