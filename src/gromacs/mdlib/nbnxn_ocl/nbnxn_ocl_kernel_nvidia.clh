@@ -95,25 +95,25 @@ __attribute__((reqd_work_group_size(CL_SIZE, CL_SIZE, 1)))
  __global float *restrict f, //__global float3 *f,                                   /* OUT */
  __global float *restrict e_lj,                                                      /* OUT */
  __global float *restrict e_el,                                                      /* OUT */
- //const __global float3 *fshift, 
+ //const __global float3 *fshift,
 __global float *restrict fshift, // __global float3 *fshift,                         /* OUT */
  const __global int *restrict atom_types,                                            /* IN */
  const __global float *restrict shift_vec,//const __global float3 *shift_vec,        /* IN */
  __constant float* nbfp_climg2d,                                        /* IN */
  __constant float* nbfp_comb_climg2d,                                   /* IN */
  __constant float* coulomb_tab_climg2d,                                 /* IN */
- 
+
  const __global nbnxn_sci_t* pl_sci,                                        /* IN */
- 
+
 #ifndef PRUNE_NBL
     const
 #endif
  __global nbnxn_cj4_t* pl_cj4,                                              /* OUT / IN */
- 
+
  const __global nbnxn_excl_t* excl,                                         /* IN */
- 
+
  int bCalcFshift,
- 
+
  __local  float4   *xqib,   /* Pointer to dyn alloc'ed shmem */
  __global float *debug_buffer
  )
@@ -125,8 +125,8 @@ __global float *restrict fshift, // __global float3 *fshift,                    
 ////// const __global cl_nbparam_t    *nbparam,
 ////// const __global cl_plist_t      *plist,
 ////       __local  float4          *xqib,   /* Pointer to dyn alloc'ed shmem */
-//// __read_only image2d_t            nbfp_climg2d,       
-//// __read_only image2d_t            nbfp_comb_climg2d,       
+//// __read_only image2d_t            nbfp_climg2d,
+//// __read_only image2d_t            nbfp_comb_climg2d,
 //// __read_only image2d_t            coulomb_tab_climg2d,
 //// int bCalcFshift)
 {
@@ -144,7 +144,7 @@ __global float *restrict fshift, // __global float3 *fshift,                    
     //float3             *f           = atdat->f;
     //const float3       *shift_vec   = atdat->shift_vec;
     float               rcoulomb_sq = nbparam->rcoulomb_sq;
-    
+
 #ifdef VDW_CUTOFF_CHECK
     float               rvdw_sq     = nbparam_params.rvdw_sq;//nbparam->rvdw_sq;
     float               vdw_in_range;
@@ -208,11 +208,11 @@ __global float *restrict fshift, // __global float3 *fshift,                    
 
     /* shmem buffer for i x+q pre-loading */
     //extern __shared__  float4 xqib[];
-    
+
     /* shmem buffer for cj, for both warps separately */
     __local int *cjs     = (__local int *)(xqib + NCL_PER_SUPERCL * CL_SIZE);
     #define LOCAL_OFFSET cjs + 2 * NBNXN_GPU_JGROUP_SIZE
-    
+
 #ifdef IATYPE_SHMEM //Should not be defined! CUDA > 300
     /* shmem buffer for i atom-type pre-loading */
     __local int *atib = (__local int *)(LOCAL_OFFSET);
@@ -223,9 +223,9 @@ __global float *restrict fshift, // __global float3 *fshift,                    
 #ifndef REDUCE_SHUFFLE
     /* shmem j force buffer */
     __local float *f_buf = (__local float *)(LOCAL_OFFSET);
-    #undef LOCAL_OFFSET    
+    #undef LOCAL_OFFSET
     #define LOCAL_OFFSET f_buf + CL_SIZE * CL_SIZE * 3
-#endif    
+#endif
     __local uint *warp_any = (__local uint*)(LOCAL_OFFSET);
 #undef LOCAL_OFFSET
 
@@ -249,7 +249,7 @@ __global float *restrict fshift, // __global float3 *fshift,                    
     /* Initialise warp vote. (8x8 block) 2 warps for nvidia */
     if(tidx==0 || tidx==32)
         warp_any[widx] = 0;
-    
+
     barrier(CLK_LOCAL_MEM_FENCE);
 
     for (ci_offset = 0; ci_offset < NCL_PER_SUPERCL; ci_offset++)
@@ -324,7 +324,7 @@ __global float *restrict fshift, // __global float3 *fshift,                    
         wexcl_idx   = pl_cj4[j4].imei[widx].excl_ind;
         imask       = pl_cj4[j4].imei[widx].imask;
         wexcl       = excl[wexcl_idx].pair[(tidx) & (WARP_SIZE - 1)];
-		
+
 #ifndef PRUNE_NBL
         if (imask)
 #endif
@@ -334,7 +334,7 @@ __global float *restrict fshift, // __global float3 *fshift,                    
             {
                 cjs[tidxi + tidxj * NBNXN_GPU_JGROUP_SIZE / 4] = pl_cj4[j4].cj[tidxi];
             }
-        
+
             /* Unrolling this loop
                - with pruning leads to register spilling;
                - on Kepler is much slower;
@@ -389,12 +389,12 @@ __global float *restrict fshift, // __global float3 *fshift,                    
 
                             /* If _none_ of the atoms pairs are in cutoff range,
                                the bit corresponding to the current
-                               cluster-pair in imask gets set to 0. */                            
+                               cluster-pair in imask gets set to 0. */
                             if (!warp_any[widx])
                                 imask &= ~mask_ji;
 
                             warp_any[widx]=0;
-							
+
 #endif
 
                             int_bit = (wexcl & mask_ji) ? 1.0f : 0.0f;
@@ -436,7 +436,7 @@ __global float *restrict fshift, // __global float3 *fshift,                    
                                                      c6 * (inv_r6 + nbparam->dispersion_shift.cpot)*ONE_SIXTH_F);
 
 #endif
-								
+
 
 #ifdef LJ_FORCE_SWITCH
 #ifdef CALC_ENERGIES
@@ -475,7 +475,7 @@ __global float *restrict fshift, // __global float3 *fshift,                    
                                 E_lj_p       *= vdw_in_range;
 #endif
 #endif                          /* VDW_CUTOFF_CHECK */
-							
+
 #ifdef LJ_POT_SWITCH
 #ifdef CALC_ENERGIES
                                 calculate_potential_switch_F_E(nbparam, c6, c12, inv_r, r2, &F_invr, &E_lj_p);
@@ -486,7 +486,7 @@ __global float *restrict fshift, // __global float3 *fshift,                    
 
 #ifdef CALC_ENERGIES
                                 E_lj    += E_lj_p;
-							  
+
 #endif
 
 
@@ -551,7 +551,7 @@ __global float *restrict fshift, // __global float3 *fshift,                    
 #ifdef PRUNE_NBL
             /* Update the imask with the new one which does not contain the
                out of range clusters anymore. */
-			   
+
             pl_cj4[j4].imei[widx].imask = imask;
 #endif
         }
@@ -582,7 +582,7 @@ __global float *restrict fshift, // __global float3 *fshift,                    
     f_buf[              tidx] = E_lj;
     f_buf[FBUF_STRIDE + tidx] = E_el;
     reduce_energy_pow2(f_buf + (tidx & WARP_SIZE), e_lj, e_el, tidx & ~WARP_SIZE);
-	
+
 #endif
 
 #endif /* DEBUG_E_EL_SUM_PHASE_1 */
