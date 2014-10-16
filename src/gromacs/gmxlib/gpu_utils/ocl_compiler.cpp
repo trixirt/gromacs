@@ -74,15 +74,23 @@ create_ocl_build_options_length(
         build_options_length += 
             strlen(custom_build_options_prepend)+whitespace;
        
-    if (!strcmp(build_device_vendor,"Advanced Micro Devices, Inc.") || 
-        !strcmp(build_device_vendor,"GenuineIntel") )
+    if ((!strcmp(build_device_vendor,"Advanced Micro Devices, Inc.") || 
+        !strcmp(build_device_vendor,"GenuineIntel")) && getenv("OCL_DEBUG") )
     {
         build_options_length += get_ocl_build_option_length(_generic_debug_symbols_)+whitespace;       
     }                        
 
-    build_options_length += 
-        get_ocl_build_option_length(_generic_noopt_compilation_)+whitespace;        
-        
+    if(getenv("OCL_NOOPT"))
+    {
+        build_options_length += 
+            get_ocl_build_option_length(_generic_noopt_compilation_)+whitespace;        
+    }
+    if(getenv("OCL_FASTMATH"))
+    {
+       build_options_length += 
+            get_ocl_build_option_length(_generic_fast_relaxed_math_)+whitespace      ;  
+    }
+    
     build_options_length += 
         get_ocl_build_option_length(_include_install_opencl_dir_)+whitespace;
         
@@ -103,46 +111,58 @@ create_ocl_build_options(char * build_options_string,
                          const char * custom_build_options_prepend,
                          const char * custom_build_options_append)
 {
-    //cl_device_type device_type;
-    //clGetDeviceInfo(ocl_gpu->ocl_gpu_id.ocl_device_id, CL_DEVICE_TYPE, sizeof(cl_device_type), &device_type, NULL);  
     size_t char_added=0;
-    
+
     if(custom_build_options_prepend)
     {
         strncpy( build_options_string+char_added, 
                  custom_build_options_prepend, 
                  strlen(custom_build_options_prepend));
-        
+
         char_added += strlen(custom_build_options_prepend);
         build_options_string[char_added++] =' ';
-    }    
-    
-    strncpy( build_options_string+char_added, 
-             get_ocl_build_option(_generic_noopt_compilation_),
-             get_ocl_build_option_length(_generic_noopt_compilation_) );
-        
-    char_added += get_ocl_build_option_length(_generic_noopt_compilation_);        
-    build_options_string[char_added++]=' ';            
-    
-    if (!strcmp(build_device_vendor,"Advanced Micro Devices, Inc.") || 
-        !strcmp(build_device_vendor,"GenuineIntel")
+    }
+
+    if(getenv("OCL_NOOPT") )
+    {
+        strncpy( build_options_string+char_added, 
+                get_ocl_build_option(_generic_noopt_compilation_),
+                get_ocl_build_option_length(_generic_noopt_compilation_) );
+
+        char_added += get_ocl_build_option_length(_generic_noopt_compilation_);
+        build_options_string[char_added++]=' ';
+
+    }
+
+    if(getenv("OCL_FASTMATH") )
+    {
+        strncpy( build_options_string+char_added, 
+                get_ocl_build_option(_generic_fast_relaxed_math_),
+                get_ocl_build_option_length(_generic_fast_relaxed_math_) );
+
+        char_added += get_ocl_build_option_length(_generic_fast_relaxed_math_);
+        build_options_string[char_added++]=' ';
+    }
+
+    if ( ( !strcmp(build_device_vendor,"Advanced Micro Devices, Inc.") || 
+            !strcmp(build_device_vendor,"GenuineIntel") ) && getenv("OCL_DEBUG") 
     )
     {
         strncpy( build_options_string+char_added, 
-                 get_ocl_build_option(_generic_debug_symbols_),
-                 get_ocl_build_option_length(_generic_debug_symbols_) );
-        
-        char_added += get_ocl_build_option_length(_generic_debug_symbols_);        
+                get_ocl_build_option(_generic_debug_symbols_),
+                get_ocl_build_option_length(_generic_debug_symbols_) );
+
+        char_added += get_ocl_build_option_length(_generic_debug_symbols_);
         build_options_string[char_added++]=' ';
     }
-    
+
     strncpy( build_options_string+char_added,
              get_ocl_build_option(_include_install_opencl_dir_),
              get_ocl_build_option_length(_include_install_opencl_dir_)
     );
     char_added += get_ocl_build_option_length(_include_install_opencl_dir_);
     build_options_string[char_added++]=' ';
-    
+
     strncpy( build_options_string+char_added,
              get_ocl_build_option(_include_source_opencl_dirs_),
              get_ocl_build_option_length(_include_source_opencl_dirs_)
@@ -345,7 +365,7 @@ static cl_int ocl_get_warp_size(cl_context context, cl_device_id device_id)
     cl_int cl_error = CL_SUCCESS;
     size_t warp_size = 0;
     const char *dummy_kernel="__kernel void test(__global int* test){test[get_local_id(0)] = 0;}";
-    size_t dummy_size = strlen(dummy_kernel);
+
     cl_program program =
         clCreateProgramWithSource(context, 1, (const char**)&dummy_kernel, NULL, &cl_error);
         

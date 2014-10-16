@@ -35,147 +35,8 @@
 
 #include "nbnxn_ocl_kernel_utils.clh"
 
-/* #include "gromacs/math/utilities.h" */
-/* Fixing headers: Attempting to include host system headers inside device code. 
- * Dependencies: real, M_FLOAT_1_SQRTPI. moved to opencl_types*/
-
 #include "ishift.h"
 
-/* Note that floating-point constants in CUDA code should be suffixed
- * with f (e.g. 0.5f), to stop the compiler producing intermediate
- * code that is in double precision.
- */
-
-/////////////////////////////////////////////////////////////////////////////////////////////////
-//// TO DO: these data structures must be shared between the OpenCL device and OpenCL host code
-//// 
-/////////////////////////////////////////////////////////////////////////////////////////////////
-//
-//// Data structures shared between OpenCL device code and OpenCL host code
-//// TO DO: review, improve
-//// Replaced real by float for now, to avoid including any other header
-//typedef struct {
-//    /*real*/float c2;
-//    /*real*/float c3;
-//    /*real*/float cpot;
-//} shift_consts_t;
-//
-///* Used with potential switching:
-// * rsw        = max(r - r_switch, 0)
-// * sw         = 1 + c3*rsw^3 + c4*rsw^4 + c5*rsw^5
-// * dsw        = 3*c3*rsw^2 + 4*c4*rsw^3 + 5*c5*rsw^4
-// * force      = force*dsw - potential*sw
-// * potential *= sw
-// */
-//typedef struct {
-//    /*real*/float c3;
-//    /*real*/float c4;
-//    /*real*/float c5;
-//} switch_consts_t;
-//
-//// Data structure shared between the OpenCL device code and OpenCL host code
-//// Must not contain OpenCL objects (buffers)
-//// TO DO: review, improve
-//typedef struct cl_atomdata_params
-//{
-//    int      natoms;            /**< number of atoms                              */
-//    int      natoms_local;      /**< number of local atoms                        */
-//    int      nalloc;            /**< allocation size for the atom data (xq, f)    */    
-//
-//    int      ntypes;            /**< number of atom types                         */
-//    
-//    /*bool*/int     bShiftVecUploaded; /**< true if the shift vector has been uploaded   */
-//} cl_atomdata_params_t;
-//
-//// Data structure shared between the OpenCL device code and OpenCL host code
-//// Must not contain OpenCL objects (buffers)
-//// TO DO: review, improve
-//typedef struct cl_nbparam_params
-//{
-//
-//    int             eeltype;          /**< type of electrostatics, takes values from #eelCu */
-//    int             vdwtype;          /**< type of VdW impl., takes values from #evdwCu     */
-//
-//    float           epsfac;           /**< charge multiplication factor                      */
-//    float           c_rf;             /**< Reaction-field/plain cutoff electrostatics const. */
-//    float           two_k_rf;         /**< Reaction-field electrostatics constant            */
-//    float           ewald_beta;       /**< Ewald/PME parameter                               */
-//    float           sh_ewald;         /**< Ewald/PME correction term substracted from the direct-space potential */
-//    float           sh_lj_ewald;      /**< LJ-Ewald/PME correction term added to the correction potential        */
-//    float           ewaldcoeff_lj;    /**< LJ-Ewald/PME coefficient                          */
-//
-//    float           rcoulomb_sq;      /**< Coulomb cut-off squared                           */
-//
-//    float           rvdw_sq;          /**< VdW cut-off squared                               */
-//    float           rvdw_switch;      /**< VdW switched cut-off                              */
-//    float           rlist_sq;         /**< pair-list cut-off squared                         */
-//
-//    shift_consts_t  dispersion_shift; /**< VdW shift dispersion constants           */
-//    shift_consts_t  repulsion_shift;  /**< VdW shift repulsion constants            */
-//    switch_consts_t vdw_switch;       /**< VdW switch constants                     */   
-//
-//    /* Ewald Coulomb force table data - accessed through texture memory */
-//    int                    coulomb_tab_size;   /**< table size (s.t. it fits in texture cache) */
-//    float                  coulomb_tab_scale;  /**< table scale/spacing                        */    
-//}cl_nbparam_params_t;
-//
-//
-//// Data structure shared between the OpenCL device code and OpenCL host code
-//// Must not contain OpenCL objects (buffers)
-//// TO DO: review, improve
-//typedef struct cl_plist_params
-//{
-//    int              na_c;        /**< number of atoms per cluster                  */
-//
-//    int              nsci;        /**< size of sci, # of i clusters in the list     */
-//    int              sci_nalloc;  /**< allocation size of sci                       */   
-//
-//    int              ncj4;        /**< total # of 4*j clusters                      */
-//    int              cj4_nalloc;  /**< allocation size of cj4                       */
-//   
-//    int              nexcl;       /**< count for excl                               */
-//    int              excl_nalloc; /**< allocation size of excl                      */
-//
-//    /*bool*/int             bDoPrune;    /**< true if pair-list pruning needs to be
-//                                       done during the  current step                */
-//}cl_plist_params_t;
-//
-//
-//// TO DO: review, improve
-//typedef struct {
-//    int sci;            /* i-super-cluster       */
-//    int shift;          /* Shift vector index plus possible flags */
-//    int cj4_ind_start;  /* Start index into cj4  */
-//    int cj4_ind_end;    /* End index into cj4    */
-//} nbnxn_sci_t;
-//
-//typedef struct {
-//    unsigned int imask;    /* The i-cluster interactions mask for 1 warp  */
-//    int          excl_ind; /* Index into the exclusion array for 1 warp   */
-//} nbnxn_im_ei_t;
-//
-//typedef struct {
-//    int           cj[4];   /* The 4 j-clusters                            */
-//    nbnxn_im_ei_t imei[2]; /* The i-cluster mask data       for 2 warps   */
-//} nbnxn_cj4_t;
-//
-//
-//typedef struct {
-//    unsigned int pair[32]; /* Topology exclusion interaction bits for one warp,
-//                            * each unsigned has bitS for 4*8 i clusters
-//                            */
-//} nbnxn_excl_t;
-//
-//// TO DO: place these defines in one single place
-////////// Currently WARP_SIZE is defined in nbnxn_ocl_kernel_utils.clh
-////////#define WARP_SIZE  32
-////////
-/////////* Convenience defines */
-////////#define NCL_PER_SUPERCL         (NBNXN_GPU_NCLUSTER_PER_SUPERCLUSTER)
-////////#define CL_SIZE                 (NBNXN_GPU_CLUSTER_SIZE)
-//
-/////////////////////////////////////////////////////////////////////////////////////////////////
-//// 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #if defined EL_EWALD_ANA || defined EL_EWALD_TAB
@@ -229,8 +90,6 @@ __attribute__((reqd_work_group_size(CL_SIZE, CL_SIZE, 1)))
 #endif
 (cl_atomdata_params_t atomdata_params,                                      /* IN */
  cl_nbparam_params_t nbparam_params,                                        /* IN */
- cl_plist_params_t plist_params,                                            /* IN */
-
 
  const __global float4 *restrict xq,                                                 /* IN */
  __global float *restrict f, //__global float3 *f,                                   /* OUT */
@@ -465,7 +324,6 @@ __global float *restrict fshift, // __global float3 *fshift,                    
         wexcl_idx   = pl_cj4[j4].imei[widx].excl_ind;
         imask       = pl_cj4[j4].imei[widx].imask;
         wexcl       = excl[wexcl_idx].pair[(tidx) & (WARP_SIZE - 1)];
-        barrier(CLK_GLOBAL_MEM_FENCE);
 		
 #ifndef PRUNE_NBL
         if (imask)
@@ -476,9 +334,6 @@ __global float *restrict fshift, // __global float3 *fshift,                    
             {
                 cjs[tidxi + tidxj * NBNXN_GPU_JGROUP_SIZE / 4] = pl_cj4[j4].cj[tidxi];
             }
-            /* CPU DEBUG..  */
-
-    barrier(CLK_LOCAL_MEM_FENCE);
         
             /* Unrolling this loop
                - with pruning leads to register spilling;
@@ -497,8 +352,6 @@ __global float *restrict fshift, // __global float3 *fshift,                    
 
                     cj      = cjs[jm + (tidxj & 4) * NBNXN_GPU_JGROUP_SIZE / 4];
                     aj      = cj * CL_SIZE + tidxj;
-
-                    barrier(CLK_LOCAL_MEM_FENCE);
 
                     /* load j atom data */
                     xqbuf   = xq[aj];
@@ -533,14 +386,14 @@ __global float *restrict fshift, // __global float3 *fshift,                    
                             /* vote.. should code shmem serialisation, wonder what the hit will be */
                             if (r2 < rlist_sq)
                                 warp_any[widx]=1;
-                            barrier(CLK_LOCAL_MEM_FENCE);
+
                             /* If _none_ of the atoms pairs are in cutoff range,
                                the bit corresponding to the current
                                cluster-pair in imask gets set to 0. */                            
                             if (!warp_any[widx])
                                 imask &= ~mask_ji;
-							barrier(CLK_LOCAL_MEM_FENCE);
-							warp_any[widx]=0;
+
+                            warp_any[widx]=0;
 							
 #endif
 
@@ -691,7 +544,7 @@ __global float *restrict fshift, // __global float3 *fshift,                    
                     f_buf[                  tidx] = fcj_buf.x;
                     f_buf[    FBUF_STRIDE + tidx] = fcj_buf.y;
                     f_buf[2 * FBUF_STRIDE + tidx] = fcj_buf.z;
-					barrier(CLK_LOCAL_MEM_FENCE);
+
                     reduce_force_j_generic(f_buf, f, tidxi, tidxj, aj);
                 }
             }
@@ -700,7 +553,6 @@ __global float *restrict fshift, // __global float3 *fshift,                    
                out of range clusters anymore. */
 			   
             pl_cj4[j4].imei[widx].imask = imask;
-			barrier(CLK_GLOBAL_MEM_FENCE);
 #endif
         }
     }
@@ -717,9 +569,8 @@ __global float *restrict fshift, // __global float3 *fshift,                    
         reduce_force_i(f_buf, f,
                        &fshift_buf, bCalcFshift,
                        tidxi, tidxj, ai);
-        barrier(CLK_GLOBAL_MEM_FENCE);
+        barrier(CLK_LOCAL_MEM_FENCE);
     }
-    barrier(CLK_LOCAL_MEM_FENCE);
     /* add up local shift forces into global mem */
     if (bCalcFshift && tidxj == 0)
     {

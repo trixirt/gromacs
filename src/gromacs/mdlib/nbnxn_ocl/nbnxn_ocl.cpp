@@ -583,26 +583,29 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
 
     arg_no = 0;    
     cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(atomdata_params), &(atomdata_params));    
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(nbparams_params), &(nbparams_params));    
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(plist_params), &(plist_params));    
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->xq));
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->f));
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->e_lj));
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->e_el));
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->fshift));
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->atom_types));
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->shift_vec));    
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(nbp->nbfp_climg2d));    
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(nbp->nbfp_comb_climg2d));
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(nbp->coulomb_tab_climg2d));
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(plist->sci));
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(plist->cj4));
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(plist->excl));
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(int), &bCalcFshift);
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, shmem, NULL);
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(ocl_nb->debug_buffer));
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(nbparams_params), &(nbparams_params));    
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->xq));
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->f));
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->e_lj));
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->e_el));
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->fshift));
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->atom_types));
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->shift_vec));    
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(nbp->nbfp_climg2d));    
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(nbp->nbfp_comb_climg2d));
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(nbp->coulomb_tab_climg2d));
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(plist->sci));
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(plist->cj4));
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(plist->excl));
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(int), &bCalcFshift);
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, shmem, NULL);
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(ocl_nb->debug_buffer));
 
+    assert(cl_error == CL_SUCCESS);
 
+    if(cl_error)
+        printf("ClERROR! %d\n",cl_error);
+    
     cl_error = clEnqueueNDRangeKernel(stream, nb_kernel, 3, NULL, dim_grid, dim_block, 0, NULL, NULL);
 
     //cl_error = clFinish(stream);

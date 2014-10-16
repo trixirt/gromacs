@@ -526,7 +526,6 @@ float pmecorrF(float z2)
 void reduce_force_j_generic(__local float *f_buf, __global float *fout,//__global float3 *fout,
                             int tidxi, int tidxj, int aidx)
 {
-	barrier(CLK_LOCAL_MEM_FENCE);
     if (tidxi == 0)
     {
         float3 f = (float3)(0.0f);
@@ -614,7 +613,7 @@ void reduce_force_i_pow2(volatile __local float *f_buf, __global float *fout,//_
      * Can't just use i as loop variable because than nvcc refuses to unroll.
      */
     i = CL_SIZE/2;
-    # pragma unroll 5
+//    # pragma unroll 5
     for (j = CL_SIZE_POW2_EXPONENT - 1; j > 0; j--)
     {
         if (tidxj < i)
@@ -626,7 +625,7 @@ void reduce_force_i_pow2(volatile __local float *f_buf, __global float *fout,//_
         }
         i >>= 1;
     }
-	barrier(CLK_LOCAL_MEM_FENCE);
+
     /* i == 1, last reduction step, writing to global mem */
     if (tidxj == 0)
     {
@@ -708,7 +707,7 @@ void reduce_energy_pow2(volatile __local float *buf,
     float   e1, e2;
 
     i = WARP_SIZE/2;
-	barrier(CLK_LOCAL_MEM_FENCE);
+
     /* Can't just use i as loop variable because than nvcc refuses to unroll. */
 //# pragma unroll 10
     for (j = WARP_SIZE_POW2_EXPONENT - 1; j > 0; j--)
@@ -720,7 +719,7 @@ void reduce_energy_pow2(volatile __local float *buf,
         }
         i >>= 1;
     }
-    barrier(CLK_LOCAL_MEM_FENCE);
+
     /* last reduction step, writing to global mem */
     if (tidx == 0)
     {
