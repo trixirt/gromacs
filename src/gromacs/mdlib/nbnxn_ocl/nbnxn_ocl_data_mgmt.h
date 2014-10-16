@@ -99,8 +99,7 @@ void nbnxn_ocl_upload_shiftvec(nbnxn_opencl_ptr_t       gmx_unused         cu_nb
 /** Clears GPU outputs: nonbonded force, shift force and energy. */
 FUNC_QUALIFIER
 void nbnxn_ocl_clear_outputs(
-    ocl_gpu_info_t *    dev_info, 
-    nbnxn_cuda_ptr_t    cl_nb,
+	nbnxn_opencl_ptr_t ocl_nb,
     int gmx_unused      flags) FUNC_TERM
 
 /** Frees all GPU resources used for the nonbonded calculations. */

@@ -303,8 +303,9 @@ static void init_ewald_coulomb_force_table(//cu_nbparam_t          *nbp,
         array_format.image_channel_data_type = CL_FLOAT;
         array_format.image_channel_order = CL_R;
 
-        coul_tab = clCreateImage2D(dev_info->context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-            &array_format, tabsize, 1, 0, ftmp, &cl_error);
+        /*coul_tab = clCreateImage2D(dev_info->context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+            &array_format, tabsize, 1, 0, ftmp, &cl_error);*/
+		coul_tab = clCreateBuffer(dev_info->context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, tabsize*sizeof(cl_float), ftmp, &cl_error);
         assert(cl_error == CL_SUCCESS);
         // TO DO: handle errors
 
@@ -556,8 +557,9 @@ static void init_nbparam(/*cu_nbparam_t*/cl_nbparam_t  *nbp,
         array_format.image_channel_data_type = CL_FLOAT;
         array_format.image_channel_order = CL_R;
 
-        nbp->coulomb_tab_climg2d = clCreateImage2D(dev_info->context, CL_MEM_READ_WRITE,
-            &array_format, 1, 1, 0, NULL, &cl_error);
+        /*nbp->coulomb_tab_climg2d = clCreateImage2D(dev_info->context, CL_MEM_READ_WRITE,
+            &array_format, 1, 1, 0, NULL, &cl_error);*/
+		nbp->coulomb_tab_climg2d = clCreateBuffer(dev_info->context, CL_MEM_READ_ONLY, sizeof(cl_float), NULL, &cl_error);
         // TO DO: handle errors        
     }
 
@@ -601,16 +603,19 @@ static void init_nbparam(/*cu_nbparam_t*/cl_nbparam_t  *nbp,
 
         array_format.image_channel_data_type = CL_FLOAT;
         array_format.image_channel_order = CL_R;
-
-        nbp->nbfp_climg2d = clCreateImage2D(dev_info->context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-            &array_format, nnbfp, 1, 0, nbat->nbfp, &cl_error);
+        /*nbp->nbfp_climg2d = clCreateImage2D(dev_info->context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+            &array_format, nnbfp, 1, 0, nbat->nbfp, &cl_error);*/
+		nbp->nbfp_climg2d = clCreateBuffer(dev_info->context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, nnbfp*sizeof(cl_float), nbat->nbfp, &cl_error);
         assert(cl_error == CL_SUCCESS);
         // TO DO: handle errors
 
         if (ic->vdwtype == evdwPME)
         {
-            nbp->nbfp_comb_climg2d = clCreateImage2D(dev_info->context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                &array_format, nnbfp_comb, 1, 0, nbat->nbfp_comb, &cl_error);
+          /*  nbp->nbfp_comb_climg2d = clCreateImage2D(dev_info->context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+                &array_format, nnbfp_comb, 1, 0, nbat->nbfp_comb, &cl_error);*/
+			nbp->nbfp_comb_climg2d = clCreateBuffer(dev_info->context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, nnbfp_comb*sizeof(cl_float), nbat->nbfp_comb, &cl_error);
+
+
             assert(cl_error == CL_SUCCESS);            
             // TO DO: handle errors
         }
@@ -619,8 +624,11 @@ static void init_nbparam(/*cu_nbparam_t*/cl_nbparam_t  *nbp,
             // TO DO: improvement needed.
             // The image2d is created here even if vdwtype is not evdwPME because the OpenCL kernels
             // don't accept NULL values for image2D parameters.
-            nbp->nbfp_comb_climg2d = clCreateImage2D(dev_info->context, CL_MEM_READ_WRITE,
-                &array_format, 1, 1, 0, NULL, &cl_error);
+           /* nbp->nbfp_comb_climg2d = clCreateImage2D(dev_info->context, CL_MEM_READ_WRITE,
+                &array_format, 1, 1, 0, NULL, &cl_error);*/
+			nbp->nbfp_comb_climg2d = clCreateBuffer(dev_info->context, CL_MEM_READ_ONLY, sizeof(cl_float), NULL, &cl_error);
+
+
             assert(cl_error == CL_SUCCESS);
             // TO DO: handle errors
         }
