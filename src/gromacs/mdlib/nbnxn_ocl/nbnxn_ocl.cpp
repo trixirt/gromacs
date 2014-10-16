@@ -377,7 +377,7 @@ static inline int calc_shmem_required()
 
 
 static void fillin_ocl_structures(cl_atomdata_t *adat, cl_nbparam_t *nbp, cl_plist_t *plist,
-                                  cl_atomdata_params_t *atomdata_params, cl_nbparam_params_t *nbparams_params, cl_plist_params_t *plist_params)
+                                  cl_atomdata_params_t *atomdata_params, cl_nbparam_params_t *nbparams_params)
 {
     atomdata_params->natoms = adat->natoms;
     atomdata_params->natoms_local = adat->natoms_local;
@@ -404,14 +404,6 @@ static void fillin_ocl_structures(cl_atomdata_t *adat, cl_nbparam_t *nbp, cl_pli
     nbparams_params->vdwtype = nbp->vdwtype;
     nbparams_params->vdw_switch = nbp->vdw_switch;
 
-    plist_params->bDoPrune = plist->bDoPrune;
-    plist_params->cj4_nalloc = plist->cj4_nalloc;
-    plist_params->excl_nalloc = plist->excl_nalloc;
-    plist_params->na_c = plist->na_c;
-    plist_params->ncj4 = plist->ncj4;
-    plist_params->nexcl = plist->nexcl;
-    plist_params->nsci = plist->nsci;
-    plist_params->sci_nalloc = plist->sci_nalloc;
 }
 
 /*! As we execute nonbonded workload in separate streams, before launching
@@ -579,7 +571,7 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
     ////            NCL_PER_SUPERCL, plist->na_c);
     ////}
 
-    fillin_ocl_structures(adat, nbp, plist, &atomdata_params, &nbparams_params, &plist_params);
+    fillin_ocl_structures(adat, nbp, plist, &atomdata_params, &nbparams_params);
 
     arg_no = 0;
     cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(atomdata_params), &(atomdata_params));
