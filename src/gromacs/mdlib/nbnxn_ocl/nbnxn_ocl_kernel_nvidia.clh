@@ -212,7 +212,7 @@
 /* NOTE:
 NB_KERNEL_FUNC_NAME differs from the CUDA equivalent as it is not a variadic macro due to OpenCL not having a support for them, this version only takes exactly 2 arguments. Thus if more strings need to be appended a new macro must be written or it must be directly appended here.
 */
-__attribute__((reqd_work_group_size(8, 8, 1)))
+__attribute__((reqd_work_group_size(CL_SIZE, CL_SIZE, 1)))
 #ifdef PRUNE_NBL
     #ifdef CALC_ENERGIES
         __kernel void NB_KERNEL_FUNC_NAME(nbnxn_kernel, _VF_prune_opencl)
@@ -541,7 +541,6 @@ __global float *restrict fshift, // __global float3 *fshift,                    
                                 imask &= ~mask_ji;
 							barrier(CLK_LOCAL_MEM_FENCE);
 							warp_any[widx]=0;
-							//printf("%d %d\n", tidx, widx);
 							
 #endif
 
@@ -566,9 +565,6 @@ __global float *restrict fshift, // __global float3 *fshift,                    
                                 c6      = nbfp_climg2d[2 * (ntypes * typei + typej)];
                                 c12     = nbfp_climg2d[2 * (ntypes * typei + typej)+1];
 
-								
-								//if(c6 != 0.0f || c12 != 0.0f) printf("%f %f swag\n", c6, c12);
-								//printf("%d %d %d %d\n", ntypes, typei, typej,2 * (ntypes * typei + typej));
                                 /* avoid NaN for excluded pairs at r=0 */
                                 r2      += (1.0f - int_bit) * NBNXN_AVOID_SING_R2_INC;
 
@@ -585,8 +581,7 @@ __global float *restrict fshift, // __global float3 *fshift,                    
 #if defined CALC_ENERGIES || defined LJ_POT_SWITCH
                                 E_lj_p  = int_bit * (c12 * (inv_r6 * inv_r6 + nbparam->repulsion_shift.cpot)*ONE_TWELVETH_F -
                                                      c6 * (inv_r6 + nbparam->dispersion_shift.cpot)*ONE_SIXTH_F);
-													 
-							    //printf("%f %f\n", int_bit,E_lj_p);
+
 #endif
 								
 
