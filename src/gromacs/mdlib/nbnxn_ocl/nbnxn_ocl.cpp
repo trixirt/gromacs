@@ -322,7 +322,10 @@ static inline cl_kernel select_nbnxn_kernel(nbnxn_opencl_ptr_t ocl_nb,
     printf("Selected kernel: %s\n",kernel_name_to_run);
 
     if (NULL == kernel_ptr[0])
+    {
         *kernel_ptr = clCreateKernel(ocl_nb->dev_info->program, kernel_name_to_run, &cl_error);
+        assert(cl_error == CL_SUCCESS);
+    }
     // TO DO: handle errors
 
     return *kernel_ptr;
@@ -599,6 +602,7 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
         printf("ClERROR! %d\n",cl_error);
 
     cl_error = clEnqueueNDRangeKernel(stream, nb_kernel, 3, NULL, dim_grid, dim_block, 0, NULL, NULL);
+    assert(cl_error == CL_SUCCESS);
 
     //cl_error = clFinish(stream);
 
@@ -619,6 +623,7 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
         if (DEBUG_RUN_STEP == run_step)
         {
             FILE *pf;
+            char file_name[256] = {0};
 
             ocl_copy_D2H_async(debug_buffer_h, ocl_nb->debug_buffer, 0,
                 debug_buffer_size, stream, NULL);
@@ -628,7 +633,8 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
 
             printf("\nWriting debug_buffer to debug_buffer_ocl.txt...");
 
-            pf = fopen("debug_buffer_ocl.txt", "wt");
+            sprintf(file_name, "debug_buffer_ocl_%d.txt", DEBUG_RUN_STEP);
+            pf = fopen(file_name, "wt");
             assert(pf != NULL);
 
             fprintf(pf,"%20s", "");
@@ -942,6 +948,8 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t        ocl_nb,
             nbnxn_cj4_t *temp_cj4;
             int cnt;
             size_t size;
+            char ocl_file_name[256] = {0};
+            char cuda_file_name[256] = {0};
 
             cnt = ocl_nb->plist[0]->ncj4;
             size = cnt * sizeof(nbnxn_cj4_t);
@@ -953,7 +961,9 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t        ocl_nb,
             // Make sure all data has been transfered back from device
             clFinish(stream);
 
-            dump_compare_results_cj4(temp_cj4, cnt, "ocl_cj4.txt", "cuda_cj4.txt");
+            sprintf(ocl_file_name, "ocl_cj4_%d.txt", DEBUG_RUN_STEP);
+            sprintf(cuda_file_name, "cuda_cj4_%d.txt", DEBUG_RUN_STEP);
+            dump_compare_results_cj4(temp_cj4, cnt, ocl_file_name, cuda_file_name);
 
             free(temp_cj4);
         }
@@ -970,11 +980,17 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t        ocl_nb,
 
         if (DEBUG_RUN_STEP == run_step)
         {
+            char ocl_file_name[256] = {0};
+            char cuda_file_name[256] = {0};
+
             // Make sure all data has been transfered back from device
             clFinish(stream);
 
+            sprintf(ocl_file_name, "ocl_f_%d.txt", DEBUG_RUN_STEP);
+            sprintf(cuda_file_name, "cuda_f_%d.txt", DEBUG_RUN_STEP);
+
             dump_compare_results_f(nbatom->out[0].f + adat_begin * 3, (adat_len) * 3,
-                "ocl_f.txt", "cuda_f.txt");
+                ocl_file_name, cuda_file_name);
         }
 
         run_step++;
@@ -989,11 +1005,17 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t        ocl_nb,
 
         if (DEBUG_RUN_STEP == run_step)
         {
+            char ocl_file_name[256] = {0};
+            char cuda_file_name[256] = {0};
+
             // Make sure all data has been transfered back from device
             clFinish(stream);
+            
+            sprintf(ocl_file_name, "ocl_fshift_%d.txt", DEBUG_RUN_STEP);
+            sprintf(cuda_file_name, "cuda_fshift_%d.txt", DEBUG_RUN_STEP);
 
             dump_compare_results_f(ocl_nb->nbst.fshift, SHIFTS * 3,
-                "ocl_fshift.txt", "cuda_fshift.txt");
+                ocl_file_name, cuda_file_name);
         }
 
         run_step++;
