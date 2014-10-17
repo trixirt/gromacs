@@ -4,7 +4,7 @@
 #define OCL_COMPILER_H
 #include <CL/opencl.h>
 
-typedef enum{ 
+typedef enum{
     _default_kernel_source_ = 0, /* Standard source file with generated methods/energy/prune */
     _num_kernels_
 } kernel_source_index_t;

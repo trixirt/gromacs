@@ -371,13 +371,13 @@ static inline int calc_shmem_required()
     shmem += CL_SIZE * CL_SIZE * 3 * sizeof(float);         /* f_buf */
 /* #endif */
     /* Warp vote. In fact it must be * number of warps in block.. */
-    shmem += sizeof(cl_uint) * 2; /* warp_any */ 
+    shmem += sizeof(cl_uint) * 2; /* warp_any */
     return shmem;
 }
 
 
 static void fillin_ocl_structures(cl_atomdata_t *adat, cl_nbparam_t *nbp, cl_plist_t *plist,
-                                  cl_atomdata_params_t *atomdata_params, cl_nbparam_params_t *nbparams_params, cl_plist_params_t *plist_params)
+                                  cl_atomdata_params_t *atomdata_params, cl_nbparam_params_t *nbparams_params)
 {
     atomdata_params->natoms = adat->natoms;
     atomdata_params->natoms_local = adat->natoms_local;
@@ -404,14 +404,6 @@ static void fillin_ocl_structures(cl_atomdata_t *adat, cl_nbparam_t *nbp, cl_pli
     nbparams_params->vdwtype = nbp->vdwtype;
     nbparams_params->vdw_switch = nbp->vdw_switch;
 
-    plist_params->bDoPrune = plist->bDoPrune;
-    plist_params->cj4_nalloc = plist->cj4_nalloc;
-    plist_params->excl_nalloc = plist->excl_nalloc;
-    plist_params->na_c = plist->na_c;
-    plist_params->ncj4 = plist->ncj4;
-    plist_params->nexcl = plist->nexcl;
-    plist_params->nsci = plist->nsci;
-    plist_params->sci_nalloc = plist->sci_nalloc;
 }
 
 /*! As we execute nonbonded workload in separate streams, before launching
@@ -456,7 +448,7 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
     bool                 bDoTime     = ocl_nb->bDoTime;
     cl_uint                  arg_no;
 
-    cl_atomdata_params_t atomdata_params;    
+    cl_atomdata_params_t atomdata_params;
     cl_nbparam_params_t nbparams_params;
     cl_plist_params_t plist_params;
 #ifdef DEBUG_OCL
@@ -540,7 +532,7 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
     dim_block[0] = CL_SIZE;
     dim_block[1] = CL_SIZE;
     dim_block[2] = 1;
-    
+
     //dim_grid  = dim3(nblock, 1, 1);
     dim_grid[0] = nblock * dim_block[0];
     dim_grid[1] = 1 * dim_block[1];
@@ -550,7 +542,7 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
 
 #ifdef DEBUG_OCL
     {
-        static int run_step = 1;        
+        static int run_step = 1;
 
         if (DEBUG_RUN_STEP == run_step)
         {
@@ -559,7 +551,7 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
             assert(NULL != debug_buffer_h);
 
             if (NULL == ocl_nb->debug_buffer)
-            {   
+            {
                 ocl_nb->debug_buffer = clCreateBuffer(ocl_nb->dev_info->context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
                     debug_buffer_size, debug_buffer_h, &cl_error);
 
@@ -578,30 +570,33 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
     ////            dim_grid.x, dim_grid.y, plist->nsci*NCL_PER_SUPERCL,
     ////            NCL_PER_SUPERCL, plist->na_c);
     ////}
-    
-    fillin_ocl_structures(adat, nbp, plist, &atomdata_params, &nbparams_params, &plist_params);
 
-    arg_no = 0;    
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(atomdata_params), &(atomdata_params));    
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(nbparams_params), &(nbparams_params));    
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(plist_params), &(plist_params));    
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->xq));
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->f));
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->e_lj));
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->e_el));
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->fshift));
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->atom_types));
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->shift_vec));    
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(nbp->nbfp_climg2d));    
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(nbp->nbfp_comb_climg2d));
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(nbp->coulomb_tab_climg2d));
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(plist->sci));
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(plist->cj4));
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(plist->excl));
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(int), &bCalcFshift);
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, shmem, NULL);
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(ocl_nb->debug_buffer));
+    fillin_ocl_structures(adat, nbp, plist, &atomdata_params, &nbparams_params);
 
+    arg_no = 0;
+    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(atomdata_params), &(atomdata_params));
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(nbparams_params), &(nbparams_params));
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->xq));
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->f));
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->e_lj));
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->e_el));
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->fshift));
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->atom_types));
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->shift_vec));
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(nbp->nbfp_climg2d));
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(nbp->nbfp_comb_climg2d));
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(nbp->coulomb_tab_climg2d));
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(plist->sci));
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(plist->cj4));
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(plist->excl));
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(int), &bCalcFshift);
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, shmem, NULL);
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(ocl_nb->debug_buffer));
+
+    assert(cl_error == CL_SUCCESS);
+
+    if(cl_error)
+        printf("ClERROR! %d\n",cl_error);
 
     cl_error = clEnqueueNDRangeKernel(stream, nb_kernel, 3, NULL, dim_grid, dim_block, 0, NULL, NULL);
 
@@ -619,7 +614,7 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
 
 #ifdef DEBUG_OCL
     {
-        static int run_step = 1;        
+        static int run_step = 1;
 
         if (DEBUG_RUN_STEP == run_step)
         {
@@ -629,10 +624,10 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
                 debug_buffer_size, stream, NULL);
 
             // Make sure all data has been transfered back from device
-            clFinish(stream);    
+            clFinish(stream);
 
             printf("\nWriting debug_buffer to debug_buffer_ocl.txt...");
-        
+
             pf = fopen("debug_buffer_ocl.txt", "wt");
             assert(pf != NULL);
 
@@ -671,12 +666,12 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
 }
 
 void dump_compare_results_cj4(nbnxn_cj4_t* results, int cnt, char* out_file, char* ref_file)
-{    
-    FILE *pf;    
+{
+    FILE *pf;
 
     pf = fopen(out_file, "wt");
     assert(pf != NULL);
-                
+
     fprintf(pf, "%20s%20s%20s%20s%20s%20s%20s%20s\n",
         "cj[0]", "cj[1]", "cj[2]", "cj[3]",
         "imei[0].excl_ind", "imei[0].imask",
@@ -696,7 +691,7 @@ void dump_compare_results_cj4(nbnxn_cj4_t* results, int cnt, char* out_file, cha
 
     pf = fopen(ref_file, "rt");
     if (pf)
-    {   
+    {
         char c;
         int diff = 0;
         printf("\n%s file found. Comparing results...", ref_file);
@@ -708,10 +703,10 @@ void dump_compare_results_cj4(nbnxn_cj4_t* results, int cnt, char* out_file, cha
         for (int index = 0; index < cnt; index++)
         {
             int ref_val;
-            
+
             for (int j = 0; j < 4; j++)
             {
-                fscanf(pf, "%d", &ref_val);            
+                fscanf(pf, "%d", &ref_val);
                 if (ref_val != results[index].cj[j])
                 {
                     printf("\nDifference for cj[%d] at index %d computed value = %d reference value = %d",
@@ -723,7 +718,7 @@ void dump_compare_results_cj4(nbnxn_cj4_t* results, int cnt, char* out_file, cha
 
             for (int j = 0; j < 2; j++)
             {
-                fscanf(pf, "%d", &ref_val);            
+                fscanf(pf, "%d", &ref_val);
                 if (ref_val != results[index].imei[j].excl_ind)
                 {
                     printf("\nDifference for imei[%d].excl_ind at index %d computed value = %d reference value = %d",
@@ -732,7 +727,7 @@ void dump_compare_results_cj4(nbnxn_cj4_t* results, int cnt, char* out_file, cha
                     diff++;
                 }
 
-                fscanf(pf, "%u", &ref_val);            
+                fscanf(pf, "%u", &ref_val);
                 if (ref_val != results[index].imei[j].imask)
                 {
                     printf("\nDifference for imei[%d].imask at index %d computed value = %u reference value = %u",
@@ -752,13 +747,13 @@ void dump_compare_results_cj4(nbnxn_cj4_t* results, int cnt, char* out_file, cha
 }
 
 void dump_compare_results_f(float* results, int cnt, char* out_file, char* ref_file)
-{    
-    FILE *pf;    
+{
+    FILE *pf;
     float cmp_eps = 0.001f;
 
     pf = fopen(out_file, "wt");
     assert(pf != NULL);
-                
+
     for (int index = 0; index < cnt; index++)
     {
         fprintf(pf, "%15.5f\n", results[index]);
@@ -770,7 +765,7 @@ void dump_compare_results_f(float* results, int cnt, char* out_file, char* ref_f
 
     pf = fopen(ref_file, "rt");
     if (pf)
-    {   
+    {
         int diff = 0;
         printf("\n%s file found. Comparing results...", ref_file);
         for (int index = 0; index < cnt; index++)
@@ -817,7 +812,7 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t        ocl_nb,
         char stmp[STRLEN];
         sprintf(stmp, "Invalid atom locality passed (%d); valid here is only "
                 "local (%d) or nonlocal (%d)", aloc, eatLocal, eatNonlocal);
-        
+
         // TO DO: fix for OpenCL
         //gmx_incons(stmp);
     }
@@ -932,7 +927,7 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t        ocl_nb,
                               sizeof(float), stream, NULL);
             // TO DO: the last parameter is not always NULL
             ocl_copy_D2H_async(ocl_nb->nbst.e_el, adat->e_el, 0,
-                              sizeof(float), stream, NULL);            
+                              sizeof(float), stream, NULL);
         }
     }
 
@@ -940,10 +935,10 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t        ocl_nb,
 //#define DEBUG_DUMP_CJ4_OCL
 #ifdef DEBUG_DUMP_CJ4_OCL
     {
-        static int run_step = 1;        
+        static int run_step = 1;
 
         if (DEBUG_RUN_STEP == run_step)
-        {         
+        {
             nbnxn_cj4_t *temp_cj4;
             int cnt;
             size_t size;
@@ -971,7 +966,7 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t        ocl_nb,
 //#define DEBUG_DUMP_F_OCL
 #ifdef DEBUG_DUMP_F_OCL
     {
-        static int run_step = 1;        
+        static int run_step = 1;
 
         if (DEBUG_RUN_STEP == run_step)
         {
@@ -993,7 +988,7 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t        ocl_nb,
         static int run_step = 1;
 
         if (DEBUG_RUN_STEP == run_step)
-        {     
+        {
             // Make sure all data has been transfered back from device
             clFinish(stream);
 
@@ -1039,7 +1034,7 @@ void nbnxn_ocl_wait_gpu(nbnxn_opencl_ptr_t cu_nb,
 	bool             bCalcEner   = flags & GMX_FORCE_VIRIAL;
 	bool             bCalcFshift = flags & GMX_FORCE_VIRIAL;
 	cl_nb_staging    nbst = cu_nb->nbst;
-	
+
 
 	/* determine interaction locality from atom locality */
 	if (LOCAL_A(aloc))
@@ -1072,7 +1067,7 @@ void nbnxn_ocl_wait_gpu(nbnxn_opencl_ptr_t cu_nb,
 	        *e_lj += *nbst.e_lj;
 	        *e_el += *nbst.e_el;
 	    }
-	
+
 	    if (bCalcFshift)
 	    {
 	        for (i = 0; i < SHIFTS; i++)
@@ -1083,7 +1078,7 @@ void nbnxn_ocl_wait_gpu(nbnxn_opencl_ptr_t cu_nb,
 	        }
 	    }
 	}
-	
+
 	/* turn off pruning (doesn't matter if this is pair-search step or not) */
 	plist->bDoPrune = false;
 

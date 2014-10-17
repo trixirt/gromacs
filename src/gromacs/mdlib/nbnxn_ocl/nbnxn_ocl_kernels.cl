@@ -6,7 +6,7 @@ memset_f3(__global float3 *buf,const float value,const unsigned int Nbuf)
 {
     unsigned int tidx = get_global_id(0);
     if(tidx < Nbuf)
-        buf[tidx] = value;    
+        buf[tidx] = value;
 }
 
 __kernel void
@@ -14,7 +14,7 @@ memset_f2(__global float2 *buf,const float value,const unsigned int Nbuf)
 {
     unsigned int tidx = get_global_id(0);
     if(tidx < Nbuf)
-        buf[tidx] = value;    
+        buf[tidx] = value;
 }
 
 __kernel void
@@ -22,7 +22,7 @@ memset_f(__global float *buf,const float value,const unsigned int Nbuf)
 {
     unsigned int tidx = get_global_id(0);
     if(tidx < Nbuf)
-        buf[tidx] = value;    
+        buf[tidx] = value;
 }
 
 /* Very few data */
@@ -31,12 +31,12 @@ zero_e_fshift(__global float *fshift,__global float *e_lj,__global float *e_el,c
 {
     unsigned int tidx = get_global_id(0);
     if(tidx < Nbuf)
-        fshift[tidx] = 0.0f;    
+        fshift[tidx] = 0.0f;
     if(tidx==0)
     {
         *e_lj     = 0.0f;
         *e_el     = 0.0f;
-    }    
+    }
 }
 
 /* Top-level kernel generation: will generate through multiple inclusion the
