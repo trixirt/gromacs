@@ -317,8 +317,9 @@ __global float *restrict fshift, // __global float3 *fshift,                    
     //float *e_lj        = atdat->e_lj;
     //float *e_el        = atdat->e_el;
 #endif /* CALC_ENERGIES */
-
+	
     /* thread/block/warp id-s */
+
     unsigned int tidxi  = get_local_id(0);
     unsigned int tidxj  = get_local_id(1);
     unsigned int tidx   = get_local_id(1) * get_local_size(0) + get_local_id(0);
@@ -367,7 +368,9 @@ __global float *restrict fshift, // __global float3 *fshift,                    
     #undef LOCAL_OFFSET    
     #define LOCAL_OFFSET f_buf + CL_SIZE * CL_SIZE * 3
 #endif    
+#ifdef PRUNE_NBL
     __local uint *warp_any = (__local uint*)(LOCAL_OFFSET);
+#endif
 #undef LOCAL_OFFSET
 
     nb_sci      = pl_sci[bidx];         /* my i super-cluster's index = current bidx */
@@ -388,11 +391,14 @@ __global float *restrict fshift, // __global float3 *fshift,                    
     atib[tidxj * CL_SIZE + tidxi] = atom_types[ai];
 #endif
     /* Initialise warp vote. (8x8 block) 2 warps for nvidia */
+	
+#ifdef PRUNE_NBL
     if(tidx==0 || tidx==32)
+	{
         warp_any[widx] = 0;
-    
-    barrier(CLK_LOCAL_MEM_FENCE);
-
+    }
+    //barrier(CLK_LOCAL_MEM_FENCE);
+#endif
     for (ci_offset = 0; ci_offset < NCL_PER_SUPERCL; ci_offset++)
     {
         fci_buf[ci_offset] = (float3)(0.0f);
@@ -465,7 +471,7 @@ __global float *restrict fshift, // __global float3 *fshift,                    
         wexcl_idx   = pl_cj4[j4].imei[widx].excl_ind;
         imask       = pl_cj4[j4].imei[widx].imask;
         wexcl       = excl[wexcl_idx].pair[(tidx) & (WARP_SIZE - 1)];
-        barrier(CLK_GLOBAL_MEM_FENCE);
+        //barrier(CLK_GLOBAL_MEM_FENCE);
 		
 #ifndef PRUNE_NBL
         if (imask)
@@ -478,7 +484,7 @@ __global float *restrict fshift, // __global float3 *fshift,                    
             }
             /* CPU DEBUG..  */
 
-    barrier(CLK_LOCAL_MEM_FENCE);
+    //barrier(CLK_LOCAL_MEM_FENCE);
         
             /* Unrolling this loop
                - with pruning leads to register spilling;
@@ -498,7 +504,7 @@ __global float *restrict fshift, // __global float3 *fshift,                    
                     cj      = cjs[jm + (tidxj & 4) * NBNXN_GPU_JGROUP_SIZE / 4];
                     aj      = cj * CL_SIZE + tidxj;
 
-                    barrier(CLK_LOCAL_MEM_FENCE);
+                    //barrier(CLK_LOCAL_MEM_FENCE);
 
                     /* load j atom data */
                     xqbuf   = xq[aj];
@@ -540,8 +546,8 @@ __global float *restrict fshift, // __global float3 *fshift,                    
                             if (!warp_any[widx])
                                 imask &= ~mask_ji;
 							barrier(CLK_LOCAL_MEM_FENCE);
-							warp_any[widx]=0;
-							//printf("%d %d\n", tidx, widx);
+							if(tidx==0 || tidx==32)
+								warp_any[widx]=0;
 							
 #endif
 
@@ -565,10 +571,7 @@ __global float *restrict fshift, // __global float3 *fshift,                    
                                 /* LJ 6*C6 and 12*C12 */
                                 c6      = nbfp_climg2d[2 * (ntypes * typei + typej)];
                                 c12     = nbfp_climg2d[2 * (ntypes * typei + typej)+1];
-
-								
-								//if(c6 != 0.0f || c12 != 0.0f) printf("%f %f swag\n", c6, c12);
-								//printf("%d %d %d %d\n", ntypes, typei, typej,2 * (ntypes * typei + typej));
+							
                                 /* avoid NaN for excluded pairs at r=0 */
                                 r2      += (1.0f - int_bit) * NBNXN_AVOID_SING_R2_INC;
 
@@ -586,7 +589,6 @@ __global float *restrict fshift, // __global float3 *fshift,                    
                                 E_lj_p  = int_bit * (c12 * (inv_r6 * inv_r6 + nbparam->repulsion_shift.cpot)*ONE_TWELVETH_F -
                                                      c6 * (inv_r6 + nbparam->dispersion_shift.cpot)*ONE_SIXTH_F);
 													 
-							    //printf("%f %f\n", int_bit,E_lj_p);
 #endif
 								
 
@@ -651,6 +653,7 @@ __global float *restrict fshift, // __global float3 *fshift,                    
 #endif
 #ifdef EL_RF
                                 F_invr  += qi * qj_f * (int_bit*inv_r2 * inv_r - two_k_rf);
+
 #endif
 #if defined EL_EWALD_ANA
                                 F_invr  += qi * qj_f * (int_bit*inv_r2*inv_r + pmecorrF(beta2*r2)*beta3);
@@ -696,16 +699,19 @@ __global float *restrict fshift, // __global float3 *fshift,                    
                     f_buf[                  tidx] = fcj_buf.x;
                     f_buf[    FBUF_STRIDE + tidx] = fcj_buf.y;
                     f_buf[2 * FBUF_STRIDE + tidx] = fcj_buf.z;
-					barrier(CLK_LOCAL_MEM_FENCE);
+					//barrier(CLK_LOCAL_MEM_FENCE);
                     reduce_force_j_generic(f_buf, f, tidxi, tidxj, aj);
                 }
             }
 #ifdef PRUNE_NBL
             /* Update the imask with the new one which does not contain the
                out of range clusters anymore. */
-			   
-            pl_cj4[j4].imei[widx].imask = imask;
-			barrier(CLK_GLOBAL_MEM_FENCE);
+			//barrier(CLK_GLOBAL_MEM_FENCE);
+            if(tidx==0 || tidx==32)
+				pl_cj4[j4].imei[widx].imask = imask;
+
+			//barrier(CLK_GLOBAL_MEM_FENCE);
+
 #endif
         }
     }
@@ -724,7 +730,7 @@ __global float *restrict fshift, // __global float3 *fshift,                    
                        tidxi, tidxj, ai);
         barrier(CLK_GLOBAL_MEM_FENCE);
     }
-    barrier(CLK_LOCAL_MEM_FENCE);
+    //barrier(CLK_LOCAL_MEM_FENCE);
     /* add up local shift forces into global mem */
     if (bCalcFshift && tidxj == 0)
     {
@@ -740,13 +746,6 @@ __global float *restrict fshift, // __global float3 *fshift,                    
 #endif
 
 #endif /* DEBUG_E_EL_SUM_PHASE_1 */
-/*if(get_global_id(0) == 0 && get_global_id(1) == 0)
- {
-								float foo;
-								for(int i =0; i < 18;i++) {
-								foo = nbfp_climg2d[i];
-								printf("%f %d\n",foo,i);}
- }*/
 }
 
 #undef EL_EWALD_ANY
