@@ -576,7 +576,6 @@ void reduce_force_i_generic(__local float *f_buf, __global float *fout,//__globa
                             float3 *fshift_buf, bool bCalcFshift,
                             int tidxi, int tidxj, int aidx)
 {
-	barrier(CLK_LOCAL_MEM_FENCE);
     if (tidxj == 0)
     {
         float3 f = (float3)(0.0f);
@@ -607,7 +606,6 @@ void reduce_force_i_pow2(volatile __local float *f_buf, __global float *fout,//_
 {
     int     i, j;
     float3  f = (float3)(0.0f);
-	barrier(CLK_LOCAL_MEM_FENCE);
     /* Reduce the initial CL_SIZE values for each i atom to half
      * every step by using CL_SIZE * i threads.
      * Can't just use i as loop variable because than nvcc refuses to unroll.
