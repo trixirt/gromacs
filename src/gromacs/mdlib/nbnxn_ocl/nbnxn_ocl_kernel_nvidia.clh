@@ -226,7 +226,9 @@ __global float *restrict fshift, // __global float3 *fshift,                    
     #undef LOCAL_OFFSET
     #define LOCAL_OFFSET f_buf + CL_SIZE * CL_SIZE * 3
 #endif
-    __local uint *warp_any = (__local uint*)(LOCAL_OFFSET);
+    /* Local buffer used to implement __any warp vote function from CUDA.
+       volatile is used to avoid compiler optimizations for AMD builds. */
+    volatile __local uint *warp_any = (__local uint*)(LOCAL_OFFSET);    
 #undef LOCAL_OFFSET
 
     nb_sci      = pl_sci[bidx];         /* my i super-cluster's index = current bidx */
