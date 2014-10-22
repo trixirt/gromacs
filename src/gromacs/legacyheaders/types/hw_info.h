@@ -75,6 +75,14 @@ static const char * const gpu_detect_res_str[] =
 };
 
 #if defined(GMX_GPU) && defined(GMX_USE_OPENCL)
+
+typedef enum{
+    _OCL_VENDOR_NVIDIA_    = 0,
+    _OCL_VENDOR_AMD_          ,
+    _OCL_VENDOR_INTEL_        ,
+    _OCL_VENDOR_UNKNOWN_
+} ocl_vendor_id_t;
+
 typedef struct
 {
     cl_platform_id      ocl_platform_id;

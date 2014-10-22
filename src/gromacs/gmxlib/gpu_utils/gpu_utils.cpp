@@ -35,6 +35,22 @@ static int is_gmx_supported_ocl_gpu_id()
     return egpuCompatible;
 }
 
+ocl_vendor_id_t get_vendor_id(char *vendor_name)
+{
+    if (vendor_name)   
+        if (strstr(vendor_name, "NVIDIA"))
+            return _OCL_VENDOR_NVIDIA_;
+        else
+            if (strstr(vendor_name, "AMD") ||
+                strstr(vendor_name, "Advanced Micro Devices"))
+                return _OCL_VENDOR_AMD_;
+            else
+                if (strstr(vendor_name, "Intel"))
+                    return _OCL_VENDOR_INTEL_;
+
+    return _OCL_VENDOR_UNKNOWN_;
+}
+
 int detect_ocl_gpus(gmx_gpu_info_t *gpu_info, char *err_str)
 {
     int retval;    
@@ -132,8 +148,7 @@ int detect_ocl_gpus(gmx_gpu_info_t *gpu_info, char *err_str)
             {
                 int last = -1;
                 for (int i = 0; i < gpu_info->nocl_dev; i++)
-                    if (strstr(gpu_info->ocl_dev[i].device_vendor, "Advanced Micro Devices") ||
-						strstr(gpu_info->ocl_dev[i].device_vendor, "AMD"))//"NVIDIA"))
+                    if (_OCL_VENDOR_AMD_ == get_vendor_id(gpu_info->ocl_dev[i].device_vendor))                    
                         if ((last + 1) < i)
                         {
                             ocl_gpu_info_t ocl_gpu_info;
@@ -146,7 +161,7 @@ int detect_ocl_gpus(gmx_gpu_info_t *gpu_info, char *err_str)
                 // if more than 1 device left to be sorted
                 if ((gpu_info->nocl_dev - 1 - last) > 1)                
                     for (int i = 0; i < gpu_info->nocl_dev; i++)
-                        if (strstr(gpu_info->ocl_dev[i].device_vendor, "NVIDIA"))//"AMD"))
+                        if (_OCL_VENDOR_NVIDIA_ == get_vendor_id(gpu_info->ocl_dev[i].device_vendor))
                             if ((last + 1) < i)
                             {
                                 ocl_gpu_info_t ocl_gpu_info;
