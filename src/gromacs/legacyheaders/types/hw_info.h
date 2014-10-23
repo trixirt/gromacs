@@ -97,6 +97,7 @@ typedef struct
     char                device_vendor[256];
     int                 compute_units;
     int                 stat;
+    ocl_vendor_id_t     vendor_e;
 
     cl_context          context;    
     cl_program          program;

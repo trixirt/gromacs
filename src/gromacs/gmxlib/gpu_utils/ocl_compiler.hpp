@@ -2,11 +2,16 @@
 
 #ifndef OCL_COMPILER_H
 #define OCL_COMPILER_H
+
 #include <CL/opencl.h>
+#include "../legacyheaders/types/hw_info.h"
 
 typedef enum{
-    _default_kernel_source_ = 0, /* Standard source file with generated methods/energy/prune */
-    _num_kernels_
+    _default_source_ = 0, /* Standard (warp-less) source file with generated methods/energy/prune */
+    _nvidia_source_     , /* Nvidia source file with generated methods/energy/prune */
+    _amd_source_        , /* AMD source file with generated methods/energy/prune */
+    _auto_source_       , /* Compiler will select source based on vendor id*/
+    _num_sources_
 } kernel_source_index_t;
 
 typedef enum{
@@ -29,7 +34,7 @@ ocl_compile_program(
     char                * result_str,
     cl_context            context,
     cl_device_id          device_id,
-    char *                ocl_device_vendor,
+    ocl_vendor_id_t       ocl_device_vendor,
     cl_program          * p_program
 );
 

@@ -37,7 +37,15 @@ const char* build_options_list[] = {
     -I../../../gromacs/src/gromacs/gmxlib/ocl_tools -I../../../gromacs/src/gromacs/mdlib/nbnxn_ocl -I../../../gromacs/src/gromacs/pbcutil -I../../../gromacs/src/gromacs/mdlib"
 };
 
-static const char*      kernel_filenames[]         = {"nbnxn_ocl_kernels.cl"};
+/*
+static const char*      kernel_filenames[]         = {"nbnxn_ocl_kernels_nowarp.cl",
+                                                      "nbnxn_ocl_kernels_amd.cl",
+                                                      "nbnxn_ocl_kernels_nvidia.cl"};
+                                                      */
+
+static const char*      kernel_filenames[]         = {"nbnxn_ocl_kernels.cl",
+                                                      "nbnxn_ocl_kernels.cl",
+                                                      "nbnxn_ocl_kernels.cl"};
 
 static const char* get_ocl_build_option(build_options_index_t build_option_id)
 {
@@ -57,21 +65,20 @@ static size_t get_ocl_build_option_length(build_options_index_t build_option_id)
 
 static size_t
 create_ocl_build_options_length(
-    char* build_device_vendor,
-    const char * custom_build_options_prepend,
-    const char * custom_build_options_append)
+    ocl_vendor_id_t vendor_id,
+    const char *    custom_build_options_prepend,
+    const char *    custom_build_options_append)
 {
     size_t build_options_length = 0;
     size_t whitespace = 1;
 
-    assert(build_device_vendor != NULL);
+    assert(vendor_id <= _OCL_VENDOR_UNKNOWN_);
 
     if(custom_build_options_prepend)
         build_options_length +=
             strlen(custom_build_options_prepend)+whitespace;
 
-    if ((!strcmp(build_device_vendor,"Advanced Micro Devices, Inc.") ||
-        !strcmp(build_device_vendor,"GenuineIntel")) && getenv("OCL_DEBUG") )
+    if ( (vendor_id == _OCL_VENDOR_AMD_) && getenv("OCL_DEBUG") && getenv("OCL_FORCE_CPU") )
     {
         build_options_length += get_ocl_build_option_length(_generic_debug_symbols_)+whitespace;
     }
@@ -101,11 +108,11 @@ create_ocl_build_options_length(
 }
 
 static void
-create_ocl_build_options(char * build_options_string,
-                         size_t build_options_length,
-                         char * build_device_vendor,
-                         const char * custom_build_options_prepend,
-                         const char * custom_build_options_append)
+create_ocl_build_options(char *             build_options_string,
+                         size_t             build_options_length,
+                         ocl_vendor_id_t    build_device_vendor_id,
+                         const char *       custom_build_options_prepend,
+                         const char *       custom_build_options_append)
 {
     size_t char_added=0;
 
@@ -140,9 +147,7 @@ create_ocl_build_options(char * build_options_string,
         build_options_string[char_added++]=' ';
     }
 
-    if ( ( !strcmp(build_device_vendor,"Advanced Micro Devices, Inc.") ||
-            !strcmp(build_device_vendor,"GenuineIntel") ) && getenv("OCL_DEBUG")
-    )
+    if ( ( build_device_vendor_id == _OCL_VENDOR_AMD_ ) && getenv("OCL_DEBUG") && getenv("OCL_FORCE_CPU"))
     {
         strncpy( build_options_string+char_added,
                 get_ocl_build_option(_generic_debug_symbols_),
@@ -382,13 +387,40 @@ static cl_int ocl_get_warp_size(cl_context context, cl_device_id device_id)
 
 }
 
+/**
+ * \brief Automatically select kernel source file from vendor id
+ * \param ocl_vendor_id_t Vendor id enumerator (amd,nvidia,intel,unknown)
+ * \return New kernel source index
+ */
+kernel_source_index_t ocl_autoselect_source_file_from_vendor_id(ocl_vendor_id_t vendor_id)
+{
+    kernel_source_index_t kernel_index;
+    printf("Selecting kernel source automatically\n");
+    switch(vendor_id)
+    {
+        case _OCL_VENDOR_AMD_:
+            kernel_index = _amd_source_;
+            printf("Selecting kernel for AMD\n");
+            break;
+        case _OCL_VENDOR_NVIDIA_:
+            kernel_index = _nvidia_source_;
+            printf("Selecting kernel for Nvidia\n");
+            break;
+        default:
+            kernel_index = _default_source_;
+            printf("Selecting generic kernel\n");
+            break;
+    }
+    return kernel_index;
+}
+
 cl_int
 ocl_compile_program(
     kernel_source_index_t kernel_source_file,
     char                * result_str,
     cl_context            context,
     cl_device_id          device_id,
-    char *                ocl_device_vendor,
+    ocl_vendor_id_t       ocl_device_vendor,
     cl_program          * p_program
 )
 {
@@ -402,6 +434,9 @@ ocl_compile_program(
 
     size_t ocl_source_length    = 0;
     size_t kernel_filename_len  = 0;
+
+    if ( kernel_source_file == _auto_source_)
+        kernel_source_file = ocl_autoselect_source_file_from_vendor_id(ocl_device_vendor);
 
     kernel_filename_len = get_ocl_kernel_source_file_info(kernel_source_file);
     if(kernel_filename_len) kernel_filename = (char*)malloc(kernel_filename_len);

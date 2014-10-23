@@ -37,7 +37,7 @@ static int is_gmx_supported_ocl_gpu_id()
 
 ocl_vendor_id_t get_vendor_id(char *vendor_name)
 {
-    if (vendor_name)   
+    if (vendor_name)
         if (strstr(vendor_name, "NVIDIA"))
             return _OCL_VENDOR_NVIDIA_;
         else
@@ -136,6 +136,8 @@ int detect_ocl_gpus(gmx_gpu_info_t *gpu_info, char *err_str)
                     if (egpuCompatible == gpu_info->ocl_dev[device_index].stat)
                         gpu_info->nocl_dev_compatible++;
 
+                    gpu_info->ocl_dev[device_index].vendor_e = get_vendor_id(gpu_info->ocl_dev[i].device_vendor);
+
                     device_index++;
                 }
             }
@@ -148,7 +150,7 @@ int detect_ocl_gpus(gmx_gpu_info_t *gpu_info, char *err_str)
             {
                 int last = -1;
                 for (int i = 0; i < gpu_info->nocl_dev; i++)
-                    if (_OCL_VENDOR_AMD_ == get_vendor_id(gpu_info->ocl_dev[i].device_vendor))                    
+                    if (_OCL_VENDOR_AMD_ == gpu_info->ocl_dev[i].vendor_e)
                         if ((last + 1) < i)
                         {
                             ocl_gpu_info_t ocl_gpu_info;
@@ -161,7 +163,7 @@ int detect_ocl_gpus(gmx_gpu_info_t *gpu_info, char *err_str)
                 // if more than 1 device left to be sorted
                 if ((gpu_info->nocl_dev - 1 - last) > 1)                
                     for (int i = 0; i < gpu_info->nocl_dev; i++)
-                        if (_OCL_VENDOR_NVIDIA_ == get_vendor_id(gpu_info->ocl_dev[i].device_vendor))
+                        if (_OCL_VENDOR_NVIDIA_ == gpu_info->ocl_dev[i].vendor_e)
                             if ((last + 1) < i)
                             {
                                 ocl_gpu_info_t ocl_gpu_info;
@@ -294,11 +296,11 @@ gmx_bool init_ocl_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
             break;
 
         cl_error = 
-            ocl_compile_program(_default_kernel_source_,
+            ocl_compile_program(_auto_source_,
                                 result_str,
                                 context,
                                 device_id,
-                                selected_ocl_gpu->device_vendor,
+                                selected_ocl_gpu->vendor_e,
                                 &program
                                );          
         if(cl_error != CL_SUCCESS) {
@@ -368,7 +370,7 @@ void ocl_pmalloc(void **h_ptr, size_t nbytes)
 
 void ocl_pfree(void *h_ptr)
 {
-    
+
 #ifndef NDEBUG
     printf("Warning, pfree in OpenCL is not deallocating page-locked memory\n");
 #endif
@@ -406,7 +408,7 @@ cl_int dbg_ocl_kernel_name_address(void* kernel)
                             sizeof(kernel_name), &kernel_name, NULL);                       
     if(cl_error)
     {
-        printf("No kernel found!\n",kernel);
+        printf("No kernel found!\n");
     }else{
         printf("%s\n",kernel_name);
     }
