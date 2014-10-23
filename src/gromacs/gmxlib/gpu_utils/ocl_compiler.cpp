@@ -285,7 +285,7 @@ void handle_ocl_build_log(const char*   build_log,
 {
     bool dumpFile  = false;
     bool dumpStdErr= false;
-#ifdef DNDEBUG
+#ifdef NDEBUG
     if(build_status != CL_SUCCESS) dumpFile = true;
 #else
     dumpFile = true;

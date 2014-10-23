@@ -319,7 +319,9 @@ static inline cl_kernel select_nbnxn_kernel(nbnxn_opencl_ptr_t ocl_nb,
             kernel_ptr = &(ocl_nb->kernel_noener_noprune_ptr[eeltype][evdwtype]);
         }
     }
+#ifndef NDEBUG
     printf("Selected kernel: %s\n",kernel_name_to_run);
+#endif
 
     if (NULL == kernel_ptr[0])
     {
