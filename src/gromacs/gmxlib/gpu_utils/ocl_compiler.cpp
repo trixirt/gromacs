@@ -11,10 +11,6 @@
 
 #include "ocl_compiler.hpp"
 
-//#define OCL_FILE_PATH "C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\mdlib\\nbnxn_ocl\\nbnxn_ocl_kernels.cl"
-//#define OCL_FILE_PATH "C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\gmxlib\\ocl_tools\\vectype_ops.clh"
-//#define OCL_FILE_PATH "C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\mdlib\\nbnxn_ocl\\nbnxn_ocl_kernel_nvidia.clh"
-
 /* This path is defined by CMake and it depends on the install prefix option.
    The opencl kernels are installed in bin/opencl.*/
 #if !defined(OCL_INSTALL_DIR_NAME)
@@ -445,10 +441,7 @@ ocl_compile_program(
                                  custom_build_options_prepend,NULL);
 
         size_t build_log_size       = 0;
-
-        //cl_error = clBuildProgram(program, 0, NULL, "-cl-fast-relaxed-math", NULL, NULL);
-        //cl_error = clBuildProgram(program, 0, NULL, "-I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\mdlib\\nbnxn_ocl\\ -I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\pbcutil\\ -I C:\\Anca\\SC\\gromacs\\gromacs\\src -I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\legacyheaders -I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\mdlib", NULL, NULL);
-        //cl_error = clBuildProgram(program, 0, NULL, "-I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\mdlib\\nbnxn_ocl\\ -I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\pbcutil\\ -I C:\\Anca\\SC\\gromacs\\gromacs\\src\\ -I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\legacyheaders\\ -I C:\\Anca\\SC\\gromacs\\gromacs\\src\\gromacs\\mdlib\\", NULL, NULL);
+        
         build_status = clBuildProgram(*p_program, 0, NULL, build_options_string, NULL, NULL);
 
         // Do not fail now if the compilation fails. Dump the LOG and then fail.
