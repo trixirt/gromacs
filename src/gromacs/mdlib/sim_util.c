@@ -1503,13 +1503,18 @@ void do_force_cutsVERLET(FILE *fplog, t_commrec *cr,
             nbnxn_cuda_clear_outputs(nbv->cu_nbv, flags);
             wallcycle_stop(wcycle, ewcLAUNCH_GPU_NB);
 #elif defined(GMX_GPU) && defined(GMX_USE_OPENCL)    
+            wallcycle_start(wcycle, ewcWAIT_GPU_NB_L);
 			nbnxn_ocl_wait_gpu(nbv->ocl_nbv,
 				nbv->grp[eintLocal].nbat,
 				flags, eatLocal,
 				enerd->grpp.ener[egLJSR], enerd->grpp.ener[egCOULSR],
 				fr->fshift);
 			cycles_wait_gpu += wallcycle_stop(wcycle, ewcWAIT_GPU_NB_L);
+
+            /* now clear the GPU outputs while we finish the step on the CPU */
+            wallcycle_start_nocount(wcycle, ewcLAUNCH_GPU_NB);
 			nbnxn_ocl_clear_outputs(nbv->ocl_nbv, flags);
+            wallcycle_stop(wcycle, ewcLAUNCH_GPU_NB);
 #endif            
         }
         else
@@ -2768,13 +2773,15 @@ void finish_run(FILE *fplog, t_commrec *cr,
     }
 
     if (SIMMASTER(cr))
-    {
-#if defined(GMX_GPU) && defined(GMX_USE_OPENCL)        
-#define nbnxn_cuda_get_timings(...) NULL
-#pragma message "WARNING Not implemented yet"      
-#endif        
+    {              
         wallclock_gpu_t* gputimes = use_GPU(nbv) ?
-            nbnxn_cuda_get_timings(nbv->cu_nbv) : NULL;
+#if defined(GMX_GPU) && defined(GMX_USE_OPENCL)
+                nbnxn_ocl_get_timings(nbv->ocl_nbv)
+#else
+                nbnxn_cuda_get_timings(nbv->cu_nbv)
+#endif
+                : NULL;
+
         wallcycle_print(fplog, cr->nnodes, cr->npmenodes,
                         elapsed_time_over_all_ranks,
                         wcycle, gputimes);

@@ -69,6 +69,7 @@
 
 #include "gromacs/pbcutil/ishift.h"
 #include "gromacs/utility/cstringutil.h"
+#include "gromacs/utility/fatalerror.h"
 
 #if defined TEXOBJ_SUPPORTED && __CUDA_ARCH__ >= 300
 #define USE_TEXOBJ
@@ -409,6 +410,57 @@ static void fillin_ocl_structures(cl_atomdata_t *adat, cl_nbparam_t *nbp, cl_pli
 
 }
 
+/* Waits for the commands associated with the input event to finish.
+ * Then it releases the event and sets it to 0.
+ * Don't use this function when more than one wait will be issued for the event.
+ */
+void wait_ocl_event(cl_event *ocl_event)
+{
+    cl_int cl_error;
+
+    /* Blocking wait for the event */
+    cl_error = clWaitForEvents(1, ocl_event);
+    assert(CL_SUCCESS == cl_error);
+
+    /* Release event and reset it to 0 */
+    cl_error = clReleaseEvent(*ocl_event);
+    assert(CL_SUCCESS == cl_error);
+    *ocl_event = 0;
+}
+
+/* Returns the duration in miliseconds for the command associated with the event.
+ * It then releases the event and sets it to 0.
+ * The function returns 0.0 if the input event, *ocl_event, is 0.
+ * Don't use this function when more than one wait will be issued for the event.
+ */
+double ocl_event_elapsed_ms(cl_event *ocl_event)
+{
+    cl_int cl_error;
+    cl_ulong start_ns, end_ns;
+    double elapsed_ms;
+
+    elapsed_ms = 0.0;
+    assert(NULL != ocl_event);    
+
+    if (*ocl_event)
+    {
+        cl_error = clGetEventProfilingInfo(*ocl_event, CL_PROFILING_COMMAND_START,
+            sizeof(cl_ulong), &start_ns, NULL);
+        assert(CL_SUCCESS == cl_error);
+
+        cl_error = clGetEventProfilingInfo(*ocl_event, CL_PROFILING_COMMAND_END,
+            sizeof(cl_ulong), &end_ns, NULL);
+        assert(CL_SUCCESS == cl_error);
+
+        clReleaseEvent(*ocl_event);
+        *ocl_event = 0;
+
+        elapsed_ms = (end_ns - start_ns) / 1000000.0;
+    }
+
+    return elapsed_ms;
+}
+
 /*! As we execute nonbonded workload in separate streams, before launching
    the kernel we need to make sure that he following operations have completed:
    - atomdata allocation and related H2D transfers (every nstlist step);
@@ -484,16 +536,21 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
        so we record that in the local stream and wait for it in the nonlocal one. */
     if (ocl_nb->bUseTwoStreams)
     {
-        ////if (iloc == eintLocal)
-        ////{
-        ////    stat = cudaEventRecord(cu_nb->misc_ops_done, stream);
-        ////    CU_RET_ERR(stat, "cudaEventRecord on misc_ops_done failed");
-        ////}
-        ////else
-        ////{
-        ////    stat = cudaStreamWaitEvent(stream, cu_nb->misc_ops_done, 0);
-        ////    CU_RET_ERR(stat, "cudaStreamWaitEvent on misc_ops_done failed");
-        ////}
+        if (iloc == eintLocal)
+        {
+            cl_error = clEnqueueMarker(stream, &(ocl_nb->misc_ops_done));
+            assert(CL_SUCCESS == cl_error);
+
+            //stat = cudaEventRecord(cu_nb->misc_ops_done, stream);
+            //CU_RET_ERR(stat, "cudaEventRecord on misc_ops_done failed");
+        }
+        else
+        {
+            wait_ocl_event(&(ocl_nb->misc_ops_done));
+            
+            //stat = cudaStreamWaitEvent(stream, cu_nb->misc_ops_done, 0);
+            //CU_RET_ERR(stat, "cudaStreamWaitEvent on misc_ops_done failed");
+        }
     }
 
     /* beginning of timed HtoD section */
@@ -505,7 +562,7 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
 
     /* HtoD x, q */
     ocl_copy_H2D_async(adat->xq, nbatom->x + adat_begin * 4, adat_begin,
-        adat_len * sizeof(float) * 4, stream, NULL);
+        adat_len * sizeof(float) * 4, stream, bDoTime ? (&(t->nb_h2d[iloc])) : NULL);
     //cu_copy_H2D_async(adat->xq + adat_begin, nbatom->x + adat_begin * 4,
     //                  adat_len * sizeof(*adat->xq), stream);
 
@@ -565,14 +622,14 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
         run_step++;
     }
 #endif
-    ////if (debug)
-    ////{
-    ////    fprintf(debug, "GPU launch configuration:\n\tThread block: %dx%dx%d\n\t"
-    ////            "Grid: %dx%d\n\t#Super-clusters/clusters: %d/%d (%d)\n",
-    ////            dim_block.x, dim_block.y, dim_block.z,
-    ////            dim_grid.x, dim_grid.y, plist->nsci*NCL_PER_SUPERCL,
-    ////            NCL_PER_SUPERCL, plist->na_c);
-    ////}
+    if (debug)
+    {
+        fprintf(debug, "GPU launch configuration:\n\tLocal work size: %dx%dx%d\n\t"
+                "Global work size : %dx%d\n\t#Super-clusters/clusters: %d/%d (%d)\n",
+                dim_block[0], dim_block[1], dim_block[2],
+                dim_grid[0], dim_grid[1], plist->nsci*NCL_PER_SUPERCL,
+                NCL_PER_SUPERCL, plist->na_c);
+    }
 
     fillin_ocl_structures(adat, nbp, plist, &atomdata_params, &nbparams_params);
 
@@ -601,7 +658,7 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
     if(cl_error)
         printf("ClERROR! %d\n",cl_error);
 
-    cl_error = clEnqueueNDRangeKernel(stream, nb_kernel, 3, NULL, dim_grid, dim_block, 0, NULL, NULL);
+    cl_error = clEnqueueNDRangeKernel(stream, nb_kernel, 3, NULL, dim_grid, dim_block, 0, NULL, bDoTime ? &(t->nb_k[iloc]) : NULL);
     assert(cl_error == CL_SUCCESS);
 
     //cl_error = clFinish(stream);
@@ -799,8 +856,8 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t        ocl_nb,
                                const nbnxn_atomdata_t *nbatom,
                                int                     flags,
                                int                     aloc)
-{
-    //cudaError_t stat;
+{    
+    cl_int      cl_error;
     int         adat_begin, adat_len, adat_end; /* local/nonlocal offset and length used for xq and f */
     int         iloc = -1;
 
@@ -892,25 +949,21 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t        ocl_nb,
        has been launched. */
     if (iloc == eintLocal && ocl_nb->bUseTwoStreams)
     {
-        // TO DO: implement for OpenCL
-        ////stat = cudaStreamWaitEvent(stream, cu_nb->nonlocal_done, 0);
-        ////CU_RET_ERR(stat, "cudaStreamWaitEvent on nonlocal_done failed");
+        wait_ocl_event(&(ocl_nb->nonlocal_done));        
     }
 
-    /* DtoH f */
-    // TO DO: the last parameter is not always NULL
+    /* DtoH f */    
     ocl_copy_D2H_async(nbatom->out[0].f + adat_begin * 3, adat->f, adat_begin,
-                      (adat_len)*sizeof(float) * 3, stream, NULL);
+                      (adat_len)*sizeof(float) * 3, stream, bDoTime ? &(t->nb_d2h_f[iloc]) : NULL);
 
     /* After the non-local D2H is launched the nonlocal_done event can be
        recorded which signals that the local D2H can proceed. This event is not
        placed after the non-local kernel because we first need the non-local
        data back first. */
     if (iloc == eintNonlocal)
-    {
-        // TO DO: implement for OpenCL
-        ////stat = cudaEventRecord(cu_nb->nonlocal_done, stream);
-        ////CU_RET_ERR(stat, "cudaEventRecord on nonlocal_done failed");
+    {        
+        cl_error = clEnqueueMarker(stream, &(ocl_nb->nonlocal_done));
+        assert(CL_SUCCESS == cl_error);
     }
 
     /* only transfer energies in the local stream */
@@ -918,22 +971,20 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t        ocl_nb,
     {
         /* DtoH fshift */
         if (bCalcFshift)
-        {
-            // TO DO: the last parameter is not always NULL
+        {            
              // TO DO: review fshift data type and how its size is computed
             ocl_copy_D2H_async(ocl_nb->nbst.fshift, adat->fshift, 0,
-                              3 * SHIFTS * sizeof(float), stream, NULL);
+                              3 * SHIFTS * sizeof(float), stream, bDoTime ? &(t->nb_d2h_fshift[iloc]) : NULL);
         }
 
         /* DtoH energies */
         if (bCalcEner)
-        {
-            // TO DO: the last parameter is not always NULL
+        {            
             ocl_copy_D2H_async(ocl_nb->nbst.e_lj, adat->e_lj, 0,
-                              sizeof(float), stream, NULL);
-            // TO DO: the last parameter is not always NULL
+                              sizeof(float), stream, bDoTime ? &(t->nb_d2h_e_lj[iloc]) : NULL);
+            
             ocl_copy_D2H_async(ocl_nb->nbst.e_el, adat->e_el, 0,
-                              sizeof(float), stream, NULL);
+                              sizeof(float), stream, bDoTime ? &(t->nb_d2h_e_el[iloc]) : NULL);
         }
     }
 
@@ -1052,34 +1103,118 @@ void nbnxn_ocl_wait_gpu(nbnxn_opencl_ptr_t cu_nb,
                          int flags, int aloc,
                          real *e_lj, real *e_el, rvec *fshift)
 {
-	int              iloc = -1, i;
+    /* NOTE:  only implemented for single-precision at this time */
+    cl_int                 cl_error;
+    int                    i, adat_end, iloc = -1;	
+    volatile unsigned int *poll_word;
+
+    /* determine interaction locality from atom locality */
+    if (LOCAL_A(aloc))
+    {
+        iloc = eintLocal;
+    }
+    else if (NONLOCAL_A(aloc))
+    {
+        iloc = eintNonlocal;
+    }
+    else
+    {
+        char stmp[STRLEN];
+        sprintf(stmp, "Invalid atom locality passed (%d); valid here is only "
+                "local (%d) or nonlocal (%d)", aloc, eatLocal, eatNonlocal);
+        gmx_incons(stmp);
+    }
+
+    cl_plist_t      *plist    = cu_nb->plist[iloc];
+    cl_timers_t     *timers   = cu_nb->timers;
+    wallclock_gpu_t *timings  = cu_nb->timings;
+    cl_nb_staging    nbst     = cu_nb->nbst;
+
 	bool             bCalcEner   = flags & GMX_FORCE_VIRIAL;
 	bool             bCalcFshift = flags & GMX_FORCE_VIRIAL;
-	cl_nb_staging    nbst = cu_nb->nbst;
 
+    /* turn energy calculation always on/off (for debugging/testing only) */
+    bCalcEner = (bCalcEner || always_ener) && !never_ener;
 
-	/* determine interaction locality from atom locality */
-	if (LOCAL_A(aloc))
-	{
-		iloc = eintLocal;
-	}
-	else if (NONLOCAL_A(aloc))
-	{
-		iloc = eintNonlocal;
-	}
-	else
-	{
-		char stmp[STRLEN];
-		sprintf(stmp, "Invalid atom locality passed (%d); valid here is only "
-			"local (%d) or nonlocal (%d)", aloc, eatLocal, eatNonlocal);
+    /* don't launch wait/update timers & counters if there was no work to do
 
-		// TO DO: fix for OpenCL
-		//gmx_incons(stmp);
-	}
-	cl_plist_t *plist = cu_nb->plist[iloc];
+       NOTE: if timing with multiple GPUs (streams) becomes possible, the
+       counters could end up being inconsistent due to not being incremented
+       on some of the nodes! */
+    if (cu_nb->plist[iloc]->nsci == 0)
+    {
+        return;
+    }
 
-	/* Actual sync point. Waits for everything to be finished in the command queue. TODO: Find out if a more fine grained solution is needed */
-	clFinish(cu_nb->stream[iloc]);
+    /* calculate the atom data index range based on locality */
+    if (LOCAL_A(aloc))
+    {
+        adat_end = cu_nb->atdat->natoms_local;
+    }
+    else
+    {
+        adat_end = cu_nb->atdat->natoms;
+    }
+
+    if (cu_nb->bUseStreamSync)
+    {
+        /* Actual sync point. Waits for everything to be finished in the command queue. TODO: Find out if a more fine grained solution is needed */
+        cl_error = clFinish(cu_nb->stream[iloc]);
+        assert(CL_SUCCESS == cl_error);
+    }
+    else
+    {
+        /* Busy-wait until we get the signal pattern set in last byte
+         * of the l/nl float vector. This pattern corresponds to a floating
+         * point number which can't be the result of the force calculation
+         * (maximum, 127 exponent and 0 mantissa).
+         * The polling uses atomic compare-exchange.
+         */
+        poll_word = (volatile unsigned int*)&nbatom->out[0].f[adat_end*3 - 1];
+        while (atomic_cas(poll_word, poll_wait_pattern, poll_wait_pattern))
+        {
+        }
+    }
+
+    /* timing data accumulation */
+    if (cu_nb->bDoTime)
+    {
+        /* only increase counter once (at local F wait) */
+        if (LOCAL_I(iloc))
+        {
+            timings->nb_c++;
+            timings->ktime[plist->bDoPrune ? 1 : 0][bCalcEner ? 1 : 0].c += 1;
+        }
+
+        /* kernel timings */
+
+        timings->ktime[plist->bDoPrune ? 1 : 0][bCalcEner ? 1 : 0].t +=
+            ocl_event_elapsed_ms(timers->nb_k + iloc);
+
+        /* X/q H2D and F D2H timings */
+        timings->nb_h2d_t += ocl_event_elapsed_ms(timers->nb_h2d        + iloc);            
+        timings->nb_d2h_t += ocl_event_elapsed_ms(timers->nb_d2h_f      + iloc);
+        timings->nb_d2h_t += ocl_event_elapsed_ms(timers->nb_d2h_fshift + iloc);
+        timings->nb_d2h_t += ocl_event_elapsed_ms(timers->nb_d2h_e_el   + iloc);
+        timings->nb_d2h_t += ocl_event_elapsed_ms(timers->nb_d2h_e_lj   + iloc);
+
+        /* only count atdat and pair-list H2D at pair-search step */
+        if (plist->bDoPrune)
+        {
+            /* atdat transfer timing (add only once, at local F wait) */
+            if (LOCAL_A(aloc))
+            {
+                timings->pl_h2d_c++;
+                timings->pl_h2d_t += ocl_event_elapsed_ms(&(timers->atdat));
+            }
+
+            timings->pl_h2d_t +=
+                ocl_event_elapsed_ms(timers->pl_h2d_sci     + iloc) +
+                ocl_event_elapsed_ms(timers->pl_h2d_cj4     + iloc) +
+                ocl_event_elapsed_ms(timers->pl_h2d_excl    + iloc);
+
+        }
+    }
 
 	/* add up energies and shift forces (only once at local F wait) */
 	if (LOCAL_I(iloc))

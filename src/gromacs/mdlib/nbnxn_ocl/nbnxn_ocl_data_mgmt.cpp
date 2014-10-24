@@ -216,7 +216,8 @@ void ocl_realloc_buffered(cl_mem *d_dest, void *h_src,
                          int req_size,
                          cl_context context,
                          cl_command_queue s,                         
-                         bool bAsync = true)
+                         bool bAsync = true,
+                         cl_event *copy_event = NULL)
 {
     cl_int cl_error;
 
@@ -253,7 +254,7 @@ void ocl_realloc_buffered(cl_mem *d_dest, void *h_src,
     {
         if (bAsync)
         {
-            ocl_copy_H2D_async(*d_dest, h_src, 0, *curr_size * type_size, s, NULL);
+            ocl_copy_H2D_async(*d_dest, h_src, 0, *curr_size * type_size, s, copy_event);
         }
         else
         {
@@ -863,6 +864,141 @@ void nbnxn_ocl_init(FILE                 *fplog,
 
     init_plist(nb->plist[eintLocal]);
 
+    /* init events for sychronization (timing disabled for performance reasons!) */
+    //nb->nonlocal_done = clCreateUserEvent(nb->dev_info->context, &cl_error);
+    //assert(cl_error == CL_SUCCESS);    
+    // TO DO: check for errors
+    //stat = cudaEventCreateWithFlags(&nb->nonlocal_done, cudaEventDisableTiming);
+    //CU_RET_ERR(stat, "cudaEventCreate on nonlocal_done failed");
+
+    //nb->misc_ops_done = clCreateUserEvent(nb->dev_info->context, &cl_error);
+    //assert(cl_error == CL_SUCCESS);    
+    // TO DO: check for errors
+    //stat = cudaEventCreateWithFlags(&nb->misc_ops_done, cudaEventDisableTiming);
+    //CU_RET_ERR(stat, "cudaEventCreate on misc_ops_one failed");
+
+    // TO DO: Update the code below for OpenCL and for NVIDIA GPUs.
+    // For now, bUseStreamSync will always be true.    
+    nb->bUseStreamSync = true;
+
+    /* On GPUs with ECC enabled, cudaStreamSynchronize shows a large overhead
+     * (which increases with shorter time/step) caused by a known CUDA driver bug.
+     * To work around the issue we'll use an (admittedly fragile) memory polling
+     * waiting to preserve performance. This requires support for atomic
+     * operations and only works on x86/x86_64.
+     * With polling wait event-timing also needs to be disabled.
+     *
+     * The overhead is greatly reduced in API v5.0 drivers and the improvement
+     * is independent of runtime version. Hence, with API v5.0 drivers and later
+     * we won't switch to polling.
+     *
+     * NOTE: Unfortunately, this is known to fail when GPUs are shared by (t)MPI,
+     * ranks so we will also disable it in that case.
+     */
+
+//////    bStreamSync    = getenv("GMX_CUDA_STREAMSYNC") != NULL;
+//////    bNoStreamSync  = getenv("GMX_NO_CUDA_STREAMSYNC") != NULL;
+//////
+//////#ifdef TMPI_ATOMICS
+//////    bTMPIAtomics = true;
+//////#else
+//////    bTMPIAtomics = false;
+//////#endif
+//////
+//////#ifdef GMX_TARGET_X86
+//////    bX86 = true;
+//////#else
+//////    bX86 = false;
+//////#endif
+//////
+//////    if (bStreamSync && bNoStreamSync)
+//////    {
+//////        gmx_fatal(FARGS, "Conflicting environment variables: both GMX_CUDA_STREAMSYNC and GMX_NO_CUDA_STREAMSYNC defined");
+//////    }
+//////
+//////
+//////    stat = cudaDriverGetVersion(&cuda_drv_ver);
+//////    CU_RET_ERR(stat, "cudaDriverGetVersion failed");
+//////
+//////    bOldDriver = (cuda_drv_ver < 5000);
+//////
+//////    if ((nb->dev_info->prop.ECCEnabled == 1) && bOldDriver)
+//////    {
+//////        /* Polling wait should be used instead of cudaStreamSynchronize only if:
+//////         *   - ECC is ON & driver is old (checked above),
+//////         *   - we're on x86/x86_64,
+//////         *   - atomics are available, and
+//////         *   - GPUs are not being shared.
+//////         */
+//////        bool bShouldUsePollSync = (bX86 && bTMPIAtomics &&
+//////                                   (gmx_count_gpu_dev_shared(gpu_opt) < 1));
+//////
+//////        if (bStreamSync)
+//////        {
+//////            nb->bUseStreamSync = true;
+//////
+//////            /* only warn if polling should be used */
+//////            if (bShouldUsePollSync)
+//////            {
+//////                md_print_warn(fplog,
+//////                              "NOTE: Using a GPU with ECC enabled and CUDA driver API version <5.0, but\n"
+//////                              "      cudaStreamSynchronize waiting is forced by the GMX_CUDA_STREAMSYNC env. var.\n");
+//////            }
+//////        }
+//////        else
+//////        {
+//////            nb->bUseStreamSync = !bShouldUsePollSync;
+//////
+//////            if (bShouldUsePollSync)
+//////            {
+//////                md_print_warn(fplog,
+//////                              "NOTE: Using a GPU with ECC enabled and CUDA driver API version <5.0, known to\n"
+//////                              "      cause performance loss. Switching to the alternative polling GPU wait.\n"
+//////                              "      If you encounter issues, switch back to standard GPU waiting by setting\n"
+//////                              "      the GMX_CUDA_STREAMSYNC environment variable.\n");
+//////            }
+//////            else
+//////            {
+//////                /* Tell the user that the ECC+old driver combination can be bad */
+//////                sprintf(sbuf,
+//////                        "NOTE: Using a GPU with ECC enabled and CUDA driver API version <5.0.\n"
+//////                        "      A known bug in this driver version can cause performance loss.\n"
+//////                        "      However, the polling wait workaround can not be used because\n%s\n"
+//////                        "      Consider updating the driver or turning ECC off.",
+//////                        (bX86 && bTMPIAtomics) ?
+//////                        "      GPU(s) are being oversubscribed." :
+//////                        "      atomic operations are not supported by the platform/CPU+compiler.");
+//////                md_print_warn(fplog, sbuf);
+//////            }
+//////        }
+//////    }
+//////    else
+//////    {
+//////        if (bNoStreamSync)
+//////        {
+//////            nb->bUseStreamSync = false;
+//////
+//////            md_print_warn(fplog,
+//////                          "NOTE: Polling wait for GPU synchronization requested by GMX_NO_CUDA_STREAMSYNC\n");
+//////        }
+//////        else
+//////        {
+//////            /* no/off ECC, cudaStreamSynchronize not turned off by env. var. */
+//////            nb->bUseStreamSync = true;
+//////        }
+//////    }
+
+
+
+    /* OpenCL timing disabled as event timers don't work:
+       - with multiple streams = domain-decomposition;
+       - with the polling waiting hack (without cudaStreamSynchronize);
+       - when turned off by GMX_DISABLE_OPENCL_TIMING.
+     */
+    nb->bDoTime = (!nb->bUseTwoStreams && nb->bUseStreamSync &&
+                   (getenv("GMX_DISABLE_OPENCL_TIMING") == NULL));
+
+    /* Create queues only after bDoTime has been initialized */
     if (nb->bDoTime)
         queue_properties = CL_QUEUE_PROFILING_ENABLE;
     else
@@ -903,137 +1039,6 @@ void nbnxn_ocl_init(FILE                 *fplog,
 #endif
     }
 
-    /* init events for sychronization (timing disabled for performance reasons!) */
-    nb->nonlocal_done = clCreateUserEvent(nb->dev_info->context, &cl_error);
-    assert(cl_error == CL_SUCCESS);    
-    // TO DO: check for errors
-    //stat = cudaEventCreateWithFlags(&nb->nonlocal_done, cudaEventDisableTiming);
-    //CU_RET_ERR(stat, "cudaEventCreate on nonlocal_done failed");
-
-    nb->misc_ops_done = clCreateUserEvent(nb->dev_info->context, &cl_error);
-    assert(cl_error == CL_SUCCESS);    
-    // TO DO: check for errors
-    //stat = cudaEventCreateWithFlags(&nb->misc_ops_done, cudaEventDisableTiming);
-    //CU_RET_ERR(stat, "cudaEventCreate on misc_ops_one failed");
-
-    /* On GPUs with ECC enabled, cudaStreamSynchronize shows a large overhead
-     * (which increases with shorter time/step) caused by a known CUDA driver bug.
-     * To work around the issue we'll use an (admittedly fragile) memory polling
-     * waiting to preserve performance. This requires support for atomic
-     * operations and only works on x86/x86_64.
-     * With polling wait event-timing also needs to be disabled.
-     *
-     * The overhead is greatly reduced in API v5.0 drivers and the improvement
-     * is independent of runtime version. Hence, with API v5.0 drivers and later
-     * we won't switch to polling.
-     *
-     * NOTE: Unfortunately, this is known to fail when GPUs are shared by (t)MPI,
-     * ranks so we will also disable it in that case.
-     */
-
-    bStreamSync    = getenv("GMX_CUDA_STREAMSYNC") != NULL;
-    bNoStreamSync  = getenv("GMX_NO_CUDA_STREAMSYNC") != NULL;
-
-#ifdef TMPI_ATOMICS
-    bTMPIAtomics = true;
-#else
-    bTMPIAtomics = false;
-#endif
-
-#ifdef GMX_TARGET_X86
-    bX86 = true;
-#else
-    bX86 = false;
-#endif
-
-    if (bStreamSync && bNoStreamSync)
-    {
-        gmx_fatal(FARGS, "Conflicting environment variables: both GMX_CUDA_STREAMSYNC and GMX_NO_CUDA_STREAMSYNC defined");
-    }
-
-/*
-    stat = cudaDriverGetVersion(&cuda_drv_ver);
-    CU_RET_ERR(stat, "cudaDriverGetVersion failed");
-
-    bOldDriver = (cuda_drv_ver < 5000);
-*/
-    bOldDriver = CL_FALSE; //??
-
-    // TO DO: fix the below code for OpenCL
-    //////////if ((nb->dev_info->prop.ECCEnabled == 1) && bOldDriver)
-    //////////{
-    //////////    /* Polling wait should be used instead of cudaStreamSynchronize only if:
-    //////////     *   - ECC is ON & driver is old (checked above),
-    //////////     *   - we're on x86/x86_64,
-    //////////     *   - atomics are available, and
-    //////////     *   - GPUs are not being shared.
-    //////////     */
-    //////////    bool bShouldUsePollSync = (bX86 && bTMPIAtomics &&
-    //////////                               (gmx_count_gpu_dev_shared(gpu_opt) < 1));
-
-    //////////    if (bStreamSync)
-    //////////    {
-    //////////        nb->bUseStreamSync = true;
-
-    //////////        /* only warn if polling should be used */
-    //////////        if (bShouldUsePollSync)
-    //////////        {
-    //////////            md_print_warn(fplog,
-    //////////                          "NOTE: Using a GPU with ECC enabled and CUDA driver API version <5.0, but\n"
-    //////////                          "      cudaStreamSynchronize waiting is forced by the GMX_CUDA_STREAMSYNC env. var.\n");
-    //////////        }
-    //////////    }
-    //////////    else
-    //////////    {
-    //////////        nb->bUseStreamSync = !bShouldUsePollSync;
-
-    //////////        if (bShouldUsePollSync)
-    //////////        {
-    //////////            md_print_warn(fplog,
-    //////////                          "NOTE: Using a GPU with ECC enabled and CUDA driver API version <5.0, known to\n"
-    //////////                          "      cause performance loss. Switching to the alternative polling GPU wait.\n"
-    //////////                          "      If you encounter issues, switch back to standard GPU waiting by setting\n"
-    //////////                          "      the GMX_CUDA_STREAMSYNC environment variable.\n");
-    //////////        }
-    //////////        else
-    //////////        {
-    //////////            /* Tell the user that the ECC+old driver combination can be bad */
-    //////////            sprintf(sbuf,
-    //////////                    "NOTE: Using a GPU with ECC enabled and CUDA driver API version <5.0.\n"
-    //////////                    "      A known bug in this driver version can cause performance loss.\n"
-    //////////                    "      However, the polling wait workaround can not be used because\n%s\n"
-    //////////                    "      Consider updating the driver or turning ECC off.",
-    //////////                    (bX86 && bTMPIAtomics) ?
-    //////////                    "      GPU(s) are being oversubscribed." :
-    //////////                    "      atomic operations are not supported by the platform/CPU+compiler.");
-    //////////            md_print_warn(fplog, sbuf);
-    //////////        }
-    //////////    }
-    //////////}
-    //////////else
-    //////////{
-    //////////    if (bNoStreamSync)
-    //////////    {
-    //////////        nb->bUseStreamSync = false;
-
-    //////////        md_print_warn(fplog,
-    //////////                      "NOTE: Polling wait for GPU synchronization requested by GMX_NO_CUDA_STREAMSYNC\n");
-    //////////    }
-    //////////    else
-    //////////    {
-    //////////        /* no/off ECC, cudaStreamSynchronize not turned off by env. var. */
-    //////////        nb->bUseStreamSync = true;
-    //////////    }
-    //////////}
-
-    ///////////* CUDA timing disabled as event timers don't work:
-    //////////   - with multiple streams = domain-decomposition;
-    //////////   - with the polling waiting hack (without cudaStreamSynchronize);
-    //////////   - when turned off by GMX_DISABLE_CUDA_TIMING.
-    ////////// */
-    //////////nb->bDoTime = (!nb->bUseTwoStreams && nb->bUseStreamSync &&
-    //////////               (getenv("GMX_DISABLE_CUDA_TIMING") == NULL));
-
     if (nb->bDoTime)
     {
         init_timers(nb->timers, nb->bUseTwoStreams);
@@ -1048,7 +1053,7 @@ void nbnxn_ocl_init(FILE                 *fplog,
 
     if (debug)
     {
-        fprintf(debug, "Initialized CUDA data structures.\n");
+        fprintf(debug, "Initialized OpenCL data structures.\n");
     }
 }
 
@@ -1189,7 +1194,7 @@ void nbnxn_ocl_init_pairlist(nbnxn_opencl_ptr_t        ocl_nb,
                         &d_plist->nsci, &d_plist->sci_nalloc,
                         h_plist->nsci,
                         ocl_nb->dev_info->context,
-                        stream, true);
+                        stream, true, &(ocl_nb->timers->pl_h2d_sci[iloc]));
 
     //cu_realloc_buffered((void **)&d_plist->cj4, h_plist->cj4, sizeof(*d_plist->cj4),
     //                    &d_plist->ncj4, &d_plist->cj4_nalloc,
@@ -1199,7 +1204,7 @@ void nbnxn_ocl_init_pairlist(nbnxn_opencl_ptr_t        ocl_nb,
                         &d_plist->ncj4, &d_plist->cj4_nalloc,
                         h_plist->ncj4,
                         ocl_nb->dev_info->context,
-                        stream, true);
+                        stream, true, &(ocl_nb->timers->pl_h2d_cj4[iloc]));
 
     //cu_realloc_buffered((void **)&d_plist->excl, h_plist->excl, sizeof(*d_plist->excl),
     //                    &d_plist->nexcl, &d_plist->excl_nalloc,
@@ -1209,7 +1214,7 @@ void nbnxn_ocl_init_pairlist(nbnxn_opencl_ptr_t        ocl_nb,
                         &d_plist->nexcl, &d_plist->excl_nalloc,
                         h_plist->nexcl,
                         ocl_nb->dev_info->context,
-                        stream, true);
+                        stream, true, &(ocl_nb->timers->pl_h2d_excl[iloc]));
 
     if (bDoTime)
     {
@@ -1309,7 +1314,7 @@ void nbnxn_ocl_init_atomdata(nbnxn_opencl_ptr_t        ocl_nb,
     }
 
     ocl_copy_H2D_async(d_atdat->atom_types, nbat->type, 0,
-                      natoms*sizeof(int), ls, &(timers->atdat));
+                      natoms*sizeof(int), ls, bDoTime ? &(timers->atdat) : NULL);
 
     //cu_copy_H2D_async(d_atdat->atom_types, nbat->type,
     //                  natoms*sizeof(*d_atdat->atom_types), ls);
@@ -1318,13 +1323,7 @@ void nbnxn_ocl_init_atomdata(nbnxn_opencl_ptr_t        ocl_nb,
     {
         //stat = cudaEventRecord(timers->stop_atdat, ls);
         //CU_RET_ERR(stat, "cudaEventRecord failed");
-        cl_int cl_error;
-
-        cl_error = clGetEventProfilingInfo(timers->atdat, CL_PROFILING_COMMAND_START,
-            sizeof(cl_ulong), &(timers->start_atdat), NULL);
-
-        cl_error = clGetEventProfilingInfo(timers->atdat, CL_PROFILING_COMMAND_END,
-            sizeof(cl_ulong), &(timers->stop_atdat), NULL);
+        //cl_int cl_error;
     }
 }
 void free_kernel(cl_kernel *kernel_ptr)
@@ -1544,18 +1543,18 @@ void nbnxn_ocl_free(nbnxn_opencl_ptr_t ocl_nb)
 ////    CU_RET_ERR(stat, "cudaStreamWaitEvent failed");
 ////}
 
-//wallclock_gpu_t * nbnxn_cuda_get_timings(nbnxn_cuda_ptr_t cu_nb)
-//{
-//    return (cu_nb != NULL && cu_nb->bDoTime) ? cu_nb->timings : NULL;
-//}
+wallclock_gpu_t * nbnxn_ocl_get_timings(nbnxn_opencl_ptr_t cu_nb)
+{
+    return (cu_nb != NULL && cu_nb->bDoTime) ? cu_nb->timings : NULL;
+}
 
-//void nbnxn_cuda_reset_timings(nonbonded_verlet_t* nbv)
-//{
-//    if (nbv->cu_nbv && nbv->cu_nbv->bDoTime)
-//    {
-//        init_timings(nbv->cu_nbv->timings);
-//    }
-//}
+void nbnxn_ocl_reset_timings(nonbonded_verlet_t* nbv)
+{
+    if (nbv->ocl_nbv && nbv->ocl_nbv->bDoTime)
+    {
+        init_timings(nbv->ocl_nbv->timings);
+    }
+}
 
 //int nbnxn_cuda_min_ci_balanced(nbnxn_cuda_ptr_t cu_nb)
 //{

@@ -46,9 +46,11 @@
 #if defined(GMX_GPU) && defined(GMX_USE_OPENCL)
 #define FUNC_TERM ;
 #define FUNC_QUALIFIER
+#define FUNC_TERM_P ;
 #else
 #define FUNC_TERM {}
 #define FUNC_QUALIFIER static;
+#define FUNC_TERM_P {return NULL}
 #endif
 
 #ifdef __cplusplus
@@ -106,21 +108,14 @@ void nbnxn_ocl_clear_outputs(
 FUNC_QUALIFIER
 void nbnxn_ocl_free(nbnxn_opencl_ptr_t gmx_unused  cu_nb) FUNC_TERM
 
-///////** Returns the GPU timings structure or NULL if GPU is not used or timing is off. */
-//////FUNC_QUALIFIER
-//////wallclock_gpu_t * nbnxn_cuda_get_timings(nbnxn_cuda_ptr_t gmx_unused cu_nb)
-//////#ifdef GMX_GPU
-//////;
-//////#else
-//////{
-//////    return NULL;
-//////}
-//////#endif
-//////
-///////** Resets nonbonded GPU timings. */
-//////FUNC_QUALIFIER
-//////void nbnxn_cuda_reset_timings(struct nonbonded_verlet_t gmx_unused *nbv) FUNC_TERM
-//////
+/** Returns the GPU timings structure or NULL if GPU is not used or timing is off. */
+FUNC_QUALIFIER
+wallclock_gpu_t * nbnxn_ocl_get_timings(nbnxn_opencl_ptr_t gmx_unused cu_nb) FUNC_TERM_P
+
+/** Resets nonbonded GPU timings. */
+FUNC_QUALIFIER
+void nbnxn_ocl_reset_timings(struct nonbonded_verlet_t gmx_unused *nbv) FUNC_TERM
+
 ///////** Calculates the minimum size of proximity lists to improve SM load balance
 ////// *  with CUDA non-bonded kernels. */
 //////FUNC_QUALIFIER
