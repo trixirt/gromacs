@@ -7,11 +7,14 @@
 #include "../legacyheaders/types/hw_info.h"
 
 typedef enum{
-    _default_source_ = 0, /* Standard (warp-less) source file with generated methods/energy/prune */
-    _nvidia_source_     , /* Nvidia source file with generated methods/energy/prune */
-    _amd_source_        , /* AMD source file with generated methods/energy/prune */
-    _auto_source_       , /* Compiler will select source based on vendor id*/
-    _num_sources_
+    _generic_vendor_kernels_ = 0, /* Standard (warp-less) source file with generated methods/energy/prune */
+    _nvidia_vendor_kernels_     , /* Nvidia source file with generated methods/energy/prune */
+    _amd_vendor_kernels_        , /* AMD source file with generated methods/energy/prune */
+    _auto_vendor_kernels_         /* Compiler will select source based on vendor id*/
+} kernel_vendor_spec_t;
+
+typedef enum{
+    _default_source_ = 0  /* The default top-level source  */
 } kernel_source_index_t;
 
 typedef enum{
@@ -31,6 +34,7 @@ typedef enum{
 cl_int
 ocl_compile_program(
     kernel_source_index_t kernel_source_file,
+    kernel_vendor_spec_t  kernel_vendor_spec,
     char                * result_str,
     cl_context            context,
     cl_device_id          device_id,
