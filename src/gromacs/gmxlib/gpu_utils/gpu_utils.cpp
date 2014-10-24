@@ -296,7 +296,8 @@ gmx_bool init_ocl_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
             break;
 
         cl_error = 
-            ocl_compile_program(_auto_source_,
+            ocl_compile_program(_default_source_,
+                                _auto_vendor_kernels_,
                                 result_str,
                                 context,
                                 device_id,

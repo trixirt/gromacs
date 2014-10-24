@@ -37,16 +37,17 @@ const char* build_options_list[] = {
     -I../../../gromacs/src/gromacs/gmxlib/ocl_tools -I../../../gromacs/src/gromacs/mdlib/nbnxn_ocl -I../../../gromacs/src/gromacs/pbcutil -I../../../gromacs/src/gromacs/mdlib"
 };
 
-/*
-static const char*      kernel_filenames[]         = {"nbnxn_ocl_kernels_nowarp.cl",
-                                                      "nbnxn_ocl_kernels_amd.cl",
-                                                      "nbnxn_ocl_kernels_nvidia.cl"};
-                                                      */
+/* Available sources */
+static const char * kernel_filenames[]         = {"nbnxn_ocl_kernels.cl"};
 
-static const char*      kernel_filenames[]         = {"nbnxn_ocl_kernels.cl",
-                                                      "nbnxn_ocl_kernels.cl",
-                                                      "nbnxn_ocl_kernels.cl"};
+/* Defines to enable specific kernels based on vendor */
+static const char * kernel_vendor_spec_defines[] = {"_WARPLESS_SOURCE_", "_NVIDIA_SOURCE_", "_AMD_SOURCE_"};
 
+/**
+ * \brief Get the string of a build option of the specific id
+ * \param  build_option_id  The option id as defines in the header
+ * \return String containing the actual build option string for the compiler
+ */
 static const char* get_ocl_build_option(build_options_index_t build_option_id)
 {
     if(build_option_id<_num_build_options_)
@@ -361,6 +362,14 @@ void handle_ocl_build_log(const char*   build_log,
     }
 }
 
+/**
+ *  \brief Get the warp size reported by device
+ *  This is platform implementation dependant and seems to only work on the Nvidia and Amd platforms!
+ *  Nvidia reports 32, Amd for GPU 64. Ignore the rest
+ *  \param  context   Current OpenCL context
+ *  \param  device_id OpenCL device with the context
+ *  \return cl_int value of the warp size
+ */
 static cl_int ocl_get_warp_size(cl_context context, cl_device_id device_id)
 {
     cl_int cl_error = CL_SUCCESS;
@@ -388,40 +397,50 @@ static cl_int ocl_get_warp_size(cl_context context, cl_device_id device_id)
 }
 
 /**
- * \brief Automatically select kernel source file from vendor id
+ * \brief Automatically select vendor-specific kernel from vendor id
  * \param ocl_vendor_id_t Vendor id enumerator (amd,nvidia,intel,unknown)
- * \return New kernel source index
+ * \return Vendor-specific kernel version
  */
-kernel_source_index_t ocl_autoselect_source_file_from_vendor_id(ocl_vendor_id_t vendor_id)
+kernel_vendor_spec_t ocl_autoselect_kernel_from_vendor(ocl_vendor_id_t vendor_id)
 {
-    kernel_source_index_t kernel_index;
+    kernel_vendor_spec_t kernel_vendor;
     printf("Selecting kernel source automatically\n");
     switch(vendor_id)
     {
         case _OCL_VENDOR_AMD_:
-            kernel_index = _amd_source_;
+            kernel_vendor = _amd_vendor_kernels_;
             printf("Selecting kernel for AMD\n");
             break;
         case _OCL_VENDOR_NVIDIA_:
-            kernel_index = _nvidia_source_;
+            kernel_vendor = _nvidia_vendor_kernels_;
             printf("Selecting kernel for Nvidia\n");
             break;
         default:
-            kernel_index = _default_source_;
+            kernel_vendor = _generic_vendor_kernels_;
             printf("Selecting generic kernel\n");
             break;
     }
-    return kernel_index;
+    return kernel_vendor;
+}
+
+void ocl_get_vendor_specific_defines(kernel_vendor_spec_t kernel_spec, char * vendor_defines)
+{
+    assert(vendor_defines);
+    assert(kernel_spec < _auto_vendor_kernels_ );
+    printf("Setting up kernel vendor spec definitions: ");
+    sprintf(vendor_defines,"-D%s",kernel_vendor_spec_defines[kernel_spec]);
+    printf(" %s \n",vendor_defines);
 }
 
 cl_int
 ocl_compile_program(
-    kernel_source_index_t kernel_source_file,
-    char                * result_str,
-    cl_context            context,
-    cl_device_id          device_id,
-    ocl_vendor_id_t       ocl_device_vendor,
-    cl_program          * p_program
+    kernel_source_index_t       kernel_source_file,
+    kernel_vendor_spec_t        kernel_vendor_spec,
+    char *                      result_str,
+    cl_context                  context,
+    cl_device_id                device_id,
+    ocl_vendor_id_t             ocl_device_vendor,
+    cl_program *                p_program
 )
 {
     cl_int cl_error     = CL_SUCCESS;
@@ -435,8 +454,8 @@ ocl_compile_program(
     size_t ocl_source_length    = 0;
     size_t kernel_filename_len  = 0;
 
-    if ( kernel_source_file == _auto_source_)
-        kernel_source_file = ocl_autoselect_source_file_from_vendor_id(ocl_device_vendor);
+    if ( kernel_vendor_spec == _auto_vendor_kernels_)
+        kernel_vendor_spec = ocl_autoselect_kernel_from_vendor(ocl_device_vendor);
 
     kernel_filename_len = get_ocl_kernel_source_file_info(kernel_source_file);
     if(kernel_filename_len) kernel_filename = (char*)malloc(kernel_filename_len);
@@ -454,16 +473,14 @@ ocl_compile_program(
     free(kernel_filename);
 
     *p_program = clCreateProgramWithSource(context, 1, (const char**)(&ocl_source), &ocl_source_length, &cl_error);
-    //CALLOCLFUNC_LOGERROR(cl_error, result_str, retval)
-    //if (0 != retval)
-    //    break;
 
     // Build the program
     cl_int build_status         = CL_SUCCESS;
     {
         char custom_build_options_prepend[256] = {0};
-
-        sprintf(custom_build_options_prepend, "-DWARP_SIZE_TEST=%d", warp_size);
+        char kernel_vendor_spec_defines[256]   = {0};
+        ocl_get_vendor_specific_defines(kernel_vendor_spec,kernel_vendor_spec_defines);
+        sprintf(custom_build_options_prepend, "-DWARP_SIZE_TEST=%d %s", warp_size, kernel_vendor_spec_defines);
 
         size_t build_options_length =
                 create_ocl_build_options_length(ocl_device_vendor,custom_build_options_prepend,NULL);
@@ -479,12 +496,8 @@ ocl_compile_program(
         
         build_status = clBuildProgram(*p_program, 0, NULL, build_options_string, NULL, NULL);
 
-        // Do not fail now if the compilation fails. Dump the LOG and then fail.
-        //CALLOCLFUNC_LOGERROR(build_status, result_str, retval);
-
         // Get log string size
         cl_error = clGetProgramBuildInfo(*p_program, device_id, CL_PROGRAM_BUILD_LOG, 0, NULL, &build_log_size);
-        //CALLOCLFUNC_LOGERROR(cl_error, result_str, retval);
 
         if (build_log_size && (cl_error == CL_SUCCESS) )
         {
