@@ -299,37 +299,27 @@ typedef struct cl_plist_params
 #ifndef __IN_OPENCL_KERNEL__
 
 /** \internal
- * \brief CUDA events used for timing GPU kernels and H2D/D2H transfers.
+ * \brief OpenCL events used for timing GPU kernels and H2D/D2H transfers.
  *
  * The two-sized arrays hold the local and non-local values and should always
  * be indexed with eintLocal/eintNonlocal.
  */
 typedef struct cl_timers
 {
-    cl_event atdat;
-    //cl_ulong start_atdat;     /**< start event for atom data transfer (every PS step)             */
-    //cl_ulong stop_atdat;      /**< stop event for atom data transfer (every PS step)              */
+    cl_event atdat;             /**< event for atom data transfer (every PS step)                 */    
 
-    cl_event nb_h2d[2];
-    //cl_event start_nb_h2d[2]; /**< start events for x/q H2D transfers (l/nl, every step)          */
-    //cl_event stop_nb_h2d[2];  /**< stop events for x/q H2D transfers (l/nl, every step)           */
+    cl_event nb_h2d[2];         /**< events for x/q H2D transfers (l/nl, every step)              */
 
-    cl_event nb_d2h_f[2];
-    cl_event nb_d2h_fshift[2];
-    cl_event nb_d2h_e_el[2];
-    cl_event nb_d2h_e_lj[2];
-    //cl_event start_nb_d2h[2]; /**< start events for f D2H transfer (l/nl, every step)             */
-    //cl_event stop_nb_d2h[2];  /**< stop events for f D2H transfer (l/nl, every step)              */
+    cl_event nb_d2h_f[2];       /**< events for f D2H transfer (l/nl, every step)                 */
+    cl_event nb_d2h_fshift[2];  /**< events for fshift D2H transfer (l/nl, every step)            */
+    cl_event nb_d2h_e_el[2];    /**< events for e_el D2H transfer (l/nl, every step)              */
+    cl_event nb_d2h_e_lj[2];    /**< events for e_lj D2H transfer (l/nl, every step)              */    
     
-    cl_event pl_h2d_sci[2];
-    cl_event pl_h2d_cj4[2];
-    cl_event pl_h2d_excl[2];
-    //cl_event start_pl_h2d[2]; /**< start events for pair-list H2D transfers (l/nl, every PS step) */
-    //cl_event stop_pl_h2d[2];  /**< start events for pair-list H2D transfers (l/nl, every PS step) */
+    cl_event pl_h2d_sci[2];     /**< events for pair-list sci H2D transfers (l/nl, every PS step) */
+    cl_event pl_h2d_cj4[2];     /**< events for pair-list cj4 H2D transfers (l/nl, every PS step) */
+    cl_event pl_h2d_excl[2];    /**< events for pair-list excl H2D transfers (l/nl, every PS step)*/    
     
-    cl_event nb_k[2];
-    //cl_event start_nb_k[2];   /**< start event for non-bonded kernels (l/nl, every step)          */
-    //cl_event stop_nb_k[2];    /**< stop event non-bonded kernels (l/nl, every step)               */
+    cl_event nb_k[2];           /**< event for non-bonded kernels (l/nl, every step)              */    
 }cl_timers_t;
 
 /** \internal

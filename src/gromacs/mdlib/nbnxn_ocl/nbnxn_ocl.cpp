@@ -540,44 +540,20 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
         {
             cl_error = clEnqueueMarker(stream, &(ocl_nb->misc_ops_done));
             assert(CL_SUCCESS == cl_error);
-
-            //stat = cudaEventRecord(cu_nb->misc_ops_done, stream);
-            //CU_RET_ERR(stat, "cudaEventRecord on misc_ops_done failed");
         }
         else
         {
             wait_ocl_event(&(ocl_nb->misc_ops_done));
-            
-            //stat = cudaStreamWaitEvent(stream, cu_nb->misc_ops_done, 0);
-            //CU_RET_ERR(stat, "cudaStreamWaitEvent on misc_ops_done failed");
         }
     }
 
     /* beginning of timed HtoD section */
-    if (bDoTime)
-    {
-        ////stat = cudaEventRecord(t->start_nb_h2d[iloc], stream);
-        ////CU_RET_ERR(stat, "cudaEventRecord failed");
-    }
 
     /* HtoD x, q */
     ocl_copy_H2D_async(adat->xq, nbatom->x + adat_begin * 4, adat_begin,
         adat_len * sizeof(float) * 4, stream, bDoTime ? (&(t->nb_h2d[iloc])) : NULL);
-    //cu_copy_H2D_async(adat->xq + adat_begin, nbatom->x + adat_begin * 4,
-    //                  adat_len * sizeof(*adat->xq), stream);
-
-    if (bDoTime)
-    {
-        //stat = cudaEventRecord(t->stop_nb_h2d[iloc], stream);
-        //CU_RET_ERR(stat, "cudaEventRecord failed");
-    }
 
     /* beginning of timed nonbonded calculation section */
-    if (bDoTime)
-    {
-        //stat = cudaEventRecord(t->start_nb_k[iloc], stream);
-        //CU_RET_ERR(stat, "cudaEventRecord failed");
-    }
 
     /* get the pointer to the kernel flavor we need to use */
     nb_kernel = select_nbnxn_kernel(ocl_nb,
@@ -660,18 +636,6 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
 
     cl_error = clEnqueueNDRangeKernel(stream, nb_kernel, 3, NULL, dim_grid, dim_block, 0, NULL, bDoTime ? &(t->nb_k[iloc]) : NULL);
     assert(cl_error == CL_SUCCESS);
-
-    //cl_error = clFinish(stream);
-
-
-    ////nb_kernel<<< dim_grid, dim_block, shmem, stream>>> (*adat, *nbp, *plist, bCalcFshift);
-    ////CU_LAUNCH_ERR("k_calc_nb");
-
-    ////if (bDoTime)
-    ////{
-    ////    stat = cudaEventRecord(t->stop_nb_k[iloc], stream);
-    ////    CU_RET_ERR(stat, "cudaEventRecord failed");
-    ////}
 
 #ifdef DEBUG_OCL
     {
@@ -875,9 +839,8 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t        ocl_nb,
         char stmp[STRLEN];
         sprintf(stmp, "Invalid atom locality passed (%d); valid here is only "
                 "local (%d) or nonlocal (%d)", aloc, eatLocal, eatNonlocal);
-
-        // TO DO: fix for OpenCL
-        //gmx_incons(stmp);
+                
+        gmx_incons(stmp);
     }
 
     cl_atomdata_t   *adat    = ocl_nb->atdat;
@@ -910,12 +873,6 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t        ocl_nb,
     }
 
     /* beginning of timed D2H section */
-    if (bDoTime)
-    {
-        // TO DO: implement for OpenCL
-        ////stat = cudaEventRecord(t->start_nb_d2h[iloc], stream);
-        ////CU_RET_ERR(stat, "cudaEventRecord failed");
-    }
 
     if (!ocl_nb->bUseStreamSync)
     {
@@ -1072,13 +1029,6 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t        ocl_nb,
         run_step++;
     }
 #endif
-
-    if (bDoTime)
-    {
-        // TO DO: implement for OpenCL
-        //stat = cudaEventRecord(t->stop_nb_d2h[iloc], stream);
-        //CU_RET_ERR(stat, "cudaEventRecord failed");
-    }
 }
 
 /* Atomic compare-exchange operation on unsigned values. It is used in

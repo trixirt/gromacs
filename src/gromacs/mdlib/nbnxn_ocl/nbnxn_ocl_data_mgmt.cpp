@@ -729,40 +729,7 @@ static void init_plist(cl_plist_t *pl)
 /*! Initializes the timer data structure. */
 static void init_timers(cl_timers_t *t, bool bUseTwoStreams)
 {
-    ////cudaError_t stat;
-    ////int         eventflags = ( bUseCudaEventBlockingSync ? cudaEventBlockingSync : cudaEventDefault );
-
-    ////stat = cudaEventCreateWithFlags(&(t->start_atdat), eventflags);
-    ////CU_RET_ERR(stat, "cudaEventCreate on start_atdat failed");
-    ////stat = cudaEventCreateWithFlags(&(t->stop_atdat), eventflags);
-    ////CU_RET_ERR(stat, "cudaEventCreate on stop_atdat failed");
-
-    // TO DO: update for OpenCL
-
-    /////* The non-local counters/stream (second in the array) are needed only with DD. */
-    ////for (int i = 0; i <= (bUseTwoStreams ? 1 : 0); i++)
-    ////{
-    ////    stat = cudaEventCreateWithFlags(&(t->start_nb_k[i]), eventflags);
-    ////    CU_RET_ERR(stat, "cudaEventCreate on start_nb_k failed");
-    ////    stat = cudaEventCreateWithFlags(&(t->stop_nb_k[i]), eventflags);
-    ////    CU_RET_ERR(stat, "cudaEventCreate on stop_nb_k failed");
-
-
-    ////    stat = cudaEventCreateWithFlags(&(t->start_pl_h2d[i]), eventflags);
-    ////    CU_RET_ERR(stat, "cudaEventCreate on start_pl_h2d failed");
-    ////    stat = cudaEventCreateWithFlags(&(t->stop_pl_h2d[i]), eventflags);
-    ////    CU_RET_ERR(stat, "cudaEventCreate on stop_pl_h2d failed");
-
-    ////    stat = cudaEventCreateWithFlags(&(t->start_nb_h2d[i]), eventflags);
-    ////    CU_RET_ERR(stat, "cudaEventCreate on start_nb_h2d failed");
-    ////    stat = cudaEventCreateWithFlags(&(t->stop_nb_h2d[i]), eventflags);
-    ////    CU_RET_ERR(stat, "cudaEventCreate on stop_nb_h2d failed");
-
-    ////    stat = cudaEventCreateWithFlags(&(t->start_nb_d2h[i]), eventflags);
-    ////    CU_RET_ERR(stat, "cudaEventCreate on start_nb_d2h failed");
-    ////    stat = cudaEventCreateWithFlags(&(t->stop_nb_d2h[i]), eventflags);
-    ////    CU_RET_ERR(stat, "cudaEventCreate on stop_nb_d2h failed");
-    ////}
+    /* Nothing to initialize for OpenCL */
 }
 
 /*! Initializes the timings data structure. */
@@ -863,19 +830,6 @@ void nbnxn_ocl_init(FILE                 *fplog,
     ocl_pmalloc((void**)&nb->nbst.fshift, 3 * SHIFTS * sizeof(*nb->nbst.fshift));
 
     init_plist(nb->plist[eintLocal]);
-
-    /* init events for sychronization (timing disabled for performance reasons!) */
-    //nb->nonlocal_done = clCreateUserEvent(nb->dev_info->context, &cl_error);
-    //assert(cl_error == CL_SUCCESS);    
-    // TO DO: check for errors
-    //stat = cudaEventCreateWithFlags(&nb->nonlocal_done, cudaEventDisableTiming);
-    //CU_RET_ERR(stat, "cudaEventCreate on nonlocal_done failed");
-
-    //nb->misc_ops_done = clCreateUserEvent(nb->dev_info->context, &cl_error);
-    //assert(cl_error == CL_SUCCESS);    
-    // TO DO: check for errors
-    //stat = cudaEventCreateWithFlags(&nb->misc_ops_done, cudaEventDisableTiming);
-    //CU_RET_ERR(stat, "cudaEventCreate on misc_ops_one failed");
 
     // TO DO: Update the code below for OpenCL and for NVIDIA GPUs.
     // For now, bUseStreamSync will always be true.    
@@ -1045,6 +999,7 @@ void nbnxn_ocl_init(FILE                 *fplog,
         init_timings(nb->timings);
     }
 
+    // TO DO: check if it's worth implementing for NVIDIA GPUs
     ///////////* set the kernel type for the current GPU */
     ///////////* pick L1 cache configuration */
     //////////nbnxn_cuda_set_cacheconfig(nb->dev_info);
@@ -1143,12 +1098,9 @@ nbnxn_ocl_clear_outputs(nbnxn_opencl_ptr_t ocl_nb,
 void nbnxn_ocl_init_const(nbnxn_opencl_ptr_t                ocl_nb,
                            const interaction_const_t      *ic,
                            const nonbonded_verlet_group_t *nbv_group)
-{
-    // TO DO: add proper code
-    ////init_atomdata_first(cu_nb->atdat, nbv_group[0].nbat->ntype);
+{    
     init_atomdata_first(ocl_nb->atdat, nbv_group[0].nbat->ntype, ocl_nb->dev_info);
-
-    ////init_nbparam(cu_nb->nbparam, ic, nbv_group[0].nbat, cu_nb->dev_info);
+     
     init_nbparam(ocl_nb->nbparam, ic, nbv_group[0].nbat, ocl_nb->dev_info);
 
     /* clear energy and shift force outputs */
@@ -1179,49 +1131,23 @@ void nbnxn_ocl_init_pairlist(nbnxn_opencl_ptr_t        ocl_nb,
         }
     }
 
-    if (bDoTime)
-    {
-        // TO DO: add missing implementation
-        //stat = cudaEventRecord(cu_nb->timers->start_pl_h2d[iloc], stream);
-        //CU_RET_ERR(stat, "cudaEventRecord failed");
-    }
-
-    //cu_realloc_buffered((void **)&d_plist->sci, h_plist->sci, sizeof(*d_plist->sci),
-    //                    &d_plist->nsci, &d_plist->sci_nalloc,
-    //                    h_plist->nsci,
-    //                    stream, true);
     ocl_realloc_buffered(&d_plist->sci, h_plist->sci, sizeof(nbnxn_sci_t),
                         &d_plist->nsci, &d_plist->sci_nalloc,
                         h_plist->nsci,
                         ocl_nb->dev_info->context,
                         stream, true, &(ocl_nb->timers->pl_h2d_sci[iloc]));
-
-    //cu_realloc_buffered((void **)&d_plist->cj4, h_plist->cj4, sizeof(*d_plist->cj4),
-    //                    &d_plist->ncj4, &d_plist->cj4_nalloc,
-    //                    h_plist->ncj4,
-    //                    stream, true);
+        
     ocl_realloc_buffered(&d_plist->cj4, h_plist->cj4, sizeof(nbnxn_cj4_t),
                         &d_plist->ncj4, &d_plist->cj4_nalloc,
                         h_plist->ncj4,
                         ocl_nb->dev_info->context,
                         stream, true, &(ocl_nb->timers->pl_h2d_cj4[iloc]));
-
-    //cu_realloc_buffered((void **)&d_plist->excl, h_plist->excl, sizeof(*d_plist->excl),
-    //                    &d_plist->nexcl, &d_plist->excl_nalloc,
-    //                    h_plist->nexcl,
-    //                    stream, true);
+        
     ocl_realloc_buffered(&d_plist->excl, h_plist->excl, sizeof(nbnxn_excl_t),
                         &d_plist->nexcl, &d_plist->excl_nalloc,
                         h_plist->nexcl,
                         ocl_nb->dev_info->context,
                         stream, true, &(ocl_nb->timers->pl_h2d_excl[iloc]));
-
-    if (bDoTime)
-    {
-        // TO DO: add missing implementation
-        //stat = cudaEventRecord(cu_nb->timers->stop_pl_h2d[iloc], stream);
-        //CU_RET_ERR(stat, "cudaEventRecord failed");
-    }
 
     /* need to prune the pair list during the next step */
     d_plist->bDoPrune = true;
@@ -1260,13 +1186,6 @@ void nbnxn_ocl_init_atomdata(nbnxn_opencl_ptr_t        ocl_nb,
     natoms    = nbat->natoms;
     realloced = false;
 
-    //if (bDoTime)
-    //{
-    //    /* time async copy */
-    //    stat = cudaEventRecord(timers->start_atdat, ls);
-    //    CU_RET_ERR(stat, "cudaEventRecord failed");
-    //}
-
     /* need to reallocate if we have to copy more atoms than the amount of space
        available and only allocate if we haven't initialized yet, i.e d_atdat->natoms == -1 */
     if (natoms > d_atdat->nalloc)
@@ -1276,28 +1195,21 @@ void nbnxn_ocl_init_atomdata(nbnxn_opencl_ptr_t        ocl_nb,
         /* free up first if the arrays have already been initialized */
         if (d_atdat->nalloc != -1)
         {
-            //cu_free_buffered(d_atdat->f, &d_atdat->natoms, &d_atdat->nalloc);
-            //cu_free_buffered(d_atdat->xq);
-            //cu_free_buffered(d_atdat->atom_types);
-
             ocl_free_buffered(d_atdat->f, &d_atdat->natoms, &d_atdat->nalloc);
             ocl_free_buffered(d_atdat->xq, NULL, NULL);
             ocl_free_buffered(d_atdat->atom_types, NULL, NULL);
         }
-
-        //stat = cudaMalloc((void **)&d_atdat->f, nalloc*sizeof(*d_atdat->f));
-        //CU_RET_ERR(stat, "cudaMalloc failed on d_atdat->f");
+        
         d_atdat->f = clCreateBuffer(ocl_nb->dev_info->context, CL_MEM_READ_WRITE, nalloc * sizeof(rvec), NULL, &cl_error);
+        assert(CL_SUCCESS == cl_error);
         // TO DO: handle errors, check clCreateBuffer flags
-
-        //stat = cudaMalloc((void **)&d_atdat->xq, nalloc*sizeof(*d_atdat->xq));
-        //CU_RET_ERR(stat, "cudaMalloc failed on d_atdat->xq");
+                
         d_atdat->xq = clCreateBuffer(ocl_nb->dev_info->context, CL_MEM_READ_WRITE, nalloc * sizeof(cl_float4), NULL, &cl_error);
+        assert(CL_SUCCESS == cl_error);
         // TO DO: handle errors, check clCreateBuffer flags
-
-        //stat = cudaMalloc((void **)&d_atdat->atom_types, nalloc*sizeof(*d_atdat->atom_types));
-        //CU_RET_ERR(stat, "cudaMalloc failed on d_atdat->atom_types");
+        
         d_atdat->atom_types = clCreateBuffer(ocl_nb->dev_info->context, CL_MEM_READ_WRITE, nalloc * sizeof(int), NULL, &cl_error);
+        assert(CL_SUCCESS == cl_error);
         // TO DO: handle errors, check clCreateBuffer flags
 
         d_atdat->nalloc = nalloc;
@@ -1315,17 +1227,8 @@ void nbnxn_ocl_init_atomdata(nbnxn_opencl_ptr_t        ocl_nb,
 
     ocl_copy_H2D_async(d_atdat->atom_types, nbat->type, 0,
                       natoms*sizeof(int), ls, bDoTime ? &(timers->atdat) : NULL);
-
-    //cu_copy_H2D_async(d_atdat->atom_types, nbat->type,
-    //                  natoms*sizeof(*d_atdat->atom_types), ls);
-
-    if (bDoTime)
-    {
-        //stat = cudaEventRecord(timers->stop_atdat, ls);
-        //CU_RET_ERR(stat, "cudaEventRecord failed");
-        //cl_int cl_error;
-    }
 }
+
 void free_kernel(cl_kernel *kernel_ptr)
 {
     cl_int cl_error;
