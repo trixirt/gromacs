@@ -111,7 +111,11 @@ static void reset_all_counters(FILE *fplog, t_commrec *cr,
     md_print_warn(cr, fplog, "step %s: resetting all time and cycle counters\n",
                   gmx_step_str(step, sbuf));
 
+#if defined(GMX_GPU) && defined(GMX_USE_OPENCL)
+    nbnxn_ocl_reset_timings(nbv);
+#else
     nbnxn_cuda_reset_timings(nbv);
+#endif
 
     wallcycle_stop(wcycle, ewcRUN);
     wallcycle_reset_all(wcycle);
