@@ -430,6 +430,8 @@ void wait_ocl_event(cl_event *ocl_event)
 
 /* Returns the duration in miliseconds for the command associated with the event.
  * It then releases the event and sets it to 0.
+ * Before calling this function, make sure the command has finished either by
+ * calling clFinish or clWaitForEvents.
  * The function returns 0.0 if the input event, *ocl_event, is 0.
  * Don't use this function when more than one wait will be issued for the event.
  */
