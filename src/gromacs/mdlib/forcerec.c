@@ -1836,11 +1836,19 @@ static void pick_nbnxn_resources(const t_commrec     *cr,
         {
             /* At this point the init should never fail as we made sure that
              * we have all the GPUs we need. If it still does, we'll bail. */
+#ifdef GMX_USE_OPENCL
+            gmx_fatal(FARGS, "On rank %d failed to initialize GPU #%s: %s",
+                      cr->nodeid,
+                      get_ocl_gpu_device_name(&hwinfo->gpu_info, gpu_opt,
+                                        cr->rank_pp_intranode),
+                      gpu_err_str);
+#else
             gmx_fatal(FARGS, "On rank %d failed to initialize GPU #%d: %s",
                       cr->nodeid,
                       get_cuda_gpu_device_id(&hwinfo->gpu_info, gpu_opt,
                                         cr->rank_pp_intranode),
                       gpu_err_str);
+#endif
         }
 
         /* Here we actually turn on hardware GPU acceleration */

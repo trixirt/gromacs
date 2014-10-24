@@ -241,8 +241,7 @@ makeGpuUsageReport(const gmx_gpu_info_t *gpu_info,
         for (int i = 0; i < ngpu_use; i++)
         {
 #if defined(GMX_GPU) && defined(GMX_USE_OPENCL)
-            //gpuIdsInUse.push_back(i);
-            gpuNamesInUse.push_back(gpu_info->ocl_dev[i].device_name);
+            gpuNamesInUse.push_back(get_ocl_gpu_device_name(gpu_info, gpu_opt, i));           
 #else
             gpuIdsInUse.push_back(get_cuda_gpu_device_id(gpu_info, gpu_opt, i));
 #endif
@@ -824,11 +823,17 @@ void gmx_parse_gpu_ids(gmx_gpu_opt_t *gpu_opt)
         /* Parse a "plain" GPU ID string which contains a sequence of
          * digits corresponding to GPU IDs; the order will indicate
          * the process/tMPI thread - GPU assignment. */
+#ifdef GMX_USE_OPENCL
+        parse_digits_from_plain_string(env,
+                                       &gpu_opt->nocl_dev_use,
+                                       &gpu_opt->ocl_dev_use);
+        if (gpu_opt->nocl_dev_use == 0)
+#else
         parse_digits_from_plain_string(env,
                                        &gpu_opt->ncuda_dev_use,
                                        &gpu_opt->cuda_dev_use);
-
         if (gpu_opt->ncuda_dev_use == 0)
+#endif        
         {
             gmx_fatal(FARGS, "Empty GPU ID string encountered.\n%s\n",
                       invalid_gpuid_hint);
@@ -861,9 +866,13 @@ void gmx_select_gpu_ids(FILE *fplog, const t_commrec *cr,
         int *checkres;
         int  res;
 
+#ifdef GMX_USE_OPENCL
+        snew(checkres, gpu_opt->nocl_dev_use);
+        res = check_selected_ocl_gpus(checkres, gpu_info, gpu_opt);
+#else
         snew(checkres, gpu_opt->ncuda_dev_use);
-
         res = check_selected_cuda_gpus(checkres, gpu_info, gpu_opt);
+#endif
 
         if (!res)
         {
@@ -875,7 +884,11 @@ void gmx_select_gpu_ids(FILE *fplog, const t_commrec *cr,
                 if (checkres[i] != egpuCompatible)
                 {
                     sprintf(stmp, "    GPU #%d: %s\n",
+#ifdef GMX_USE_OPENCL
+                            gpu_opt->ocl_dev_use[i],
+#else
                             gpu_opt->cuda_dev_use[i],
+#endif
                             gpu_detect_res_str[checkres[i]]);
                     strcat(sbuf, stmp);
                 }

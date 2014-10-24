@@ -29,6 +29,16 @@
     }
 
 
+/*! \brief Helper function that checks whether a given GPU status indicates compatible GPU.
+ *
+ * \param[in] stat  GPU status.
+ * \returns         true if the provided status is egpuCompatible, otherwise false.
+ */
+static bool is_compatible_ocl_gpu(int stat)
+{
+    return (stat == egpuCompatible);
+}
+
 static int is_gmx_supported_ocl_gpu_id()
 {
     // TO DO: add code for this function
@@ -205,9 +215,8 @@ void pick_compatible_ocl_gpus(const gmx_gpu_info_t *gpu_info,
     snew(compat, gpu_info->nocl_dev);
     ncompat = 0;
     for (i = 0; i < gpu_info->nocl_dev; i++)
-    {
-        //if (is_compatible_gpu(gpu_info->cuda_dev[i].stat))
-        if (egpuCompatible == gpu_info->ocl_dev[i].stat)
+    {        
+        if (is_compatible_ocl_gpu(gpu_info->ocl_dev[i].stat))        
         {
             ncompat++;
             compat[ncompat - 1] = i;
@@ -220,6 +229,56 @@ void pick_compatible_ocl_gpus(const gmx_gpu_info_t *gpu_info,
     sfree(compat);
 }
 
+
+/*! \brief Check the existence/compatibility of a set of GPUs specified by their device IDs.
+ *
+ * Given the a list of gpu->nocl_dev_use GPU device IDs stored in
+ * gpu_opt->ocl_dev_use check the existence and compatibility
+ * of the respective GPUs. Also provide the caller with an array containing
+ * the result of checks in \checkres.
+ *
+ * \param[out]  checkres    check result for each ID passed in \requested_devs
+ * \param[in]   gpu_info    pointer to structure holding GPU information
+ * \param[out]  gpu_opt     pointer to structure holding GPU options
+ * \returns                 TRUE if every the requested GPUs are compatible
+ */
+gmx_bool check_selected_ocl_gpus(int                  *checkres,
+                                  const gmx_gpu_info_t *gpu_info,
+                                  gmx_gpu_opt_t        *gpu_opt)
+{
+    int  i, id;
+    bool bAllOk;
+
+    assert(checkres);
+    assert(gpu_info);
+    assert(gpu_opt->nocl_dev_use >= 0);
+
+    if (gpu_opt->nocl_dev_use == 0)
+    {
+        return TRUE;
+    }
+
+    assert(gpu_opt->ocl_dev_use);
+
+    /* we will assume that all GPUs requested are valid IDs,
+       otherwise we'll bail anyways */
+
+    bAllOk = true;
+    for (i = 0; i < gpu_opt->nocl_dev_use; i++)
+    {
+        id = gpu_opt->ocl_dev_use[i];
+
+        /* devices are stored in increasing order of IDs in ocl_dev */
+        gpu_opt->ocl_dev_use[i] = id;
+
+        checkres[i] = (id >= gpu_info->nocl_dev) ?
+            egpuNonexistent : gpu_info->ocl_dev[id].stat;        
+        
+        bAllOk = bAllOk && is_compatible_ocl_gpu(checkres[i]);            
+    }
+
+    return bAllOk;
+}
 
 void get_ocl_gpu_device_info_string(char gmx_unused *s, const gmx_gpu_info_t gmx_unused *gpu_info, int gmx_unused index)
 {
@@ -337,10 +396,21 @@ ocl_gpu_id_t get_ocl_gpu_device_id(const gmx_gpu_info_t *gpu_info,
 {
     assert(gpu_info);
     assert(gpu_opt);
-    assert(idx >= 0 && idx < gpu_opt->ncuda_dev_use);
+    assert(idx >= 0 && idx < gpu_opt->nocl_dev_use);
 
     return gpu_info->ocl_dev[gpu_opt->ocl_dev_use[idx]].ocl_gpu_id;
     //return gpu_info->cuda_dev[gpu_opt->cuda_dev_use[idx]].id;
+}
+
+char* get_ocl_gpu_device_name(const gmx_gpu_info_t *gpu_info,
+                      const gmx_gpu_opt_t  *gpu_opt,
+                      int                   idx)
+{
+    assert(gpu_info);
+    assert(gpu_opt);
+    assert(idx >= 0 && idx < gpu_opt->nocl_dev_use);
+
+    return gpu_info->ocl_dev[gpu_opt->ocl_dev_use[idx]].device_name;    
 }
 
 void ocl_pmalloc(void **h_ptr, size_t nbytes)

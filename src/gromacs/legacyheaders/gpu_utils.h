@@ -56,6 +56,7 @@
 #define FUNC_QUALIFIER
 #define FUNC_TERM_INT_OPENCL {return -1;}
 #define FUNC_TERM_VOID_OPENCL {}
+#define FUNC_TERM_PTR_OPENCL { return NULL;}
 #define FUNC_QUALIFIER_OPENCL static
 typedef int ocl_gpu_id_t;
 typedef int ocl_vendor_id_t;
@@ -66,6 +67,7 @@ typedef int ocl_vendor_id_t;
 #define FUNC_QUALIFIER static
 #define FUNC_TERM_INT_OPENCL ;
 #define FUNC_TERM_VOID_OPENCL ;
+#define FUNC_TERM_PTR_OPENCL ;
 #define FUNC_QUALIFIER_OPENCL 
 #else
 #define FUNC_TERM_INT {return -1; }
@@ -74,8 +76,10 @@ typedef int ocl_vendor_id_t;
 #define FUNC_QUALIFIER static
 #define FUNC_TERM_INT_OPENCL {return -1;}
 #define FUNC_TERM_VOID_OPENCL {}
+#define FUNC_TERM_PTR_OPENCL { return NULL;}
 #define FUNC_QUALIFIER_OPENCL static
 typedef int ocl_gpu_id_t;
+typedef int ocl_vendor_id_t;
 #endif
 
 #ifdef __cplusplus
@@ -100,6 +104,11 @@ FUNC_QUALIFIER
 gmx_bool check_selected_cuda_gpus(int gmx_unused                  *checkres,
                                   const gmx_gpu_info_t gmx_unused *gpu_info,
                                   gmx_gpu_opt_t gmx_unused        *gpu_opt) FUNC_TERM_INT
+
+FUNC_QUALIFIER_OPENCL
+gmx_bool check_selected_ocl_gpus(int gmx_unused                  *checkres,
+                                  const gmx_gpu_info_t gmx_unused *gpu_info,
+                                  gmx_gpu_opt_t gmx_unused        *gpu_opt) FUNC_TERM_INT_OPENCL
 
 FUNC_QUALIFIER
 void free_cuda_gpu_info(const gmx_gpu_info_t gmx_unused *gpu_info) FUNC_TERM_VOID
@@ -133,6 +142,10 @@ FUNC_QUALIFIER_OPENCL
 ocl_gpu_id_t get_ocl_gpu_device_id(const gmx_gpu_info_t gmx_unused *gpu_info,
                       const gmx_gpu_opt_t gmx_unused  *gpu_opt,
                       int gmx_unused                   index) FUNC_TERM_INT_OPENCL
+FUNC_QUALIFIER_OPENCL
+char* get_ocl_gpu_device_name(const gmx_gpu_info_t *gpu_info,
+                      const gmx_gpu_opt_t  *gpu_opt,
+                      int                   idx) FUNC_TERM_PTR_OPENCL
 
 FUNC_QUALIFIER
 void get_cuda_gpu_device_info_string(char gmx_unused *s, const gmx_gpu_info_t gmx_unused *gpu_info, int gmx_unused index) FUNC_TERM_VOID
