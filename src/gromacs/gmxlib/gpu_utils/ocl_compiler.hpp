@@ -31,15 +31,23 @@ typedef enum{
     _num_build_options_
 } build_options_index_t;
 
+typedef struct
+{
+    int eeltype;
+    int vdwtype;
+} kernel_algo_family_t;
+
 cl_int
 ocl_compile_program(
-    kernel_source_index_t kernel_source_file,
-    kernel_vendor_spec_t  kernel_vendor_spec,
-    char                * result_str,
-    cl_context            context,
-    cl_device_id          device_id,
-    ocl_vendor_id_t       ocl_device_vendor,
-    cl_program          * p_program
+    kernel_source_index_t       kernel_source_file,
+    kernel_vendor_spec_t        kernel_vendor_spec,
+    kernel_algo_family_t *      kernel_algo_family,
+    int                         DoFastGen,
+    char *                      result_str,
+    cl_context                  context,
+    cl_device_id                device_id,
+    ocl_vendor_id_t             ocl_device_vendor,
+    cl_program *                p_program
 );
 
 #endif /* OCL_COMPILER_H */

@@ -10,6 +10,7 @@
 #include <CL/opencl.h>
 
 #include "ocl_compiler.hpp"
+#include "../mdlib/nbnxn_ocl/nbnxn_ocl_types.h"
 
 /* This path is defined by CMake and it depends on the install prefix option.
    The opencl kernels are installed in bin/opencl.*/
@@ -41,7 +42,25 @@ const char* build_options_list[] = {
 static const char * kernel_filenames[]         = {"nbnxn_ocl_kernels.cl"};
 
 /* Defines to enable specific kernels based on vendor */
-static const char * kernel_vendor_spec_defines[] = {"_WARPLESS_SOURCE_", "_NVIDIA_SOURCE_", "_AMD_SOURCE_"};
+static const char * kernel_vendor_spec_definitions[] = {"-D_WARPLESS_SOURCE_", "-D_NVIDIA_SOURCE_", "-D_AMD_SOURCE_"};
+
+typedef enum eelOcl  eelOcl_t;
+static const char * kernel_electrostatic_family_definitions[] =
+    {"-DEL_CUTOFF -D_EELNAME=_ElecCut",
+     "-DEL_RF -D_EELNAME=_ElecRF",
+     "-DEL_EWALD_ANA -D_EELNAME=_ElecEw",
+     "-DEL_EWALD_ANA -DLJ_CUTOFF_CHECK -D_EELNAME=_ElecEwTwinCut",
+     "-DEL_EWALD_TAB -D_EELNAME=_ElecEwQSTab",
+     "-DEL_EWALD_TAB -DLJ_CUTOFF_CHECK -D_EELNAME=_ElecEwQSTabTwinCut"};
+
+typedef enum evdwOcl evdwOcl_t;
+static const char * kernel_VdW_family_definitions[] =
+    {"-D_VDWNAME=_VdwLJ",
+     "-DLJ_EWALD_COMB_GEOM -D_VDWNAME=_VdwLJEwCombGeom",
+     "-DLJ_EWALD_COMB_LB -D_VDWNAME=_VdwLJEwCombLB",
+     "-DLJ_FORCE_SWITCH -D_VDWNAME=_VdwLJFsw",
+     "-DLJ_POT_SWITCH -D_VDWNAME=_VdwLJPsw"};
+
 
 /**
  * \brief Get the string of a build option of the specific id
@@ -401,7 +420,7 @@ static cl_int ocl_get_warp_size(cl_context context, cl_device_id device_id)
  * \param ocl_vendor_id_t Vendor id enumerator (amd,nvidia,intel,unknown)
  * \return Vendor-specific kernel version
  */
-kernel_vendor_spec_t ocl_autoselect_kernel_from_vendor(ocl_vendor_id_t vendor_id)
+static kernel_vendor_spec_t ocl_autoselect_kernel_from_vendor(ocl_vendor_id_t vendor_id)
 {
     kernel_vendor_spec_t kernel_vendor;
     printf("Selecting kernel source automatically\n");
@@ -423,19 +442,48 @@ kernel_vendor_spec_t ocl_autoselect_kernel_from_vendor(ocl_vendor_id_t vendor_id
     return kernel_vendor;
 }
 
-void ocl_get_vendor_specific_defines(kernel_vendor_spec_t kernel_spec, char * vendor_defines)
+/**
+ * \brief Returns the compiler define string needed to activate vendor-specific kernels
+ * \param kernel_spec Kernel vendor specification
+ * \return String with the define for the spec
+ */
+static const char * ocl_get_vendor_specific_define(kernel_vendor_spec_t kernel_spec)
 {
-    assert(vendor_defines);
     assert(kernel_spec < _auto_vendor_kernels_ );
-    printf("Setting up kernel vendor spec definitions: ");
-    sprintf(vendor_defines,"-D%s",kernel_vendor_spec_defines[kernel_spec]);
-    printf(" %s \n",vendor_defines);
+    printf("Setting up kernel vendor spec definitions:  %s \n",kernel_vendor_spec_definitions[kernel_spec]);
+    return kernel_vendor_spec_definitions[kernel_spec];
+}
+
+/**
+ * \brief Populates algo_defines with the compiler defines required to avoid all flavor generation
+ * For example if flavor eelOclRF with evdwOclFSWITCH, the output will be such that the corresponding
+ * kernel flavor is generated:
+ * -D_OCL_FASTGEN_ (will replace flavor generator kernels.clh with the fastgen one kernels_fastgen.clh)
+ * -DEL_RF             (The eelOclRF flavor)
+ * -D_EELNAME=_ElecRF  (The first part of the generated kernel name )
+ * -DLJ_EWALD_COMB_GEOM (The evdwOclFSWITCH flavor)
+ * -D_VDWNAME=_VdwLJEwCombGeom (The second part of the generated kernel name )
+ * prune/energy are still generated as originally. It is only the the flavor-level that has changed, so that
+ * only the required flavor for the simulation is compiled.
+ * \param p_kernel_algo_family Pointer to algo_family structure (eel,vdw)
+ * \param p_algo_defines       String to populate with the defines
+ */
+static void ocl_get_fastgen_define(kernel_algo_family_t * p_kernel_algo_family, char * p_algo_defines)
+{
+    printf("Setting up kernel fastgen definitions: ");
+    sprintf(p_algo_defines,"-D_OCL_FASTGEN_ %s %s ",
+            kernel_electrostatic_family_definitions[p_kernel_algo_family->eeltype],
+            kernel_VdW_family_definitions[p_kernel_algo_family->vdwtype]
+    );
+    printf(" %s \n",p_algo_defines);
 }
 
 cl_int
 ocl_compile_program(
     kernel_source_index_t       kernel_source_file,
     kernel_vendor_spec_t        kernel_vendor_spec,
+    kernel_algo_family_t *      p_kernel_algo_family,
+    int                         DoFastGen,
     char *                      result_str,
     cl_context                  context,
     cl_device_id                device_id,
@@ -477,10 +525,16 @@ ocl_compile_program(
     // Build the program
     cl_int build_status         = CL_SUCCESS;
     {
-        char custom_build_options_prepend[256] = {0};
-        char kernel_vendor_spec_defines[256]   = {0};
-        ocl_get_vendor_specific_defines(kernel_vendor_spec,kernel_vendor_spec_defines);
-        sprintf(custom_build_options_prepend, "-DWARP_SIZE_TEST=%d %s", warp_size, kernel_vendor_spec_defines);
+        char custom_build_options_prepend[512] = {0};
+
+        const char * kernel_vendor_spec_define =
+            ocl_get_vendor_specific_define(kernel_vendor_spec);
+
+        char kernel_fastgen_define[128] = {0};
+        if(DoFastGen)
+            ocl_get_fastgen_define(p_kernel_algo_family, kernel_fastgen_define);
+
+        sprintf(custom_build_options_prepend, "-DWARP_SIZE_TEST=%d %s %s", warp_size, kernel_vendor_spec_define, kernel_fastgen_define);
 
         size_t build_options_length =
                 create_ocl_build_options_length(ocl_device_vendor,custom_build_options_prepend,NULL);

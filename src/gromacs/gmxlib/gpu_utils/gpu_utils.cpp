@@ -38,6 +38,7 @@ static int is_gmx_supported_ocl_gpu_id()
 ocl_vendor_id_t get_vendor_id(char *vendor_name)
 {
     if (vendor_name)
+    {
         if (strstr(vendor_name, "NVIDIA"))
             return _OCL_VENDOR_NVIDIA_;
         else
@@ -47,7 +48,7 @@ ocl_vendor_id_t get_vendor_id(char *vendor_name)
             else
                 if (strstr(vendor_name, "Intel"))
                     return _OCL_VENDOR_INTEL_;
-
+    }
     return _OCL_VENDOR_UNKNOWN_;
 }
 
@@ -257,7 +258,11 @@ void get_ocl_gpu_device_info_string(char gmx_unused *s, const gmx_gpu_info_t gmx
 
 gmx_bool init_ocl_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
                   const gmx_gpu_info_t gmx_unused *gpu_info,
-                  const gmx_gpu_opt_t gmx_unused *gpu_opt)
+                  const gmx_gpu_opt_t gmx_unused *gpu_opt,
+                  const int gmx_unused eeltype,
+                  const int gmx_unused vdwtype,
+                  const gmx_bool gmx_unused bOclDoFastGen
+                     )
 {
     
     cl_context_properties context_properties[3];
@@ -267,8 +272,11 @@ gmx_bool init_ocl_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
     cl_context context;
     cl_program program;
     cl_int cl_error;    
-    cl_uint num_kernels;
-    cl_kernel *kernels;
+
+    kernel_algo_family_t   kernel_algo_family;
+
+    kernel_algo_family.eeltype = eeltype;
+    kernel_algo_family.vdwtype = vdwtype;
 
     int retval;
 
@@ -298,6 +306,8 @@ gmx_bool init_ocl_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
         cl_error = 
             ocl_compile_program(_default_source_,
                                 _auto_vendor_kernels_,
+                                &kernel_algo_family,
+                                bOclDoFastGen,
                                 result_str,
                                 context,
                                 device_id,
