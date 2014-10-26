@@ -39,6 +39,12 @@ zero_e_fshift(__global float *fshift,__global float *e_lj,__global float *e_el,c
     }
 }
 
+#ifdef _OCL_FASTGEN_
+    #define FLAVOR_LEVEL_GENERATOR "nbnxn_ocl_kernels_fastgen.clh"
+#else
+    #define FLAVOR_LEVEL_GENERATOR "nbnxn_ocl_kernels.clh"
+#endif
+
 /* Top-level kernel generation: will generate through multiple inclusion the
  * following flavors for all kernels:
  * - force-only output;
@@ -46,19 +52,20 @@ zero_e_fshift(__global float *fshift,__global float *e_lj,__global float *e_el,c
  * - force-only with pair list pruning;
  * - force and energy output with pair list pruning.
  */
+
 /** Force only **/
-#include "nbnxn_ocl_kernels.clh"
+#include FLAVOR_LEVEL_GENERATOR
 /** Force & energy **/
 #define CALC_ENERGIES
-#include "nbnxn_ocl_kernels.clh"
+#include FLAVOR_LEVEL_GENERATOR
 #undef CALC_ENERGIES
 
 /*** Pair-list pruning kernels ***/
 /** Force only **/
 #define PRUNE_NBL
-#include "nbnxn_ocl_kernels.clh"
+#include FLAVOR_LEVEL_GENERATOR
 /** Force & energy **/
 #define CALC_ENERGIES
-#include "nbnxn_ocl_kernels.clh"
+#include FLAVOR_LEVEL_GENERATOR
 #undef CALC_ENERGIES
 #undef PRUNE_NBL

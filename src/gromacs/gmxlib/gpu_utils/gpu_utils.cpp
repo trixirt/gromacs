@@ -47,7 +47,8 @@ static int is_gmx_supported_ocl_gpu_id()
 
 ocl_vendor_id_t get_vendor_id(char *vendor_name)
 {
-    if (vendor_name)   
+    if (vendor_name)
+    {
         if (strstr(vendor_name, "NVIDIA"))
             return _OCL_VENDOR_NVIDIA_;
         else
@@ -57,7 +58,7 @@ ocl_vendor_id_t get_vendor_id(char *vendor_name)
             else
                 if (strstr(vendor_name, "Intel"))
                     return _OCL_VENDOR_INTEL_;
-
+    }
     return _OCL_VENDOR_UNKNOWN_;
 }
 
@@ -146,6 +147,8 @@ int detect_ocl_gpus(gmx_gpu_info_t *gpu_info, char *err_str)
                     if (egpuCompatible == gpu_info->ocl_dev[device_index].stat)
                         gpu_info->nocl_dev_compatible++;
 
+                    gpu_info->ocl_dev[device_index].vendor_e = get_vendor_id(gpu_info->ocl_dev[i].device_vendor);
+
                     device_index++;
                 }
             }
@@ -158,7 +161,7 @@ int detect_ocl_gpus(gmx_gpu_info_t *gpu_info, char *err_str)
             {
                 int last = -1;
                 for (int i = 0; i < gpu_info->nocl_dev; i++)
-                    if (_OCL_VENDOR_AMD_ == get_vendor_id(gpu_info->ocl_dev[i].device_vendor))                    
+                    if (_OCL_VENDOR_AMD_ == gpu_info->ocl_dev[i].vendor_e)
                         if ((last + 1) < i)
                         {
                             ocl_gpu_info_t ocl_gpu_info;
@@ -171,7 +174,7 @@ int detect_ocl_gpus(gmx_gpu_info_t *gpu_info, char *err_str)
                 // if more than 1 device left to be sorted
                 if ((gpu_info->nocl_dev - 1 - last) > 1)                
                     for (int i = 0; i < gpu_info->nocl_dev; i++)
-                        if (_OCL_VENDOR_NVIDIA_ == get_vendor_id(gpu_info->ocl_dev[i].device_vendor))
+                        if (_OCL_VENDOR_NVIDIA_ == gpu_info->ocl_dev[i].vendor_e)
                             if ((last + 1) < i)
                             {
                                 ocl_gpu_info_t ocl_gpu_info;
@@ -314,7 +317,11 @@ void get_ocl_gpu_device_info_string(char gmx_unused *s, const gmx_gpu_info_t gmx
 
 gmx_bool init_ocl_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
                   const gmx_gpu_info_t gmx_unused *gpu_info,
-                  const gmx_gpu_opt_t gmx_unused *gpu_opt)
+                  const gmx_gpu_opt_t gmx_unused *gpu_opt,
+                  const int gmx_unused eeltype,
+                  const int gmx_unused vdwtype,
+                  const gmx_bool gmx_unused bOclDoFastGen
+                     )
 {
     
     cl_context_properties context_properties[3];
@@ -324,8 +331,11 @@ gmx_bool init_ocl_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
     cl_context context;
     cl_program program;
     cl_int cl_error;    
-    cl_uint num_kernels;
-    cl_kernel *kernels;
+
+    kernel_algo_family_t   kernel_algo_family;
+
+    kernel_algo_family.eeltype = eeltype;
+    kernel_algo_family.vdwtype = vdwtype;
 
     int retval;
 
@@ -353,11 +363,14 @@ gmx_bool init_ocl_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
             break;
 
         cl_error = 
-            ocl_compile_program(_default_kernel_source_,
+            ocl_compile_program(_default_source_,
+                                _auto_vendor_kernels_,
+                                &kernel_algo_family,
+                                bOclDoFastGen,
                                 result_str,
                                 context,
                                 device_id,
-                                selected_ocl_gpu->device_vendor,
+                                selected_ocl_gpu->vendor_e,
                                 &program
                                );          
         if(cl_error != CL_SUCCESS) {
@@ -415,11 +428,11 @@ char* get_ocl_gpu_device_name(const gmx_gpu_info_t *gpu_info,
 
 void ocl_pmalloc(void **h_ptr, size_t nbytes)
 {
-    //cudaError_t stat;
     char        strbuf[STRLEN];
-    //int         flag = cudaHostAllocDefault;
 
+#ifndef NDEBUG
     printf("Warning, pmalloc in OpenCL is doing a normal alloc instead of page-locked alloc\n");
+#endif
     
     if (nbytes == 0)
     {
@@ -427,27 +440,21 @@ void ocl_pmalloc(void **h_ptr, size_t nbytes)
         return;
     }
 
-    //CU_CHECK_PREV_ERR();
-
-    //stat = cudaMallocHost(h_ptr, nbytes, flag);    
-    //*h_ptr = malloc(nbytes);
-    // Replaced malloc with calloc as cudaMallocHost seems to also
-    // set all bytes to 0. 
     *h_ptr = calloc(1, nbytes);    
     
     if(! *h_ptr)
     {
-        sprintf(strbuf, "cudaMallocHost of size %d bytes failed", (int)nbytes);
+        sprintf(strbuf, "calloc of size %d bytes failed", (int)nbytes);
         gmx_fatal(FARGS, "%s: %s\n", __FUNCTION__,strbuf);        
     }
-    //CU_RET_ERR(stat, strbuf);
 }
 
 void ocl_pfree(void *h_ptr)
 {
-    //cudaError_t stat;
 
+#ifndef NDEBUG
     printf("Warning, pfree in OpenCL is not deallocating page-locked memory\n");
+#endif
     
     if (h_ptr)
     {
@@ -482,7 +489,7 @@ cl_int dbg_ocl_kernel_name_address(void* kernel)
                             sizeof(kernel_name), &kernel_name, NULL);                       
     if(cl_error)
     {
-        printf("No kernel found!\n",kernel);
+        printf("No kernel found!\n");
     }else{
         printf("%s\n",kernel_name);
     }

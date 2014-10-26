@@ -10,6 +10,7 @@
 #include <CL/opencl.h>
 
 #include "ocl_compiler.hpp"
+#include "../mdlib/nbnxn_ocl/nbnxn_ocl_types.h"
 
 /* This path is defined by CMake and it depends on the install prefix option.
    The opencl kernels are installed in bin/opencl.*/
@@ -37,8 +38,35 @@ const char* build_options_list[] = {
     -I../../../gromacs/src/gromacs/gmxlib/ocl_tools -I../../../gromacs/src/gromacs/mdlib/nbnxn_ocl -I../../../gromacs/src/gromacs/pbcutil -I../../../gromacs/src/gromacs/mdlib"
 };
 
-static const char*      kernel_filenames[]         = {"nbnxn_ocl_kernels.cl"};
+/* Available sources */
+static const char * kernel_filenames[]         = {"nbnxn_ocl_kernels.cl"};
 
+/* Defines to enable specific kernels based on vendor */
+static const char * kernel_vendor_spec_definitions[] = {"-D_WARPLESS_SOURCE_", "-D_NVIDIA_SOURCE_", "-D_AMD_SOURCE_"};
+
+typedef enum eelOcl  eelOcl_t;
+static const char * kernel_electrostatic_family_definitions[] =
+    {"-DEL_CUTOFF -D_EELNAME=_ElecCut",
+     "-DEL_RF -D_EELNAME=_ElecRF",
+     "-DEL_EWALD_ANA -D_EELNAME=_ElecEw",
+     "-DEL_EWALD_ANA -DLJ_CUTOFF_CHECK -D_EELNAME=_ElecEwTwinCut",
+     "-DEL_EWALD_TAB -D_EELNAME=_ElecEwQSTab",
+     "-DEL_EWALD_TAB -DLJ_CUTOFF_CHECK -D_EELNAME=_ElecEwQSTabTwinCut"};
+
+typedef enum evdwOcl evdwOcl_t;
+static const char * kernel_VdW_family_definitions[] =
+    {"-D_VDWNAME=_VdwLJ",
+     "-DLJ_EWALD_COMB_GEOM -D_VDWNAME=_VdwLJEwCombGeom",
+     "-DLJ_EWALD_COMB_LB -D_VDWNAME=_VdwLJEwCombLB",
+     "-DLJ_FORCE_SWITCH -D_VDWNAME=_VdwLJFsw",
+     "-DLJ_POT_SWITCH -D_VDWNAME=_VdwLJPsw"};
+
+
+/**
+ * \brief Get the string of a build option of the specific id
+ * \param  build_option_id  The option id as defines in the header
+ * \return String containing the actual build option string for the compiler
+ */
 static const char* get_ocl_build_option(build_options_index_t build_option_id)
 {
     if(build_option_id<_num_build_options_)
@@ -57,21 +85,20 @@ static size_t get_ocl_build_option_length(build_options_index_t build_option_id)
 
 static size_t
 create_ocl_build_options_length(
-    char* build_device_vendor,
-    const char * custom_build_options_prepend,
-    const char * custom_build_options_append)
+    ocl_vendor_id_t vendor_id,
+    const char *    custom_build_options_prepend,
+    const char *    custom_build_options_append)
 {
     size_t build_options_length = 0;
     size_t whitespace = 1;
 
-    assert(build_device_vendor != NULL);
+    assert(vendor_id <= _OCL_VENDOR_UNKNOWN_);
 
     if(custom_build_options_prepend)
         build_options_length +=
             strlen(custom_build_options_prepend)+whitespace;
 
-    if ((!strcmp(build_device_vendor,"Advanced Micro Devices, Inc.") ||
-        !strcmp(build_device_vendor,"GenuineIntel")) && getenv("OCL_DEBUG") )
+    if ( (vendor_id == _OCL_VENDOR_AMD_) && getenv("OCL_DEBUG") && getenv("OCL_FORCE_CPU") )
     {
         build_options_length += get_ocl_build_option_length(_generic_debug_symbols_)+whitespace;
     }
@@ -101,11 +128,11 @@ create_ocl_build_options_length(
 }
 
 static void
-create_ocl_build_options(char * build_options_string,
-                         size_t build_options_length,
-                         char * build_device_vendor,
-                         const char * custom_build_options_prepend,
-                         const char * custom_build_options_append)
+create_ocl_build_options(char *             build_options_string,
+                         size_t             build_options_length,
+                         ocl_vendor_id_t    build_device_vendor_id,
+                         const char *       custom_build_options_prepend,
+                         const char *       custom_build_options_append)
 {
     size_t char_added=0;
 
@@ -140,9 +167,7 @@ create_ocl_build_options(char * build_options_string,
         build_options_string[char_added++]=' ';
     }
 
-    if ( ( !strcmp(build_device_vendor,"Advanced Micro Devices, Inc.") ||
-            !strcmp(build_device_vendor,"GenuineIntel") ) && getenv("OCL_DEBUG")
-    )
+    if ( ( build_device_vendor_id == _OCL_VENDOR_AMD_ ) && getenv("OCL_DEBUG") && getenv("OCL_FORCE_CPU"))
     {
         strncpy( build_options_string+char_added,
                 get_ocl_build_option(_generic_debug_symbols_),
@@ -285,7 +310,7 @@ void handle_ocl_build_log(const char*   build_log,
 {
     bool dumpFile  = false;
     bool dumpStdErr= false;
-#ifdef DNDEBUG
+#ifdef NDEBUG
     if(build_status != CL_SUCCESS) dumpFile = true;
 #else
     dumpFile = true;
@@ -356,6 +381,14 @@ void handle_ocl_build_log(const char*   build_log,
     }
 }
 
+/**
+ *  \brief Get the warp size reported by device
+ *  This is platform implementation dependant and seems to only work on the Nvidia and Amd platforms!
+ *  Nvidia reports 32, Amd for GPU 64. Ignore the rest
+ *  \param  context   Current OpenCL context
+ *  \param  device_id OpenCL device with the context
+ *  \return cl_int value of the warp size
+ */
 static cl_int ocl_get_warp_size(cl_context context, cl_device_id device_id)
 {
     cl_int cl_error = CL_SUCCESS;
@@ -382,14 +415,80 @@ static cl_int ocl_get_warp_size(cl_context context, cl_device_id device_id)
 
 }
 
+/**
+ * \brief Automatically select vendor-specific kernel from vendor id
+ * \param ocl_vendor_id_t Vendor id enumerator (amd,nvidia,intel,unknown)
+ * \return Vendor-specific kernel version
+ */
+static kernel_vendor_spec_t ocl_autoselect_kernel_from_vendor(ocl_vendor_id_t vendor_id)
+{
+    kernel_vendor_spec_t kernel_vendor;
+    printf("Selecting kernel source automatically\n");
+    switch(vendor_id)
+    {
+        case _OCL_VENDOR_AMD_:
+            kernel_vendor = _amd_vendor_kernels_;
+            printf("Selecting kernel for AMD\n");
+            break;
+        case _OCL_VENDOR_NVIDIA_:
+            kernel_vendor = _nvidia_vendor_kernels_;
+            printf("Selecting kernel for Nvidia\n");
+            break;
+        default:
+            kernel_vendor = _generic_vendor_kernels_;
+            printf("Selecting generic kernel\n");
+            break;
+    }
+    return kernel_vendor;
+}
+
+/**
+ * \brief Returns the compiler define string needed to activate vendor-specific kernels
+ * \param kernel_spec Kernel vendor specification
+ * \return String with the define for the spec
+ */
+static const char * ocl_get_vendor_specific_define(kernel_vendor_spec_t kernel_spec)
+{
+    assert(kernel_spec < _auto_vendor_kernels_ );
+    printf("Setting up kernel vendor spec definitions:  %s \n",kernel_vendor_spec_definitions[kernel_spec]);
+    return kernel_vendor_spec_definitions[kernel_spec];
+}
+
+/**
+ * \brief Populates algo_defines with the compiler defines required to avoid all flavor generation
+ * For example if flavor eelOclRF with evdwOclFSWITCH, the output will be such that the corresponding
+ * kernel flavor is generated:
+ * -D_OCL_FASTGEN_ (will replace flavor generator kernels.clh with the fastgen one kernels_fastgen.clh)
+ * -DEL_RF             (The eelOclRF flavor)
+ * -D_EELNAME=_ElecRF  (The first part of the generated kernel name )
+ * -DLJ_EWALD_COMB_GEOM (The evdwOclFSWITCH flavor)
+ * -D_VDWNAME=_VdwLJEwCombGeom (The second part of the generated kernel name )
+ * prune/energy are still generated as originally. It is only the the flavor-level that has changed, so that
+ * only the required flavor for the simulation is compiled.
+ * \param p_kernel_algo_family Pointer to algo_family structure (eel,vdw)
+ * \param p_algo_defines       String to populate with the defines
+ */
+static void ocl_get_fastgen_define(kernel_algo_family_t * p_kernel_algo_family, char * p_algo_defines)
+{
+    printf("Setting up kernel fastgen definitions: ");
+    sprintf(p_algo_defines,"-D_OCL_FASTGEN_ %s %s ",
+            kernel_electrostatic_family_definitions[p_kernel_algo_family->eeltype],
+            kernel_VdW_family_definitions[p_kernel_algo_family->vdwtype]
+    );
+    printf(" %s \n",p_algo_defines);
+}
+
 cl_int
 ocl_compile_program(
-    kernel_source_index_t kernel_source_file,
-    char                * result_str,
-    cl_context            context,
-    cl_device_id          device_id,
-    char *                ocl_device_vendor,
-    cl_program          * p_program
+    kernel_source_index_t       kernel_source_file,
+    kernel_vendor_spec_t        kernel_vendor_spec,
+    kernel_algo_family_t *      p_kernel_algo_family,
+    int                         DoFastGen,
+    char *                      result_str,
+    cl_context                  context,
+    cl_device_id                device_id,
+    ocl_vendor_id_t             ocl_device_vendor,
+    cl_program *                p_program
 )
 {
     cl_int cl_error     = CL_SUCCESS;
@@ -402,6 +501,9 @@ ocl_compile_program(
 
     size_t ocl_source_length    = 0;
     size_t kernel_filename_len  = 0;
+
+    if ( kernel_vendor_spec == _auto_vendor_kernels_)
+        kernel_vendor_spec = ocl_autoselect_kernel_from_vendor(ocl_device_vendor);
 
     kernel_filename_len = get_ocl_kernel_source_file_info(kernel_source_file);
     if(kernel_filename_len) kernel_filename = (char*)malloc(kernel_filename_len);
@@ -419,16 +521,20 @@ ocl_compile_program(
     free(kernel_filename);
 
     *p_program = clCreateProgramWithSource(context, 1, (const char**)(&ocl_source), &ocl_source_length, &cl_error);
-    //CALLOCLFUNC_LOGERROR(cl_error, result_str, retval)
-    //if (0 != retval)
-    //    break;
 
     // Build the program
     cl_int build_status         = CL_SUCCESS;
     {
-        char custom_build_options_prepend[256] = {0};
+        char custom_build_options_prepend[512] = {0};
 
-        sprintf(custom_build_options_prepend, "-DWARP_SIZE_TEST=%d", warp_size);
+        const char * kernel_vendor_spec_define =
+            ocl_get_vendor_specific_define(kernel_vendor_spec);
+
+        char kernel_fastgen_define[128] = {0};
+        if(DoFastGen)
+            ocl_get_fastgen_define(p_kernel_algo_family, kernel_fastgen_define);
+
+        sprintf(custom_build_options_prepend, "-DWARP_SIZE_TEST=%d %s %s", warp_size, kernel_vendor_spec_define, kernel_fastgen_define);
 
         size_t build_options_length =
                 create_ocl_build_options_length(ocl_device_vendor,custom_build_options_prepend,NULL);
@@ -444,12 +550,8 @@ ocl_compile_program(
         
         build_status = clBuildProgram(*p_program, 0, NULL, build_options_string, NULL, NULL);
 
-        // Do not fail now if the compilation fails. Dump the LOG and then fail.
-        //CALLOCLFUNC_LOGERROR(build_status, result_str, retval);
-
         // Get log string size
         cl_error = clGetProgramBuildInfo(*p_program, device_id, CL_PROGRAM_BUILD_LOG, 0, NULL, &build_log_size);
-        //CALLOCLFUNC_LOGERROR(cl_error, result_str, retval);
 
         if (build_log_size && (cl_error == CL_SUCCESS) )
         {

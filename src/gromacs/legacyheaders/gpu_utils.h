@@ -124,7 +124,11 @@ gmx_bool init_cuda_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
 FUNC_QUALIFIER_OPENCL
 gmx_bool init_ocl_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
                   const gmx_gpu_info_t gmx_unused *gpu_info,
-                  const gmx_gpu_opt_t gmx_unused *gpu_opt) FUNC_TERM_INT_OPENCL
+                  const gmx_gpu_opt_t gmx_unused *gpu_opt,
+                  const int gmx_unused eeltype,
+                  const int gmx_unused vdwtype,
+                  const gmx_bool gmx_unused bOclDoFastGen
+                     ) FUNC_TERM_INT_OPENCL
 
 FUNC_QUALIFIER
 gmx_bool free_gpu(char gmx_unused *result_str) FUNC_TERM_INT
@@ -165,7 +169,7 @@ void ocl_pmalloc(void **h_ptr, size_t nbytes) FUNC_TERM_VOID_OPENCL
 FUNC_QUALIFIER_OPENCL
 void ocl_pfree(void *h_ptr) FUNC_TERM_VOID_OPENCL
 
-#if defined(GMX_GPU) && defined(GMX_USE_OPENCL) && !defined(DNDEBUG)
+#if defined(GMX_GPU) && defined(GMX_USE_OPENCL) && !defined(NDEBUG)
 /* Debugger callable function that prints the name of a kernel function pointer */
 cl_int dbg_ocl_kernel_name(const cl_kernel kernel);
 cl_int dbg_ocl_kernel_name_address(void* kernel);
