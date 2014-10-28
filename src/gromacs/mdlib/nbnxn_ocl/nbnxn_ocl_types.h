@@ -157,21 +157,6 @@ typedef struct cl_atomdata
     cl_bool     bShiftVecUploaded; /**< true if the shift vector has been uploaded   */
 } cl_atomdata_t;
 
-// Data structure shared between the OpenCL device code and OpenCL host code
-// Must not contain OpenCL objects (buffers)
-// TO DO: review, improve
-typedef struct cl_atomdata_params
-{
-    int      natoms;            /**< number of atoms                              */
-    int      natoms_local;      /**< number of local atoms                        */
-    int      nalloc;            /**< allocation size for the atom data (xq, f)    */    
-
-    int      ntypes;            /**< number of atom types                         */
-    
-    /*bool*/int     bShiftVecUploaded; /**< true if the shift vector has been uploaded   */
-} cl_atomdata_params_t;
-
-
 /** \internal
  * \brief Parameters required for the CUDA nonbonded calculations.
  */

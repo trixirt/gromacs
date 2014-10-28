@@ -382,15 +382,9 @@ static inline int calc_shmem_required()
 }
 
 
-static void fillin_ocl_structures(cl_atomdata_t *adat, cl_nbparam_t *nbp, cl_plist_t *plist,
-                                  cl_atomdata_params_t *atomdata_params, cl_nbparam_params_t *nbparams_params)
+static void fillin_ocl_structures(cl_nbparam_t *nbp,
+                                  cl_nbparam_params_t *nbparams_params)
 {
-    atomdata_params->natoms = adat->natoms;
-    atomdata_params->natoms_local = adat->natoms_local;
-    atomdata_params->ntypes = adat->ntypes;
-    atomdata_params->nalloc = adat->nalloc;
-    atomdata_params->bShiftVecUploaded = adat->bShiftVecUploaded;
-
     nbparams_params->coulomb_tab_scale = nbp->coulomb_tab_scale;
     nbparams_params->coulomb_tab_size = nbp->coulomb_tab_size;
     nbparams_params->c_rf = nbp->c_rf;
@@ -507,7 +501,6 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
     bool                 bDoTime     = ocl_nb->bDoTime;
     cl_uint                  arg_no;
 
-    cl_atomdata_params_t atomdata_params;
     cl_nbparam_params_t nbparams_params;
     cl_plist_params_t plist_params;
 #ifdef DEBUG_OCL
@@ -611,10 +604,10 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
                 NCL_PER_SUPERCL, plist->na_c);
     }
 
-    fillin_ocl_structures(adat, nbp, plist, &atomdata_params, &nbparams_params);
+    fillin_ocl_structures(nbp, &nbparams_params);
 
-    arg_no = 0;
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(atomdata_params), &(atomdata_params));
+    arg_no = 0;    
+    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(int), &(adat->ntypes));        
     cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(nbparams_params), &(nbparams_params));
     cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->xq));
     cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->f));
