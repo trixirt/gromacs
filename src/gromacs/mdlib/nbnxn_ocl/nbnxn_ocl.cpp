@@ -69,6 +69,7 @@
 
 #include "gromacs/pbcutil/ishift.h"
 #include "gromacs/utility/cstringutil.h"
+#include "gromacs/utility/fatalerror.h"
 
 #if defined TEXOBJ_SUPPORTED && __CUDA_ARCH__ >= 300
 #define USE_TEXOBJ
@@ -319,10 +320,15 @@ static inline cl_kernel select_nbnxn_kernel(nbnxn_opencl_ptr_t ocl_nb,
             kernel_ptr = &(ocl_nb->kernel_noener_noprune_ptr[eeltype][evdwtype]);
         }
     }
+#ifndef NDEBUG
     printf("Selected kernel: %s\n",kernel_name_to_run);
+#endif
 
     if (NULL == kernel_ptr[0])
+    {
         *kernel_ptr = clCreateKernel(ocl_nb->dev_info->program, kernel_name_to_run, &cl_error);
+        assert(cl_error == CL_SUCCESS);
+    }
     // TO DO: handle errors
 
     return *kernel_ptr;
@@ -371,20 +377,14 @@ static inline int calc_shmem_required()
     shmem += CL_SIZE * CL_SIZE * 3 * sizeof(float);         /* f_buf */
 /* #endif */
     /* Warp vote. In fact it must be * number of warps in block.. */
-    shmem += sizeof(cl_uint) * 2; /* warp_any */ 
+    shmem += sizeof(cl_uint) * 2; /* warp_any */
     return shmem;
 }
 
 
-static void fillin_ocl_structures(cl_atomdata_t *adat, cl_nbparam_t *nbp, cl_plist_t *plist,
-                                  cl_atomdata_params_t *atomdata_params, cl_nbparam_params_t *nbparams_params, cl_plist_params_t *plist_params)
+static void fillin_ocl_structures(cl_nbparam_t *nbp,
+                                  cl_nbparam_params_t *nbparams_params)
 {
-    atomdata_params->natoms = adat->natoms;
-    atomdata_params->natoms_local = adat->natoms_local;
-    atomdata_params->ntypes = adat->ntypes;
-    atomdata_params->nalloc = adat->nalloc;
-    atomdata_params->bShiftVecUploaded = adat->bShiftVecUploaded;
-
     nbparams_params->coulomb_tab_scale = nbp->coulomb_tab_scale;
     nbparams_params->coulomb_tab_size = nbp->coulomb_tab_size;
     nbparams_params->c_rf = nbp->c_rf;
@@ -404,14 +404,59 @@ static void fillin_ocl_structures(cl_atomdata_t *adat, cl_nbparam_t *nbp, cl_pli
     nbparams_params->vdwtype = nbp->vdwtype;
     nbparams_params->vdw_switch = nbp->vdw_switch;
 
-    plist_params->bDoPrune = plist->bDoPrune;
-    plist_params->cj4_nalloc = plist->cj4_nalloc;
-    plist_params->excl_nalloc = plist->excl_nalloc;
-    plist_params->na_c = plist->na_c;
-    plist_params->ncj4 = plist->ncj4;
-    plist_params->nexcl = plist->nexcl;
-    plist_params->nsci = plist->nsci;
-    plist_params->sci_nalloc = plist->sci_nalloc;
+}
+
+/* Waits for the commands associated with the input event to finish.
+ * Then it releases the event and sets it to 0.
+ * Don't use this function when more than one wait will be issued for the event.
+ */
+void wait_ocl_event(cl_event *ocl_event)
+{
+    cl_int cl_error;
+
+    /* Blocking wait for the event */
+    cl_error = clWaitForEvents(1, ocl_event);
+    assert(CL_SUCCESS == cl_error);
+
+    /* Release event and reset it to 0 */
+    cl_error = clReleaseEvent(*ocl_event);
+    assert(CL_SUCCESS == cl_error);
+    *ocl_event = 0;
+}
+
+/* Returns the duration in miliseconds for the command associated with the event.
+ * It then releases the event and sets it to 0.
+ * Before calling this function, make sure the command has finished either by
+ * calling clFinish or clWaitForEvents.
+ * The function returns 0.0 if the input event, *ocl_event, is 0.
+ * Don't use this function when more than one wait will be issued for the event.
+ */
+double ocl_event_elapsed_ms(cl_event *ocl_event)
+{
+    cl_int cl_error;
+    cl_ulong start_ns, end_ns;
+    double elapsed_ms;
+
+    elapsed_ms = 0.0;
+    assert(NULL != ocl_event);    
+
+    if (*ocl_event)
+    {
+        cl_error = clGetEventProfilingInfo(*ocl_event, CL_PROFILING_COMMAND_START,
+            sizeof(cl_ulong), &start_ns, NULL);
+        assert(CL_SUCCESS == cl_error);
+
+        cl_error = clGetEventProfilingInfo(*ocl_event, CL_PROFILING_COMMAND_END,
+            sizeof(cl_ulong), &end_ns, NULL);
+        assert(CL_SUCCESS == cl_error);
+
+        clReleaseEvent(*ocl_event);
+        *ocl_event = 0;
+
+        elapsed_ms = (end_ns - start_ns) / 1000000.0;
+    }
+
+    return elapsed_ms;
 }
 
 /*! As we execute nonbonded workload in separate streams, before launching
@@ -456,9 +501,7 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
     bool                 bDoTime     = ocl_nb->bDoTime;
     cl_uint                  arg_no;
 
-    cl_atomdata_params_t atomdata_params;    
-    cl_nbparam_params_t nbparams_params;
-    cl_plist_params_t plist_params;
+    cl_nbparam_params_t nbparams_params;    
 #ifdef DEBUG_OCL
         float* debug_buffer_h;
         size_t debug_buffer_size;
@@ -489,43 +532,24 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
        so we record that in the local stream and wait for it in the nonlocal one. */
     if (ocl_nb->bUseTwoStreams)
     {
-        ////if (iloc == eintLocal)
-        ////{
-        ////    stat = cudaEventRecord(cu_nb->misc_ops_done, stream);
-        ////    CU_RET_ERR(stat, "cudaEventRecord on misc_ops_done failed");
-        ////}
-        ////else
-        ////{
-        ////    stat = cudaStreamWaitEvent(stream, cu_nb->misc_ops_done, 0);
-        ////    CU_RET_ERR(stat, "cudaStreamWaitEvent on misc_ops_done failed");
-        ////}
+        if (iloc == eintLocal)
+        {
+            cl_error = clEnqueueMarker(stream, &(ocl_nb->misc_ops_done));
+            assert(CL_SUCCESS == cl_error);
+        }
+        else
+        {
+            wait_ocl_event(&(ocl_nb->misc_ops_done));
+        }
     }
 
     /* beginning of timed HtoD section */
-    if (bDoTime)
-    {
-        ////stat = cudaEventRecord(t->start_nb_h2d[iloc], stream);
-        ////CU_RET_ERR(stat, "cudaEventRecord failed");
-    }
 
     /* HtoD x, q */
     ocl_copy_H2D_async(adat->xq, nbatom->x + adat_begin * 4, adat_begin,
-        adat_len * sizeof(float) * 4, stream, NULL);
-    //cu_copy_H2D_async(adat->xq + adat_begin, nbatom->x + adat_begin * 4,
-    //                  adat_len * sizeof(*adat->xq), stream);
-
-    if (bDoTime)
-    {
-        //stat = cudaEventRecord(t->stop_nb_h2d[iloc], stream);
-        //CU_RET_ERR(stat, "cudaEventRecord failed");
-    }
+        adat_len * sizeof(float) * 4, stream, bDoTime ? (&(t->nb_h2d[iloc])) : NULL);
 
     /* beginning of timed nonbonded calculation section */
-    if (bDoTime)
-    {
-        //stat = cudaEventRecord(t->start_nb_k[iloc], stream);
-        //CU_RET_ERR(stat, "cudaEventRecord failed");
-    }
 
     /* get the pointer to the kernel flavor we need to use */
     nb_kernel = select_nbnxn_kernel(ocl_nb,
@@ -540,7 +564,7 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
     dim_block[0] = CL_SIZE;
     dim_block[1] = CL_SIZE;
     dim_block[2] = 1;
-    
+
     //dim_grid  = dim3(nblock, 1, 1);
     dim_grid[0] = nblock * dim_block[0];
     dim_grid[1] = 1 * dim_block[1];
@@ -550,7 +574,7 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
 
 #ifdef DEBUG_OCL
     {
-        static int run_step = 1;        
+        static int run_step = 1;
 
         if (DEBUG_RUN_STEP == run_step)
         {
@@ -559,7 +583,7 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
             assert(NULL != debug_buffer_h);
 
             if (NULL == ocl_nb->debug_buffer)
-            {   
+            {
                 ocl_nb->debug_buffer = clCreateBuffer(ocl_nb->dev_info->context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
                     debug_buffer_size, debug_buffer_h, &cl_error);
 
@@ -570,70 +594,64 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
         run_step++;
     }
 #endif
-    ////if (debug)
-    ////{
-    ////    fprintf(debug, "GPU launch configuration:\n\tThread block: %dx%dx%d\n\t"
-    ////            "Grid: %dx%d\n\t#Super-clusters/clusters: %d/%d (%d)\n",
-    ////            dim_block.x, dim_block.y, dim_block.z,
-    ////            dim_grid.x, dim_grid.y, plist->nsci*NCL_PER_SUPERCL,
-    ////            NCL_PER_SUPERCL, plist->na_c);
-    ////}
-    
-    fillin_ocl_structures(adat, nbp, plist, &atomdata_params, &nbparams_params, &plist_params);
+    if (debug)
+    {
+        fprintf(debug, "GPU launch configuration:\n\tLocal work size: %dx%dx%d\n\t"
+                "Global work size : %dx%d\n\t#Super-clusters/clusters: %d/%d (%d)\n",
+                dim_block[0], dim_block[1], dim_block[2],
+                dim_grid[0], dim_grid[1], plist->nsci*NCL_PER_SUPERCL,
+                NCL_PER_SUPERCL, plist->na_c);
+    }
+
+    fillin_ocl_structures(nbp, &nbparams_params);
 
     arg_no = 0;    
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(atomdata_params), &(atomdata_params));    
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(nbparams_params), &(nbparams_params));    
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(plist_params), &(plist_params));    
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->xq));
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->f));
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->e_lj));
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->e_el));
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->fshift));
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->atom_types));
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->shift_vec));    
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(nbp->nbfp_climg2d));    
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(nbp->nbfp_comb_climg2d));
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(nbp->coulomb_tab_climg2d));
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(plist->sci));
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(plist->cj4));
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(plist->excl));
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(int), &bCalcFshift);
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, shmem, NULL);
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(ocl_nb->debug_buffer));
+    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(int), &(adat->ntypes));        
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(nbparams_params), &(nbparams_params));
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->xq));
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->f));
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->e_lj));
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->e_el));
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->fshift));
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->atom_types));
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->shift_vec));
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(nbp->nbfp_climg2d));
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(nbp->nbfp_comb_climg2d));
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(nbp->coulomb_tab_climg2d));
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(plist->sci));
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(plist->cj4));
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(plist->excl));
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(int), &bCalcFshift);
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, shmem, NULL);
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(ocl_nb->debug_buffer));
 
+    assert(cl_error == CL_SUCCESS);
 
-    cl_error = clEnqueueNDRangeKernel(stream, nb_kernel, 3, NULL, dim_grid, dim_block, 0, NULL, NULL);
+    if(cl_error)
+        printf("ClERROR! %d\n",cl_error);
 
-    //cl_error = clFinish(stream);
-
-
-    ////nb_kernel<<< dim_grid, dim_block, shmem, stream>>> (*adat, *nbp, *plist, bCalcFshift);
-    ////CU_LAUNCH_ERR("k_calc_nb");
-
-    ////if (bDoTime)
-    ////{
-    ////    stat = cudaEventRecord(t->stop_nb_k[iloc], stream);
-    ////    CU_RET_ERR(stat, "cudaEventRecord failed");
-    ////}
+    cl_error = clEnqueueNDRangeKernel(stream, nb_kernel, 3, NULL, dim_grid, dim_block, 0, NULL, bDoTime ? &(t->nb_k[iloc]) : NULL);
+    assert(cl_error == CL_SUCCESS);
 
 #ifdef DEBUG_OCL
     {
-        static int run_step = 1;        
+        static int run_step = 1;
 
         if (DEBUG_RUN_STEP == run_step)
         {
             FILE *pf;
+            char file_name[256] = {0};
 
             ocl_copy_D2H_async(debug_buffer_h, ocl_nb->debug_buffer, 0,
                 debug_buffer_size, stream, NULL);
 
             // Make sure all data has been transfered back from device
-            clFinish(stream);    
+            clFinish(stream);
 
             printf("\nWriting debug_buffer to debug_buffer_ocl.txt...");
-        
-            pf = fopen("debug_buffer_ocl.txt", "wt");
+
+            sprintf(file_name, "debug_buffer_ocl_%d.txt", DEBUG_RUN_STEP);
+            pf = fopen(file_name, "wt");
             assert(pf != NULL);
 
             fprintf(pf,"%20s", "");
@@ -671,12 +689,12 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
 }
 
 void dump_compare_results_cj4(nbnxn_cj4_t* results, int cnt, char* out_file, char* ref_file)
-{    
-    FILE *pf;    
+{
+    FILE *pf;
 
     pf = fopen(out_file, "wt");
     assert(pf != NULL);
-                
+
     fprintf(pf, "%20s%20s%20s%20s%20s%20s%20s%20s\n",
         "cj[0]", "cj[1]", "cj[2]", "cj[3]",
         "imei[0].excl_ind", "imei[0].imask",
@@ -696,7 +714,7 @@ void dump_compare_results_cj4(nbnxn_cj4_t* results, int cnt, char* out_file, cha
 
     pf = fopen(ref_file, "rt");
     if (pf)
-    {   
+    {
         char c;
         int diff = 0;
         printf("\n%s file found. Comparing results...", ref_file);
@@ -708,10 +726,10 @@ void dump_compare_results_cj4(nbnxn_cj4_t* results, int cnt, char* out_file, cha
         for (int index = 0; index < cnt; index++)
         {
             int ref_val;
-            
+
             for (int j = 0; j < 4; j++)
             {
-                fscanf(pf, "%d", &ref_val);            
+                fscanf(pf, "%d", &ref_val);
                 if (ref_val != results[index].cj[j])
                 {
                     printf("\nDifference for cj[%d] at index %d computed value = %d reference value = %d",
@@ -723,7 +741,7 @@ void dump_compare_results_cj4(nbnxn_cj4_t* results, int cnt, char* out_file, cha
 
             for (int j = 0; j < 2; j++)
             {
-                fscanf(pf, "%d", &ref_val);            
+                fscanf(pf, "%d", &ref_val);
                 if (ref_val != results[index].imei[j].excl_ind)
                 {
                     printf("\nDifference for imei[%d].excl_ind at index %d computed value = %d reference value = %d",
@@ -732,7 +750,7 @@ void dump_compare_results_cj4(nbnxn_cj4_t* results, int cnt, char* out_file, cha
                     diff++;
                 }
 
-                fscanf(pf, "%u", &ref_val);            
+                fscanf(pf, "%u", &ref_val);
                 if (ref_val != results[index].imei[j].imask)
                 {
                     printf("\nDifference for imei[%d].imask at index %d computed value = %u reference value = %u",
@@ -752,13 +770,13 @@ void dump_compare_results_cj4(nbnxn_cj4_t* results, int cnt, char* out_file, cha
 }
 
 void dump_compare_results_f(float* results, int cnt, char* out_file, char* ref_file)
-{    
-    FILE *pf;    
+{
+    FILE *pf;
     float cmp_eps = 0.001f;
 
     pf = fopen(out_file, "wt");
     assert(pf != NULL);
-                
+
     for (int index = 0; index < cnt; index++)
     {
         fprintf(pf, "%15.5f\n", results[index]);
@@ -770,7 +788,7 @@ void dump_compare_results_f(float* results, int cnt, char* out_file, char* ref_f
 
     pf = fopen(ref_file, "rt");
     if (pf)
-    {   
+    {
         int diff = 0;
         printf("\n%s file found. Comparing results...", ref_file);
         for (int index = 0; index < cnt; index++)
@@ -798,8 +816,8 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t        ocl_nb,
                                const nbnxn_atomdata_t *nbatom,
                                int                     flags,
                                int                     aloc)
-{
-    //cudaError_t stat;
+{    
+    cl_int      cl_error;
     int         adat_begin, adat_len, adat_end; /* local/nonlocal offset and length used for xq and f */
     int         iloc = -1;
 
@@ -817,9 +835,8 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t        ocl_nb,
         char stmp[STRLEN];
         sprintf(stmp, "Invalid atom locality passed (%d); valid here is only "
                 "local (%d) or nonlocal (%d)", aloc, eatLocal, eatNonlocal);
-        
-        // TO DO: fix for OpenCL
-        //gmx_incons(stmp);
+                
+        gmx_incons(stmp);
     }
 
     cl_atomdata_t   *adat    = ocl_nb->atdat;
@@ -852,12 +869,6 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t        ocl_nb,
     }
 
     /* beginning of timed D2H section */
-    if (bDoTime)
-    {
-        // TO DO: implement for OpenCL
-        ////stat = cudaEventRecord(t->start_nb_d2h[iloc], stream);
-        ////CU_RET_ERR(stat, "cudaEventRecord failed");
-    }
 
     if (!ocl_nb->bUseStreamSync)
     {
@@ -891,25 +902,21 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t        ocl_nb,
        has been launched. */
     if (iloc == eintLocal && ocl_nb->bUseTwoStreams)
     {
-        // TO DO: implement for OpenCL
-        ////stat = cudaStreamWaitEvent(stream, cu_nb->nonlocal_done, 0);
-        ////CU_RET_ERR(stat, "cudaStreamWaitEvent on nonlocal_done failed");
+        wait_ocl_event(&(ocl_nb->nonlocal_done));        
     }
 
-    /* DtoH f */
-    // TO DO: the last parameter is not always NULL
+    /* DtoH f */    
     ocl_copy_D2H_async(nbatom->out[0].f + adat_begin * 3, adat->f, adat_begin,
-                      (adat_len)*sizeof(float) * 3, stream, NULL);
+                      (adat_len)*sizeof(float) * 3, stream, bDoTime ? &(t->nb_d2h_f[iloc]) : NULL);
 
     /* After the non-local D2H is launched the nonlocal_done event can be
        recorded which signals that the local D2H can proceed. This event is not
        placed after the non-local kernel because we first need the non-local
        data back first. */
     if (iloc == eintNonlocal)
-    {
-        // TO DO: implement for OpenCL
-        ////stat = cudaEventRecord(cu_nb->nonlocal_done, stream);
-        ////CU_RET_ERR(stat, "cudaEventRecord on nonlocal_done failed");
+    {        
+        cl_error = clEnqueueMarker(stream, &(ocl_nb->nonlocal_done));
+        assert(CL_SUCCESS == cl_error);
     }
 
     /* only transfer energies in the local stream */
@@ -917,22 +924,20 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t        ocl_nb,
     {
         /* DtoH fshift */
         if (bCalcFshift)
-        {
-            // TO DO: the last parameter is not always NULL
+        {            
              // TO DO: review fshift data type and how its size is computed
             ocl_copy_D2H_async(ocl_nb->nbst.fshift, adat->fshift, 0,
-                              3 * SHIFTS * sizeof(float), stream, NULL);
+                              3 * SHIFTS * sizeof(float), stream, bDoTime ? &(t->nb_d2h_fshift[iloc]) : NULL);
         }
 
         /* DtoH energies */
         if (bCalcEner)
-        {
-            // TO DO: the last parameter is not always NULL
+        {            
             ocl_copy_D2H_async(ocl_nb->nbst.e_lj, adat->e_lj, 0,
-                              sizeof(float), stream, NULL);
-            // TO DO: the last parameter is not always NULL
+                              sizeof(float), stream, bDoTime ? &(t->nb_d2h_e_lj[iloc]) : NULL);
+            
             ocl_copy_D2H_async(ocl_nb->nbst.e_el, adat->e_el, 0,
-                              sizeof(float), stream, NULL);            
+                              sizeof(float), stream, bDoTime ? &(t->nb_d2h_e_el[iloc]) : NULL);
         }
     }
 
@@ -940,13 +945,15 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t        ocl_nb,
 //#define DEBUG_DUMP_CJ4_OCL
 #ifdef DEBUG_DUMP_CJ4_OCL
     {
-        static int run_step = 1;        
+        static int run_step = 1;
 
         if (DEBUG_RUN_STEP == run_step)
-        {         
+        {
             nbnxn_cj4_t *temp_cj4;
             int cnt;
             size_t size;
+            char ocl_file_name[256] = {0};
+            char cuda_file_name[256] = {0};
 
             cnt = ocl_nb->plist[0]->ncj4;
             size = cnt * sizeof(nbnxn_cj4_t);
@@ -958,7 +965,9 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t        ocl_nb,
             // Make sure all data has been transfered back from device
             clFinish(stream);
 
-            dump_compare_results_cj4(temp_cj4, cnt, "ocl_cj4.txt", "cuda_cj4.txt");
+            sprintf(ocl_file_name, "ocl_cj4_%d.txt", DEBUG_RUN_STEP);
+            sprintf(cuda_file_name, "cuda_cj4_%d.txt", DEBUG_RUN_STEP);
+            dump_compare_results_cj4(temp_cj4, cnt, ocl_file_name, cuda_file_name);
 
             free(temp_cj4);
         }
@@ -971,15 +980,21 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t        ocl_nb,
 //#define DEBUG_DUMP_F_OCL
 #ifdef DEBUG_DUMP_F_OCL
     {
-        static int run_step = 1;        
+        static int run_step = 1;
 
         if (DEBUG_RUN_STEP == run_step)
         {
+            char ocl_file_name[256] = {0};
+            char cuda_file_name[256] = {0};
+
             // Make sure all data has been transfered back from device
             clFinish(stream);
 
+            sprintf(ocl_file_name, "ocl_f_%d.txt", DEBUG_RUN_STEP);
+            sprintf(cuda_file_name, "cuda_f_%d.txt", DEBUG_RUN_STEP);
+
             dump_compare_results_f(nbatom->out[0].f + adat_begin * 3, (adat_len) * 3,
-                "ocl_f.txt", "cuda_f.txt");
+                ocl_file_name, cuda_file_name);
         }
 
         run_step++;
@@ -993,24 +1008,23 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t        ocl_nb,
         static int run_step = 1;
 
         if (DEBUG_RUN_STEP == run_step)
-        {     
+        {
+            char ocl_file_name[256] = {0};
+            char cuda_file_name[256] = {0};
+
             // Make sure all data has been transfered back from device
             clFinish(stream);
+            
+            sprintf(ocl_file_name, "ocl_fshift_%d.txt", DEBUG_RUN_STEP);
+            sprintf(cuda_file_name, "cuda_fshift_%d.txt", DEBUG_RUN_STEP);
 
             dump_compare_results_f(ocl_nb->nbst.fshift, SHIFTS * 3,
-                "ocl_fshift.txt", "cuda_fshift.txt");
+                ocl_file_name, cuda_file_name);
         }
 
         run_step++;
     }
 #endif
-
-    if (bDoTime)
-    {
-        // TO DO: implement for OpenCL
-        //stat = cudaEventRecord(t->stop_nb_d2h[iloc], stream);
-        //CU_RET_ERR(stat, "cudaEventRecord failed");
-    }
 }
 
 /* Atomic compare-exchange operation on unsigned values. It is used in
@@ -1035,34 +1049,118 @@ void nbnxn_ocl_wait_gpu(nbnxn_opencl_ptr_t cu_nb,
                          int flags, int aloc,
                          real *e_lj, real *e_el, rvec *fshift)
 {
-	int              iloc = -1, i;
+    /* NOTE:  only implemented for single-precision at this time */
+    cl_int                 cl_error;
+    int                    i, adat_end, iloc = -1;	
+    volatile unsigned int *poll_word;
+
+    /* determine interaction locality from atom locality */
+    if (LOCAL_A(aloc))
+    {
+        iloc = eintLocal;
+    }
+    else if (NONLOCAL_A(aloc))
+    {
+        iloc = eintNonlocal;
+    }
+    else
+    {
+        char stmp[STRLEN];
+        sprintf(stmp, "Invalid atom locality passed (%d); valid here is only "
+                "local (%d) or nonlocal (%d)", aloc, eatLocal, eatNonlocal);
+        gmx_incons(stmp);
+    }
+
+    cl_plist_t      *plist    = cu_nb->plist[iloc];
+    cl_timers_t     *timers   = cu_nb->timers;
+    wallclock_gpu_t *timings  = cu_nb->timings;
+    cl_nb_staging    nbst     = cu_nb->nbst;
+
 	bool             bCalcEner   = flags & GMX_FORCE_VIRIAL;
 	bool             bCalcFshift = flags & GMX_FORCE_VIRIAL;
-	cl_nb_staging    nbst = cu_nb->nbst;
-	
 
-	/* determine interaction locality from atom locality */
-	if (LOCAL_A(aloc))
-	{
-		iloc = eintLocal;
-	}
-	else if (NONLOCAL_A(aloc))
-	{
-		iloc = eintNonlocal;
-	}
-	else
-	{
-		char stmp[STRLEN];
-		sprintf(stmp, "Invalid atom locality passed (%d); valid here is only "
-			"local (%d) or nonlocal (%d)", aloc, eatLocal, eatNonlocal);
+    /* turn energy calculation always on/off (for debugging/testing only) */
+    bCalcEner = (bCalcEner || always_ener) && !never_ener;
 
-		// TO DO: fix for OpenCL
-		//gmx_incons(stmp);
-	}
-	cl_plist_t *plist = cu_nb->plist[iloc];
+    /* don't launch wait/update timers & counters if there was no work to do
 
-	/* Actual sync point. Waits for everything to be finished in the command queue. TODO: Find out if a more fine grained solution is needed */
-	clFinish(cu_nb->stream[iloc]);
+       NOTE: if timing with multiple GPUs (streams) becomes possible, the
+       counters could end up being inconsistent due to not being incremented
+       on some of the nodes! */
+    if (cu_nb->plist[iloc]->nsci == 0)
+    {
+        return;
+    }
+
+    /* calculate the atom data index range based on locality */
+    if (LOCAL_A(aloc))
+    {
+        adat_end = cu_nb->atdat->natoms_local;
+    }
+    else
+    {
+        adat_end = cu_nb->atdat->natoms;
+    }
+
+    if (cu_nb->bUseStreamSync)
+    {
+        /* Actual sync point. Waits for everything to be finished in the command queue. TODO: Find out if a more fine grained solution is needed */
+        cl_error = clFinish(cu_nb->stream[iloc]);
+        assert(CL_SUCCESS == cl_error);
+    }
+    else
+    {
+        /* Busy-wait until we get the signal pattern set in last byte
+         * of the l/nl float vector. This pattern corresponds to a floating
+         * point number which can't be the result of the force calculation
+         * (maximum, 127 exponent and 0 mantissa).
+         * The polling uses atomic compare-exchange.
+         */
+        poll_word = (volatile unsigned int*)&nbatom->out[0].f[adat_end*3 - 1];
+        while (atomic_cas(poll_word, poll_wait_pattern, poll_wait_pattern))
+        {
+        }
+    }
+
+    /* timing data accumulation */
+    if (cu_nb->bDoTime)
+    {
+        /* only increase counter once (at local F wait) */
+        if (LOCAL_I(iloc))
+        {
+            timings->nb_c++;
+            timings->ktime[plist->bDoPrune ? 1 : 0][bCalcEner ? 1 : 0].c += 1;
+        }
+
+        /* kernel timings */
+
+        timings->ktime[plist->bDoPrune ? 1 : 0][bCalcEner ? 1 : 0].t +=
+            ocl_event_elapsed_ms(timers->nb_k + iloc);
+
+        /* X/q H2D and F D2H timings */
+        timings->nb_h2d_t += ocl_event_elapsed_ms(timers->nb_h2d        + iloc);            
+        timings->nb_d2h_t += ocl_event_elapsed_ms(timers->nb_d2h_f      + iloc);
+        timings->nb_d2h_t += ocl_event_elapsed_ms(timers->nb_d2h_fshift + iloc);
+        timings->nb_d2h_t += ocl_event_elapsed_ms(timers->nb_d2h_e_el   + iloc);
+        timings->nb_d2h_t += ocl_event_elapsed_ms(timers->nb_d2h_e_lj   + iloc);
+
+        /* only count atdat and pair-list H2D at pair-search step */
+        if (plist->bDoPrune)
+        {
+            /* atdat transfer timing (add only once, at local F wait) */
+            if (LOCAL_A(aloc))
+            {
+                timings->pl_h2d_c++;
+                timings->pl_h2d_t += ocl_event_elapsed_ms(&(timers->atdat));
+            }
+
+            timings->pl_h2d_t +=
+                ocl_event_elapsed_ms(timers->pl_h2d_sci     + iloc) +
+                ocl_event_elapsed_ms(timers->pl_h2d_cj4     + iloc) +
+                ocl_event_elapsed_ms(timers->pl_h2d_excl    + iloc);
+
+        }
+    }
 
 	/* add up energies and shift forces (only once at local F wait) */
 	if (LOCAL_I(iloc))
@@ -1072,7 +1170,7 @@ void nbnxn_ocl_wait_gpu(nbnxn_opencl_ptr_t cu_nb,
 	        *e_lj += *nbst.e_lj;
 	        *e_el += *nbst.e_el;
 	    }
-	
+
 	    if (bCalcFshift)
 	    {
 	        for (i = 0; i < SHIFTS; i++)
@@ -1083,7 +1181,7 @@ void nbnxn_ocl_wait_gpu(nbnxn_opencl_ptr_t cu_nb,
 	        }
 	    }
 	}
-	
+
 	/* turn off pruning (doesn't matter if this is pair-search step or not) */
 	plist->bDoPrune = false;
 

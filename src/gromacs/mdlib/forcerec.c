@@ -1792,13 +1792,17 @@ static void pick_nbnxn_resources(const t_commrec     *cr,
                                  gmx_bool             bDoNonbonded,
                                  gmx_bool            *bUseGPU,
                                  gmx_bool            *bEmulateGPU,
-                                 const gmx_gpu_opt_t *gpu_opt)
+                                 const gmx_gpu_opt_t *gpu_opt,
+                                 const int            eeltype,
+                                 const int            vdwtype
+                                )
 {
-    gmx_bool bEmulateGPUEnvVarSet;
+    gmx_bool bEmulateGPUEnvVarSet, bOclDoFastGen;
     char     gpu_err_str[STRLEN];
 
     *bUseGPU = FALSE;
 
+    bOclDoFastGen        = (getenv("OCL_NOFASTGEN") == NULL);
     bEmulateGPUEnvVarSet = (getenv("GMX_EMULATE_GPU") != NULL);
 
     /* Run GPU emulation mode if GMX_EMULATE_GPU is defined. Because
@@ -1826,9 +1830,10 @@ static void pick_nbnxn_resources(const t_commrec     *cr,
     {
         /* Each PP node will use the intra-node id-th device from the
          * list of detected/selected GPUs. */
+
 #ifdef GMX_USE_OPENCL
         if (!init_ocl_gpu(cr->rank_pp_intranode, gpu_err_str,
-                      &hwinfo->gpu_info, gpu_opt))
+                      &hwinfo->gpu_info, gpu_opt, eeltype, vdwtype, bOclDoFastGen))
 #else
         if (!init_cuda_gpu(cr->rank_pp_intranode, gpu_err_str,
                       &hwinfo->gpu_info, gpu_opt))
@@ -1836,11 +1841,19 @@ static void pick_nbnxn_resources(const t_commrec     *cr,
         {
             /* At this point the init should never fail as we made sure that
              * we have all the GPUs we need. If it still does, we'll bail. */
+#ifdef GMX_USE_OPENCL
+            gmx_fatal(FARGS, "On rank %d failed to initialize GPU #%s: %s",
+                      cr->nodeid,
+                      get_ocl_gpu_device_name(&hwinfo->gpu_info, gpu_opt,
+                                        cr->rank_pp_intranode),
+                      gpu_err_str);
+#else
             gmx_fatal(FARGS, "On rank %d failed to initialize GPU #%d: %s",
                       cr->nodeid,
                       get_cuda_gpu_device_id(&hwinfo->gpu_info, gpu_opt,
                                         cr->rank_pp_intranode),
                       gpu_err_str);
+#endif
         }
 
         /* Here we actually turn on hardware GPU acceleration */
@@ -2166,7 +2179,10 @@ static void init_nb_verlet(FILE                *fp,
                          fr->bNonbonded,
                          &nbv->bUseGPU,
                          &bEmulateGPU,
-                         fr->gpu_opt);
+                         fr->gpu_opt,
+                         fr->eeltype,
+                         fr->vdwtype
+                        );
 
     nbv->nbs = NULL;
 

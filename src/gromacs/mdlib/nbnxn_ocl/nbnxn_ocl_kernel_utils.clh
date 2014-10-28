@@ -101,20 +101,6 @@ typedef struct {
 // Data structure shared between the OpenCL device code and OpenCL host code
 // Must not contain OpenCL objects (buffers)
 // TO DO: review, improve
-typedef struct cl_atomdata_params
-{
-    int      natoms;            /**< number of atoms                              */
-    int      natoms_local;      /**< number of local atoms                        */
-    int      nalloc;            /**< allocation size for the atom data (xq, f)    */    
-
-    int      ntypes;            /**< number of atom types                         */
-    
-    /*bool*/int     bShiftVecUploaded; /**< true if the shift vector has been uploaded   */
-} cl_atomdata_params_t;
-
-// Data structure shared between the OpenCL device code and OpenCL host code
-// Must not contain OpenCL objects (buffers)
-// TO DO: review, improve
 typedef struct cl_nbparam_params
 {
 
@@ -143,27 +129,6 @@ typedef struct cl_nbparam_params
     int                    coulomb_tab_size;   /**< table size (s.t. it fits in texture cache) */
     float                  coulomb_tab_scale;  /**< table scale/spacing                        */    
 }cl_nbparam_params_t;
-
-
-// Data structure shared between the OpenCL device code and OpenCL host code
-// Must not contain OpenCL objects (buffers)
-// TO DO: review, improve
-typedef struct cl_plist_params
-{
-    int              na_c;        /**< number of atoms per cluster                  */
-
-    int              nsci;        /**< size of sci, # of i clusters in the list     */
-    int              sci_nalloc;  /**< allocation size of sci                       */   
-
-    int              ncj4;        /**< total # of 4*j clusters                      */
-    int              cj4_nalloc;  /**< allocation size of cj4                       */
-   
-    int              nexcl;       /**< count for excl                               */
-    int              excl_nalloc; /**< allocation size of excl                      */
-
-    /*bool*/int             bDoPrune;    /**< true if pair-list pruning needs to be
-                                       done during the  current step                */
-}cl_plist_params_t;
 
 
 // TO DO: review, improve
@@ -526,7 +491,6 @@ float pmecorrF(float z2)
 void reduce_force_j_generic(__local float *f_buf, __global float *fout,//__global float3 *fout,
                             int tidxi, int tidxj, int aidx)
 {
-	barrier(CLK_LOCAL_MEM_FENCE);
     if (tidxi == 0)
     {
         float3 f = (float3)(0.0f);
@@ -577,7 +541,6 @@ void reduce_force_i_generic(__local float *f_buf, __global float *fout,//__globa
                             float3 *fshift_buf, bool bCalcFshift,
                             int tidxi, int tidxj, int aidx)
 {
-	barrier(CLK_LOCAL_MEM_FENCE);
     if (tidxj == 0)
     {
         float3 f = (float3)(0.0f);
@@ -608,13 +571,12 @@ void reduce_force_i_pow2(volatile __local float *f_buf, __global float *fout,//_
 {
     int     i, j;
     float3  f = (float3)(0.0f);
-	barrier(CLK_LOCAL_MEM_FENCE);
     /* Reduce the initial CL_SIZE values for each i atom to half
      * every step by using CL_SIZE * i threads.
      * Can't just use i as loop variable because than nvcc refuses to unroll.
      */
     i = CL_SIZE/2;
-    # pragma unroll 5
+//    # pragma unroll 5
     for (j = CL_SIZE_POW2_EXPONENT - 1; j > 0; j--)
     {
         if (tidxj < i)
@@ -626,7 +588,7 @@ void reduce_force_i_pow2(volatile __local float *f_buf, __global float *fout,//_
         }
         i >>= 1;
     }
-	barrier(CLK_LOCAL_MEM_FENCE);
+
     /* i == 1, last reduction step, writing to global mem */
     if (tidxj == 0)
     {
@@ -708,7 +670,7 @@ void reduce_energy_pow2(volatile __local float *buf,
     float   e1, e2;
 
     i = WARP_SIZE/2;
-	barrier(CLK_LOCAL_MEM_FENCE);
+
     /* Can't just use i as loop variable because than nvcc refuses to unroll. */
 //# pragma unroll 10
     for (j = WARP_SIZE_POW2_EXPONENT - 1; j > 0; j--)
@@ -720,7 +682,7 @@ void reduce_energy_pow2(volatile __local float *buf,
         }
         i >>= 1;
     }
-    barrier(CLK_LOCAL_MEM_FENCE);
+
     /* last reduction step, writing to global mem */
     if (tidx == 0)
     {

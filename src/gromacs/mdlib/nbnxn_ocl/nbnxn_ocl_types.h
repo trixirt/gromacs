@@ -157,21 +157,6 @@ typedef struct cl_atomdata
     cl_bool     bShiftVecUploaded; /**< true if the shift vector has been uploaded   */
 } cl_atomdata_t;
 
-// Data structure shared between the OpenCL device code and OpenCL host code
-// Must not contain OpenCL objects (buffers)
-// TO DO: review, improve
-typedef struct cl_atomdata_params
-{
-    int      natoms;            /**< number of atoms                              */
-    int      natoms_local;      /**< number of local atoms                        */
-    int      nalloc;            /**< allocation size for the atom data (xq, f)    */    
-
-    int      ntypes;            /**< number of atom types                         */
-    
-    /*bool*/int     bShiftVecUploaded; /**< true if the shift vector has been uploaded   */
-} cl_atomdata_params_t;
-
-
 /** \internal
  * \brief Parameters required for the CUDA nonbonded calculations.
  */
@@ -276,51 +261,31 @@ typedef struct cl_plist
                                        done during the  current step                */
 }cl_plist_t;
 
-// Data structure shared between the OpenCL device code and OpenCL host code
-// Must not contain OpenCL objects (buffers)
-// TO DO: review, improve
-typedef struct cl_plist_params
-{
-    int              na_c;        /**< number of atoms per cluster                  */
-
-    int              nsci;        /**< size of sci, # of i clusters in the list     */
-    int              sci_nalloc;  /**< allocation size of sci                       */   
-
-    int              ncj4;        /**< total # of 4*j clusters                      */
-    int              cj4_nalloc;  /**< allocation size of cj4                       */
-   
-    int              nexcl;       /**< count for excl                               */
-    int              excl_nalloc; /**< allocation size of excl                      */
-
-    /*bool*/int             bDoPrune;    /**< true if pair-list pruning needs to be
-                                       done during the  current step                */
-}cl_plist_params_t;
 
 #ifndef __IN_OPENCL_KERNEL__
 
 /** \internal
- * \brief CUDA events used for timing GPU kernels and H2D/D2H transfers.
+ * \brief OpenCL events used for timing GPU kernels and H2D/D2H transfers.
  *
  * The two-sized arrays hold the local and non-local values and should always
  * be indexed with eintLocal/eintNonlocal.
  */
 typedef struct cl_timers
 {
-    cl_event atdat;
-    cl_ulong start_atdat;     /**< start event for atom data transfer (every PS step)             */
-    cl_ulong stop_atdat;      /**< stop event for atom data transfer (every PS step)              */
+    cl_event atdat;             /**< event for atom data transfer (every PS step)                 */    
 
-    cl_event start_nb_h2d[2]; /**< start events for x/q H2D transfers (l/nl, every step)          */
-    cl_event stop_nb_h2d[2];  /**< stop events for x/q H2D transfers (l/nl, every step)           */
+    cl_event nb_h2d[2];         /**< events for x/q H2D transfers (l/nl, every step)              */
 
-    cl_event start_nb_d2h[2]; /**< start events for f D2H transfer (l/nl, every step)             */
-    cl_event stop_nb_d2h[2];  /**< stop events for f D2H transfer (l/nl, every step)              */
+    cl_event nb_d2h_f[2];       /**< events for f D2H transfer (l/nl, every step)                 */
+    cl_event nb_d2h_fshift[2];  /**< events for fshift D2H transfer (l/nl, every step)            */
+    cl_event nb_d2h_e_el[2];    /**< events for e_el D2H transfer (l/nl, every step)              */
+    cl_event nb_d2h_e_lj[2];    /**< events for e_lj D2H transfer (l/nl, every step)              */    
     
-    cl_event start_pl_h2d[2]; /**< start events for pair-list H2D transfers (l/nl, every PS step) */
-    cl_event stop_pl_h2d[2];  /**< start events for pair-list H2D transfers (l/nl, every PS step) */
+    cl_event pl_h2d_sci[2];     /**< events for pair-list sci H2D transfers (l/nl, every PS step) */
+    cl_event pl_h2d_cj4[2];     /**< events for pair-list cj4 H2D transfers (l/nl, every PS step) */
+    cl_event pl_h2d_excl[2];    /**< events for pair-list excl H2D transfers (l/nl, every PS step)*/    
     
-    cl_event start_nb_k[2];   /**< start event for non-bonded kernels (l/nl, every step)          */
-    cl_event stop_nb_k[2];    /**< stop event non-bonded kernels (l/nl, every step)               */
+    cl_event nb_k[2];           /**< event for non-bonded kernels (l/nl, every step)              */    
 }cl_timers_t;
 
 /** \internal
