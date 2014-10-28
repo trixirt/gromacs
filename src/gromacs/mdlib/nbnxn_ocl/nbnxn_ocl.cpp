@@ -501,8 +501,7 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
     bool                 bDoTime     = ocl_nb->bDoTime;
     cl_uint                  arg_no;
 
-    cl_nbparam_params_t nbparams_params;
-    cl_plist_params_t plist_params;
+    cl_nbparam_params_t nbparams_params;    
 #ifdef DEBUG_OCL
         float* debug_buffer_h;
         size_t debug_buffer_size;
