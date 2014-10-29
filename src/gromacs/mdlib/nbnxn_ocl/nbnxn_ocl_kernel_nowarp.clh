@@ -88,65 +88,39 @@ __attribute__((reqd_work_group_size(CL_SIZE, CL_SIZE, 1)))
         //__kernel void test
     #endif
 #endif
-(cl_atomdata_params_t atomdata_params,                                      /* IN */
- cl_nbparam_params_t nbparam_params,                                        /* IN */
+(cl_atomdata_params_t atomdata_params,      /* IN */
+ cl_nbparam_params_t nbparam_params,        /* IN */
+ const __global float4 *restrict xq,        /* IN */
+ __global float *restrict f,                /* OUT */
+ __global float *restrict e_lj,             /* OUT */
+ __global float *restrict e_el,             /* OUT */
+__global float *restrict fshift,            /* OUT */
+ const __global int *restrict atom_types,   /* IN */
+ const __global float *restrict shift_vec,  /* IN */
+ __constant float* nbfp_climg2d,            /* IN */
+ __constant float* nbfp_comb_climg2d,       /* IN */
+ __constant float* coulomb_tab_climg2d,     /* IN */
 
- const __global float4 *restrict xq,                                                 /* IN */
- __global float *restrict f, //__global float3 *f,                                   /* OUT */
- __global float *restrict e_lj,                                                      /* OUT */
- __global float *restrict e_el,                                                      /* OUT */
- //const __global float3 *fshift,
-__global float *restrict fshift, // __global float3 *fshift,                         /* OUT */
- const __global int *restrict atom_types,                                            /* IN */
- const __global float *restrict shift_vec,//const __global float3 *shift_vec,        /* IN */
- __constant float* nbfp_climg2d,                                        /* IN */
- __constant float* nbfp_comb_climg2d,                                   /* IN */
- __constant float* coulomb_tab_climg2d,                                 /* IN */
-
- const __global nbnxn_sci_t* pl_sci,                                        /* IN */
+ const __global nbnxn_sci_t* pl_sci,        /* IN */
 
 #ifndef PRUNE_NBL
     const
 #endif
- __global nbnxn_cj4_t* pl_cj4,                                              /* OUT / IN */
-
- const __global nbnxn_excl_t* excl,                                         /* IN */
-
+ __global nbnxn_cj4_t* pl_cj4,              /* OUT / IN */
+ const __global nbnxn_excl_t* excl,         /* IN */
  int bCalcFshift,
-
- __local  float4   *xqib,   /* Pointer to dyn alloc'ed shmem */
+ __local  float4   *xqib,
  __global float *debug_buffer
  )
-
- ////
-////
-////
-//////const __global cl_atomdata_t   *atdat,
-////// const __global cl_nbparam_t    *nbparam,
-////// const __global cl_plist_t      *plist,
-////       __local  float4          *xqib,   /* Pointer to dyn alloc'ed shmem */
-//// __read_only image2d_t            nbfp_climg2d,
-//// __read_only image2d_t            nbfp_comb_climg2d,
-//// __read_only image2d_t            coulomb_tab_climg2d,
-//// int bCalcFshift)
 {
     /* convenience variables */
-    //const nbnxn_sci_t *pl_sci       = plist->sci;
     cl_atomdata_params_t *atdat = &atomdata_params;
     cl_nbparam_params_t *nbparam = &nbparam_params;
-    //cl_plist_params_t *plist = &plist_params; //<--Does not seem to be needed anymore
-
-    //nbnxn_cj4_t        *pl_cj4      = plist->cj4;
-    //const nbnxn_excl_t *excl        = plist->excl;
-    //const int          *atom_types  = atdat->atom_types;
     int                 ntypes      = atdat->ntypes;
-    //const float4       *xq          = atdat->xq;
-    //float3             *f           = atdat->f;
-    //const float3       *shift_vec   = atdat->shift_vec;
     float               rcoulomb_sq = nbparam->rcoulomb_sq;
 
 #ifdef VDW_CUTOFF_CHECK
-    float               rvdw_sq     = nbparam_params.rvdw_sq;//nbparam->rvdw_sq;
+    float               rvdw_sq     = nbparam_params.rvdw_sq;
     float               vdw_in_range;
 #endif
 #ifdef LJ_EWALD
@@ -205,9 +179,6 @@ __global float *restrict fshift, // __global float3 *fshift,                    
     float3       xi, xj, rv, f_ij, fcj_buf, fshift_buf;
     float3       fci_buf[NCL_PER_SUPERCL]; /* i force buffer */
     nbnxn_sci_t  nb_sci;
-
-    /* shmem buffer for i x+q pre-loading */
-    //extern __shared__  float4 xqib[];
 
     /* shmem buffer for cj, for both warps separately */
     __local int *cjs     = (__local int *)(xqib + NCL_PER_SUPERCL * CL_SIZE);

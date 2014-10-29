@@ -48,18 +48,18 @@ typedef enum eelOcl  eelOcl_t;
 static const char * kernel_electrostatic_family_definitions[] =
     {"-DEL_CUTOFF -D_EELNAME=_ElecCut",
      "-DEL_RF -D_EELNAME=_ElecRF",
-     "-DEL_EWALD_ANA -D_EELNAME=_ElecEw",
-     "-DEL_EWALD_ANA -DLJ_CUTOFF_CHECK -D_EELNAME=_ElecEwTwinCut",
      "-DEL_EWALD_TAB -D_EELNAME=_ElecEwQSTab",
-     "-DEL_EWALD_TAB -DLJ_CUTOFF_CHECK -D_EELNAME=_ElecEwQSTabTwinCut"};
+     "-DEL_EWALD_TAB -DLJ_CUTOFF_CHECK -D_EELNAME=_ElecEwQSTabTwinCut",
+     "-DEL_EWALD_ANA -D_EELNAME=_ElecEw",
+     "-DEL_EWALD_ANA -DLJ_CUTOFF_CHECK -D_EELNAME=_ElecEwTwinCut"};
 
 typedef enum evdwOcl evdwOcl_t;
 static const char * kernel_VdW_family_definitions[] =
     {"-D_VDWNAME=_VdwLJ",
-     "-DLJ_EWALD_COMB_GEOM -D_VDWNAME=_VdwLJEwCombGeom",
-     "-DLJ_EWALD_COMB_LB -D_VDWNAME=_VdwLJEwCombLB",
      "-DLJ_FORCE_SWITCH -D_VDWNAME=_VdwLJFsw",
-     "-DLJ_POT_SWITCH -D_VDWNAME=_VdwLJPsw"};
+     "-DLJ_POT_SWITCH -D_VDWNAME=_VdwLJPsw",
+     "-DLJ_EWALD_COMB_GEOM -D_VDWNAME=_VdwLJEwCombGeom",
+     "-DLJ_EWALD_COMB_LB -D_VDWNAME=_VdwLJEwCombLB"};
 
 
 /**
