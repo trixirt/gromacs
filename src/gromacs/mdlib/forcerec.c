@@ -1797,12 +1797,12 @@ static void pick_nbnxn_resources(const t_commrec     *cr,
                                  const int            vdwtype
                                 )
 {
-    gmx_bool bEmulateGPUEnvVarSet, bOclDoFastGen;
+    gmx_bool bEmulateGPUEnvVarSet, bOclDoFastGen = FALSE;
     char     gpu_err_str[STRLEN];
 
     *bUseGPU = FALSE;
 
-    bOclDoFastGen        = (getenv("OCL_NOFASTGEN") == NULL);
+    bOclDoFastGen        = (getenv("OCL_FASTGEN") != NULL);
     bEmulateGPUEnvVarSet = (getenv("GMX_EMULATE_GPU") != NULL);
 
     /* Run GPU emulation mode if GMX_EMULATE_GPU is defined. Because
