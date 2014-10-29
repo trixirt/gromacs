@@ -157,21 +157,6 @@ typedef struct cl_atomdata
     cl_bool     bShiftVecUploaded; /**< true if the shift vector has been uploaded   */
 } cl_atomdata_t;
 
-// Data structure shared between the OpenCL device code and OpenCL host code
-// Must not contain OpenCL objects (buffers)
-// TO DO: review, improve
-typedef struct cl_atomdata_params
-{
-    int      natoms;            /**< number of atoms                              */
-    int      natoms_local;      /**< number of local atoms                        */
-    int      nalloc;            /**< allocation size for the atom data (xq, f)    */    
-
-    int      ntypes;            /**< number of atom types                         */
-    
-    /*bool*/int     bShiftVecUploaded; /**< true if the shift vector has been uploaded   */
-} cl_atomdata_params_t;
-
-
 /** \internal
  * \brief Parameters required for the CUDA nonbonded calculations.
  */
@@ -276,25 +261,6 @@ typedef struct cl_plist
                                        done during the  current step                */
 }cl_plist_t;
 
-// Data structure shared between the OpenCL device code and OpenCL host code
-// Must not contain OpenCL objects (buffers)
-// TO DO: review, improve
-typedef struct cl_plist_params
-{
-    int              na_c;        /**< number of atoms per cluster                  */
-
-    int              nsci;        /**< size of sci, # of i clusters in the list     */
-    int              sci_nalloc;  /**< allocation size of sci                       */   
-
-    int              ncj4;        /**< total # of 4*j clusters                      */
-    int              cj4_nalloc;  /**< allocation size of cj4                       */
-   
-    int              nexcl;       /**< count for excl                               */
-    int              excl_nalloc; /**< allocation size of excl                      */
-
-    /*bool*/int             bDoPrune;    /**< true if pair-list pruning needs to be
-                                       done during the  current step                */
-}cl_plist_params_t;
 
 #ifndef __IN_OPENCL_KERNEL__
 

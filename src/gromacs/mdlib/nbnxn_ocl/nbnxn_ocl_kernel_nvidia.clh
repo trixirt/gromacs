@@ -88,7 +88,7 @@ __attribute__((reqd_work_group_size(CL_SIZE, CL_SIZE, 1)))
         //__kernel void test
     #endif
 #endif
-(cl_atomdata_params_t atomdata_params,                                      /* IN */
+(int ntypes,                                                                        /* IN */
  cl_nbparam_params_t nbparam_params,                                        /* IN */
 
  const __global float4 *restrict xq,                                                 /* IN */
@@ -132,14 +132,14 @@ __global float *restrict fshift, // __global float3 *fshift,                    
 {
     /* convenience variables */
     //const nbnxn_sci_t *pl_sci       = plist->sci;
-    cl_atomdata_params_t *atdat = &atomdata_params;
+    //cl_atomdata_params_t *atdat = &atomdata_params;
     cl_nbparam_params_t *nbparam = &nbparam_params;
     //cl_plist_params_t *plist = &plist_params; //<--Does not seem to be needed anymore
 
     //nbnxn_cj4_t        *pl_cj4      = plist->cj4;
     //const nbnxn_excl_t *excl        = plist->excl;
     //const int          *atom_types  = atdat->atom_types;
-    int                 ntypes      = atdat->ntypes;
+    //int                 ntypes      = atdat->ntypes;
     //const float4       *xq          = atdat->xq;
     //float3             *f           = atdat->f;
     //const float3       *shift_vec   = atdat->shift_vec;
