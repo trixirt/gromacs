@@ -127,6 +127,8 @@ gmx_bool init_ocl_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
                   const gmx_gpu_opt_t gmx_unused *gpu_opt,
                   const int gmx_unused eeltype,
                   const int gmx_unused vdwtype,
+                  const int gmx_unused vdw_modifier,
+                  const int gmx_unused ljpme_comb_rule,
                   const gmx_bool gmx_unused bOclDoFastGen
                      ) FUNC_TERM_INT_OPENCL
 
