@@ -8,6 +8,7 @@
 #include <string.h>
 
 #include "types/hw_info.h"
+#include "types/enums.h"
 #include "gpu_utils.h"
 #include "gromacs/utility/smalloc.h"
 #include "gromacs/utility/cstringutil.h"
@@ -320,6 +321,8 @@ gmx_bool init_ocl_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
                   const gmx_gpu_opt_t gmx_unused *gpu_opt,
                   const int gmx_unused eeltype,
                   const int gmx_unused vdwtype,
+                  const int gmx_unused vdw_modifier,
+                  const int gmx_unused ljpme_comb_rule,
                   const gmx_bool gmx_unused bOclDoFastGen
                      )
 {
@@ -332,10 +335,12 @@ gmx_bool init_ocl_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
     cl_program program;
     cl_int cl_error;
 
-    kernel_algo_family_t   kernel_algo_family;
+    gmx_algo_family_t   gmx_algo_family;
 
-    kernel_algo_family.eeltype = eeltype;
-    kernel_algo_family.vdwtype = vdwtype;
+    gmx_algo_family.eeltype = eeltype;
+    gmx_algo_family.vdwtype = vdwtype;
+    gmx_algo_family.vdw_modifier = vdw_modifier;
+    gmx_algo_family.ljpme_comb_rule = ljpme_comb_rule;
 
     int retval;
 
@@ -365,7 +370,7 @@ gmx_bool init_ocl_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
         cl_error =
             ocl_compile_program(_default_source_,
                                 _auto_vendor_kernels_,
-                                &kernel_algo_family,
+                                &gmx_algo_family,
                                 bOclDoFastGen,
                                 result_str,
                                 context,

@@ -35,13 +35,16 @@ typedef struct
 {
     int eeltype;
     int vdwtype;
-} kernel_algo_family_t;
+    int vdw_modifier;
+    int ljpme_comb_rule;
+} gmx_algo_family_t;
+
 
 cl_int
 ocl_compile_program(
     kernel_source_index_t       kernel_source_file,
     kernel_vendor_spec_t        kernel_vendor_spec,
-    kernel_algo_family_t *      kernel_algo_family,
+    gmx_algo_family_t *         p_gmx_algo_family,
     int                         DoFastGen,
     char *                      result_str,
     cl_context                  context,

@@ -472,6 +472,69 @@ static void set_cutoff_parameters(//cu_nbparam_t              *nbp,
     nbp->vdw_switch       = ic->vdw_switch;
 }
 
+void nbnxn_ocl_convert_gmx_to_gpu_flavors(
+    const int gmx_eeltype,
+    const int gmx_vdwtype,
+    const int gmx_vdw_modifier,
+    const int gmx_ljpme_comb_rule,
+    int *gpu_eeltype,
+    int *gpu_vdwtype)
+{
+    if (gmx_vdwtype == evdwCUT)
+    {
+        switch (gmx_vdw_modifier)
+        {
+            case eintmodNONE:
+            case eintmodPOTSHIFT:
+                *gpu_vdwtype = evdwOclCUT;
+                break;
+            case eintmodFORCESWITCH:
+                *gpu_vdwtype = evdwOclFSWITCH;
+                break;
+            case eintmodPOTSWITCH:
+                *gpu_vdwtype = evdwOclPSWITCH;
+                break;
+            default:
+                gmx_incons("The requested VdW interaction modifier is not implemented in the GPU accelerated kernels!");
+                break;
+        }
+    }
+    else if (gmx_vdwtype == evdwPME)
+    {
+        if (gmx_ljpme_comb_rule == ljcrGEOM)
+        {
+            *gpu_vdwtype = evdwOclEWALDGEOM;
+        }
+        else
+        {
+            *gpu_vdwtype = evdwOclEWALDLB;
+        }
+    }
+    else
+    {
+        gmx_incons("The requested VdW type is not implemented in the GPU accelerated kernels!");
+    }
+
+    if (gmx_eeltype == eelCUT)
+    {
+        *gpu_eeltype = eelOclCUT;
+    }
+    else if (EEL_RF(gmx_eeltype))
+    {
+        *gpu_eeltype = eelOclRF;
+    }
+    else if ((EEL_PME(gmx_eeltype) || gmx_eeltype == eelEWALD))
+    {
+        /* Initially rcoulomb == rvdw, so it's surely not twin cut-off. */
+        *gpu_eeltype = pick_ewald_kernel_type(false);
+    }
+    else
+    {
+        /* Shouldn't happen, as this is checked when choosing Verlet-scheme */
+        gmx_incons("The requested electrostatics type is not implemented in the GPU accelerated kernels!");
+    }
+}
+
 /*! Initializes the nonbonded parameter data structure. */
 static void init_nbparam(/*cu_nbparam_t*/cl_nbparam_t  *nbp,
                          const interaction_const_t *ic,
@@ -486,62 +549,21 @@ static void init_nbparam(/*cu_nbparam_t*/cl_nbparam_t  *nbp,
 
     set_cutoff_parameters(nbp, ic);
 
-    if (ic->vdwtype == evdwCUT)
+    nbnxn_ocl_convert_gmx_to_gpu_flavors(
+        ic->eeltype,
+        ic->vdwtype,
+        ic->vdw_modifier,
+        ic->ljpme_comb_rule,
+        &(nbp->eeltype),
+        &(nbp->vdwtype) );
+
+    if(ic->vdwtype == evdwPME)
     {
-        switch (ic->vdw_modifier)
-        {
-            case eintmodNONE:
-            case eintmodPOTSHIFT:
-                nbp->vdwtype = evdwOclCUT;
-                break;
-            case eintmodFORCESWITCH:
-                nbp->vdwtype = evdwOclFSWITCH;
-                break;
-            case eintmodPOTSWITCH:
-                nbp->vdwtype = evdwOclPSWITCH;
-                break;
-            default:
-                gmx_incons("The requested VdW interaction modifier is not implemented in the CUDA GPU accelerated kernels!");
-                break;
-        }
-    }
-    else if (ic->vdwtype == evdwPME)
-    {
-        if (ic->ljpme_comb_rule == ljcrGEOM)
-        {
+        if(ic->ljpme_comb_rule == ljcrGEOM)
             assert(nbat->comb_rule == ljcrGEOM);
-            nbp->vdwtype = evdwOclEWALDGEOM;
-        }
         else
-        {
             assert(nbat->comb_rule == ljcrLB);
-            nbp->vdwtype = evdwOclEWALDLB;
-        }
     }
-    else
-    {
-        gmx_incons("The requested VdW type is not implemented in the CUDA GPU accelerated kernels!");
-    }
-
-    if (ic->eeltype == eelCUT)
-    {
-        nbp->eeltype = eelOclCUT;
-    }
-    else if (EEL_RF(ic->eeltype))
-    {
-        nbp->eeltype = eelOclRF;
-    }
-    else if ((EEL_PME(ic->eeltype) || ic->eeltype == eelEWALD))
-    {
-        /* Initially rcoulomb == rvdw, so it's surely not twin cut-off. */
-        nbp->eeltype = pick_ewald_kernel_type(false);
-    }
-    else
-    {
-        /* Shouldn't happen, as this is checked when choosing Verlet-scheme */
-        gmx_incons("The requested electrostatics type is not implemented in the CUDA GPU accelerated kernels!");
-    }
-
     /* generate table for PME */
     nbp->coulomb_tab_climg2d = NULL;
     if (nbp->eeltype == eelOclEWALD_TAB || nbp->eeltype == eelOclEWALD_TAB_TWIN)
@@ -1474,8 +1496,11 @@ int nbnxn_ocl_min_ci_balanced(nbnxn_opencl_ptr_t ocl_nb)
 
 gmx_bool nbnxn_ocl_is_kernel_ewald_analytical(const nbnxn_opencl_ptr_t ocl_nb)
 {
-    assert(!"Not implemented");
-#pragma message "Warning is kernel ewald analytical should not be called as Ewald Analytical was on compute >=3.0"
+    /* No analytical == warp_shuffle on OpenCL, always false */
+    assert(ocl_nb->nbparam->eeltype != eelOclEWALD_ANA);
+    assert(ocl_nb->nbparam->eeltype != eelOclEWALD_ANA_TWIN);
+    return 0;
+    /*
     return ((ocl_nb->nbparam->eeltype == eelOclEWALD_ANA) ||
-            (ocl_nb->nbparam->eeltype == eelOclEWALD_ANA_TWIN));
+            (ocl_nb->nbparam->eeltype == eelOclEWALD_ANA_TWIN));*/
 }

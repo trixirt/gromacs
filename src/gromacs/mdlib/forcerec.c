@@ -1794,15 +1794,17 @@ static void pick_nbnxn_resources(const t_commrec     *cr,
                                  gmx_bool            *bEmulateGPU,
                                  const gmx_gpu_opt_t *gpu_opt,
                                  const int            eeltype,
-                                 const int            vdwtype
+                                 const int            vdwtype,
+                                 const int            vdw_modifier,
+                                 const int            ljpme_comb_rule
                                 )
 {
-    gmx_bool bEmulateGPUEnvVarSet, bOclDoFastGen;
+    gmx_bool bEmulateGPUEnvVarSet, bOclDoFastGen = FALSE;
     char     gpu_err_str[STRLEN];
 
     *bUseGPU = FALSE;
 
-    bOclDoFastGen        = (getenv("OCL_NOFASTGEN") == NULL);
+    bOclDoFastGen        = (getenv("OCL_FASTGEN") != NULL);
     bEmulateGPUEnvVarSet = (getenv("GMX_EMULATE_GPU") != NULL);
 
     /* Run GPU emulation mode if GMX_EMULATE_GPU is defined. Because
@@ -1833,7 +1835,7 @@ static void pick_nbnxn_resources(const t_commrec     *cr,
 
 #ifdef GMX_USE_OPENCL
         if (!init_ocl_gpu(cr->rank_pp_intranode, gpu_err_str,
-                      &hwinfo->gpu_info, gpu_opt, eeltype, vdwtype, bOclDoFastGen))
+                      &hwinfo->gpu_info, gpu_opt, eeltype, vdwtype, vdw_modifier, ljpme_comb_rule, bOclDoFastGen))
 #else
         if (!init_cuda_gpu(cr->rank_pp_intranode, gpu_err_str,
                       &hwinfo->gpu_info, gpu_opt))
@@ -2181,7 +2183,9 @@ static void init_nb_verlet(FILE                *fp,
                          &bEmulateGPU,
                          fr->gpu_opt,
                          fr->eeltype,
-                         fr->vdwtype
+                         fr->vdwtype,
+                         fr->vdw_modifier,
+                         fr->ljpme_combination_rule
                         );
 
     nbv->nbs = NULL;

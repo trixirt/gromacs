@@ -11,6 +11,7 @@
 
 #include "ocl_compiler.hpp"
 #include "../mdlib/nbnxn_ocl/nbnxn_ocl_types.h"
+#include "../mdlib/nbnxn_ocl/nbnxn_ocl_data_mgmt.h"
 
 /* This path is defined by CMake and it depends on the install prefix option.
    The opencl kernels are installed in bin/opencl.*/
@@ -48,18 +49,18 @@ typedef enum eelOcl  eelOcl_t;
 static const char * kernel_electrostatic_family_definitions[] =
     {"-DEL_CUTOFF -D_EELNAME=_ElecCut",
      "-DEL_RF -D_EELNAME=_ElecRF",
-     "-DEL_EWALD_ANA -D_EELNAME=_ElecEw",
-     "-DEL_EWALD_ANA -DLJ_CUTOFF_CHECK -D_EELNAME=_ElecEwTwinCut",
      "-DEL_EWALD_TAB -D_EELNAME=_ElecEwQSTab",
-     "-DEL_EWALD_TAB -DLJ_CUTOFF_CHECK -D_EELNAME=_ElecEwQSTabTwinCut"};
+     "-DEL_EWALD_TAB -DLJ_CUTOFF_CHECK -D_EELNAME=_ElecEwQSTabTwinCut",
+     "-DEL_EWALD_ANA -D_EELNAME=_ElecEw",
+     "-DEL_EWALD_ANA -DLJ_CUTOFF_CHECK -D_EELNAME=_ElecEwTwinCut"};
 
 typedef enum evdwOcl evdwOcl_t;
 static const char * kernel_VdW_family_definitions[] =
     {"-D_VDWNAME=_VdwLJ",
-     "-DLJ_EWALD_COMB_GEOM -D_VDWNAME=_VdwLJEwCombGeom",
-     "-DLJ_EWALD_COMB_LB -D_VDWNAME=_VdwLJEwCombLB",
      "-DLJ_FORCE_SWITCH -D_VDWNAME=_VdwLJFsw",
-     "-DLJ_POT_SWITCH -D_VDWNAME=_VdwLJPsw"};
+     "-DLJ_POT_SWITCH -D_VDWNAME=_VdwLJPsw",
+     "-DLJ_EWALD_COMB_GEOM -D_VDWNAME=_VdwLJEwCombGeom",
+     "-DLJ_EWALD_COMB_LB -D_VDWNAME=_VdwLJEwCombLB"};
 
 
 /**
@@ -468,12 +469,26 @@ static const char * ocl_get_vendor_specific_define(kernel_vendor_spec_t kernel_s
  * \param p_kernel_algo_family Pointer to algo_family structure (eel,vdw)
  * \param p_algo_defines       String to populate with the defines
  */
-static void ocl_get_fastgen_define(kernel_algo_family_t * p_kernel_algo_family, char * p_algo_defines)
+static void ocl_get_fastgen_define(
+    gmx_algo_family_t * p_gmx_algo_family,
+    char *              p_algo_defines)
 {
+    int eeltype, vdwtype;
+    nbnxn_ocl_convert_gmx_to_gpu_flavors(
+        p_gmx_algo_family->eeltype,
+        p_gmx_algo_family->vdwtype,
+        p_gmx_algo_family->vdw_modifier,
+        p_gmx_algo_family->ljpme_comb_rule,
+        &eeltype,
+        &vdwtype);
+
+    assert(eeltype < eelOclNR);
+    assert(vdwtype < evdwOclNR);
+
     printf("Setting up kernel fastgen definitions: ");
     sprintf(p_algo_defines,"-D_OCL_FASTGEN_ %s %s ",
-            kernel_electrostatic_family_definitions[p_kernel_algo_family->eeltype],
-            kernel_VdW_family_definitions[p_kernel_algo_family->vdwtype]
+            kernel_electrostatic_family_definitions[eeltype],
+            kernel_VdW_family_definitions[vdwtype]
     );
     printf(" %s \n",p_algo_defines);
 }
@@ -482,7 +497,7 @@ cl_int
 ocl_compile_program(
     kernel_source_index_t       kernel_source_file,
     kernel_vendor_spec_t        kernel_vendor_spec,
-    kernel_algo_family_t *      p_kernel_algo_family,
+    gmx_algo_family_t *         p_gmx_algo_family,
     int                         DoFastGen,
     char *                      result_str,
     cl_context                  context,
@@ -532,7 +547,7 @@ ocl_compile_program(
 
         char kernel_fastgen_define[128] = {0};
         if(DoFastGen)
-            ocl_get_fastgen_define(p_kernel_algo_family, kernel_fastgen_define);
+            ocl_get_fastgen_define(p_gmx_algo_family, kernel_fastgen_define);
 
         sprintf(custom_build_options_prepend, "-DWARP_SIZE_TEST=%d %s %s", warp_size, kernel_vendor_spec_define, kernel_fastgen_define);
 

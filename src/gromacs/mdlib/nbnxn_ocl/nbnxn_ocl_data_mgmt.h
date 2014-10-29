@@ -61,6 +61,15 @@ struct nonbonded_verlet_group_t;
 struct nbnxn_pairlist_t;
 struct nbnxn_atomdata_t;
 
+FUNC_QUALIFIER
+void nbnxn_ocl_convert_gmx_to_gpu_flavors(
+    const int gmx_eeltype,
+    const int gmx_vdwtype,
+    const int gmx_vdw_modifier,
+    const int gmx_ljpme_comb_rule,
+    int *gpu_eeltype,
+    int *gpu_vdwtype) FUNC_TERM
+
 /** Initializes the data structures related to CUDA nonbonded calculations. */
 FUNC_QUALIFIER
 void nbnxn_ocl_init(FILE gmx_unused                 *fplog,
