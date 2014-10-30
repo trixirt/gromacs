@@ -34,8 +34,8 @@ const char* build_options_list[] = {
     "-cl-std=CL1.1",
     "-cl-std=CL1.2",
     "-cl-fast-relaxed-math",
-    "",
-    "",
+    "-cl-opt-disable",
+    "-g",
     "-I"OCL_INSTALL_DIR_NAME /*,
     "-I../../src/gromacs/gmxlib/ocl_tools           -I../../src/gromacs/mdlib/nbnxn_ocl            -I../../src/gromacs/pbcutil            -I../../src/gromacs/mdlib"
     -I../../../gromacs/src/gromacs/gmxlib/ocl_tools -I../../../gromacs/src/gromacs/mdlib/nbnxn_ocl -I../../../gromacs/src/gromacs/pbcutil -I../../../gromacs/src/gromacs/mdlib" */
