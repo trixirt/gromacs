@@ -118,25 +118,7 @@ _INLINE_ void atomicAdd_g_f3(__global float *addr, const float3 val)
     atomicAdd_g_f(addr + 1, val.y);
     atomicAdd_g_f(addr + 2, val.z);
 }
-/*
-_INLINE_ void atomicAdd(volatile float *addr, float val)
-{
-    union{
-        unsigned int u32;
-        float        f32;
-    } next, expected;
-    do{
-        expected.f32    = *addr;
-        next.f32        = expected.f32 + val;
-    } while( atomic_cmpxchg( (volatile unsigned int *)addr, expected.u32, next.u32) != expected.u32 );
-}
-_INLINE_ void atomicAdd( float3 *addr, float3 val)
-{
-    atomicAdd( (( float*)(addr)), val.x);
-    atomicAdd( (( float*)(addr))+1, val.y);
-    atomicAdd( (( float*)(addr))+2, val.z);
-}
-*/
+
 /****************************************************************/
 
 /**** float4 ****/
