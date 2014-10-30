@@ -21,8 +21,10 @@
 
 #if defined(__linux__) || (defined(__APPLE__)&&defined(__MACH__))
 #define SEPARATOR '/'
+#define SSEPARATOR "/"
 #elif defined(_WIN32)
 #define SEPARATOR '\\'
+#define SSEPARATOR "\\"
 #endif
 
 const char* build_options_list[] = {
@@ -34,11 +36,19 @@ const char* build_options_list[] = {
     "-cl-fast-relaxed-math",
     "-cl-opt-disable",
     "-g",
-    "-I"OCL_INSTALL_DIR_NAME,
-    "-I../../src/gromacs/gmxlib/ocl_tools           -I../../src/gromacs/mdlib/nbnxn_ocl            -I../../src/gromacs/pbcutil            -I../../src/gromacs/mdlib \
-    -I../../../gromacs/src/gromacs/gmxlib/ocl_tools -I../../../gromacs/src/gromacs/mdlib/nbnxn_ocl -I../../../gromacs/src/gromacs/pbcutil -I../../../gromacs/src/gromacs/mdlib"
+    "-I"OCL_INSTALL_DIR_NAME /*,
+    "-I../../src/gromacs/gmxlib/ocl_tools           -I../../src/gromacs/mdlib/nbnxn_ocl            -I../../src/gromacs/pbcutil            -I../../src/gromacs/mdlib"
+    -I../../../gromacs/src/gromacs/gmxlib/ocl_tools -I../../../gromacs/src/gromacs/mdlib/nbnxn_ocl -I../../../gromacs/src/gromacs/pbcutil -I../../../gromacs/src/gromacs/mdlib" */
 };
-
+/* Include paths when using the OCL_FILE_PATH to point to the gromacs source tree */
+#define INCLUDE_PATH_COUNT 4
+const char* include_path_list[]
+{
+	"gromacs" SSEPARATOR "mdlib" SSEPARATOR "nbnxn_ocl",
+	"gromacs" SSEPARATOR "gmxlib" SSEPARATOR "ocl_tools",
+	"gromacs" SSEPARATOR "pbcutil",
+	"gromacs" SSEPARATOR "mdlib"
+};
 /* Available sources */
 static const char * kernel_filenames[]         = {"nbnxn_ocl_kernels.cl"};
 
@@ -70,6 +80,8 @@ static const char * kernel_VdW_family_definitions[] =
  */
 static const char* get_ocl_build_option(build_options_index_t build_option_id)
 {
+	char * kernel_pathname = NULL;
+
     if(build_option_id<_num_build_options_)
         return build_options_list[build_option_id];
     else
@@ -78,6 +90,7 @@ static const char* get_ocl_build_option(build_options_index_t build_option_id)
 
 static size_t get_ocl_build_option_length(build_options_index_t build_option_id)
 {
+
     if(build_option_id<_num_build_options_)
         return strlen(build_options_list[build_option_id]);
     else
@@ -118,8 +131,8 @@ create_ocl_build_options_length(
     build_options_length +=
         get_ocl_build_option_length(_include_install_opencl_dir_)+whitespace;
 
-    build_options_length +=
-        get_ocl_build_option_length(_include_source_opencl_dirs_)+whitespace;
+    /*build_options_length +=
+        get_ocl_build_option_length(_include_source_opencl_dirs_)+whitespace; */
 
     if(custom_build_options_append)
         build_options_length +=
@@ -185,12 +198,12 @@ create_ocl_build_options(char *             build_options_string,
     char_added += get_ocl_build_option_length(_include_install_opencl_dir_);
     build_options_string[char_added++]=' ';
 
-    strncpy( build_options_string+char_added,
+   /* strncpy( build_options_string+char_added,
              get_ocl_build_option(_include_source_opencl_dirs_),
              get_ocl_build_option_length(_include_source_opencl_dirs_)
     );
     char_added += get_ocl_build_option_length(_include_source_opencl_dirs_);
-    build_options_string[char_added++]=' ';
+    build_options_string[char_added++]=' '; */
 
     if(custom_build_options_append)
     {
@@ -211,8 +224,8 @@ create_ocl_build_options(char *             build_options_string,
 /* TODO comments .. */
 static size_t  get_ocl_kernel_source_file_info(kernel_source_index_t kernel_src_id)
 {
-    char * kernel_filename=NULL;
-    if( (kernel_filename = getenv("OCL_FILE_PATH")) != NULL) return (strlen(kernel_filename) + 1);
+    char * kernel_pathname=NULL;
+	if ((kernel_pathname = getenv("OCL_FILE_PATH")) != NULL) return (strlen(kernel_pathname) + strlen(kernel_filenames[kernel_src_id]) + strlen(include_path_list[0]) + 2); /* separator and null char */
     else
     {
         /* Note we add 1 for the separator and 1 for the termination null char in the resulting string */
@@ -227,26 +240,45 @@ static void get_ocl_kernel_source_path(
     size_t kernel_filename_len
 )
 {
-    char *filename = NULL;
+    char *filepath = NULL;
 
     assert(kernel_filename_len != 0);
     assert(ocl_kernel_filename != NULL);
 
-    if( (filename = getenv("OCL_FILE_PATH")) != NULL)
+    if( (filepath = getenv("OCL_FILE_PATH")) != NULL)
     {
         FILE *file_ok = NULL;
 
+		size_t chars_copied = 0;
+		strncpy(ocl_kernel_filename, filepath, strlen(filepath));
+		chars_copied += strlen(filepath);
+
+		strncpy(&ocl_kernel_filename[chars_copied],
+			include_path_list[0],
+			strlen(include_path_list[0]));
+		chars_copied += strlen(include_path_list[0]);
+
+		ocl_kernel_filename[chars_copied++] = SEPARATOR;
+
+		strncpy(&ocl_kernel_filename[chars_copied],
+			kernel_filenames[kernel_src_id],
+			strlen(kernel_filenames[kernel_src_id]));
+		chars_copied += strlen(kernel_filenames[kernel_src_id]);
+
+		ocl_kernel_filename[chars_copied++] = '\0';
+
+		assert(chars_copied == kernel_filename_len);
+		
+
         //Try to open the file to check that it exists
-        file_ok = fopen(filename,"rb");
+		file_ok = fopen(ocl_kernel_filename, "rb");
         if( file_ok )
         {
-            fclose(file_ok);
-            strncpy(ocl_kernel_filename, filename, strlen(filename));
-            ocl_kernel_filename[strlen(filename)] = '\0';
+			fclose(file_ok); 
         }else
         {
             printf("Warning, you seem to have misconfigured the OCL_FILE_PATH environent variable: %s\n",
-                filename);
+                filepath);
         }
     }else
     {
@@ -541,6 +573,26 @@ ocl_compile_program(
     cl_int build_status         = CL_SUCCESS;
     {
         char custom_build_options_prepend[512] = {0};
+		char *custom_build_options_append = NULL;
+		char *oclpath = NULL;
+		if ((oclpath = getenv("OCL_FILE_PATH")) != NULL)
+		{
+			size_t chars = 0;
+			custom_build_options_append = (char*)calloc((strlen(oclpath) + 32)*INCLUDE_PATH_COUNT, 1);
+			for (int i = 0; i < INCLUDE_PATH_COUNT; i++)
+			{
+				strncpy(&custom_build_options_append[chars], "-I", strlen("-I"));
+				chars += strlen("-I");
+				strncpy(&custom_build_options_append[chars], oclpath, strlen(oclpath));
+				chars += strlen(oclpath);
+				strncpy(&custom_build_options_append[chars], include_path_list[i], strlen(include_path_list[i]));
+				chars += strlen(include_path_list[i]);
+				strncpy(&custom_build_options_append[chars], " ", 1);
+				chars += 1;
+			}
+			printf("OCL_FILE_PATH includes: %s\n", custom_build_options_append);
+		}
+
 
         const char * kernel_vendor_spec_define =
             ocl_get_vendor_specific_define(kernel_vendor_spec);
@@ -552,14 +604,14 @@ ocl_compile_program(
         sprintf(custom_build_options_prepend, "-DWARP_SIZE_TEST=%d %s %s", warp_size, kernel_vendor_spec_define, kernel_fastgen_define);
 
         size_t build_options_length =
-                create_ocl_build_options_length(ocl_device_vendor,custom_build_options_prepend,NULL);
+			create_ocl_build_options_length(ocl_device_vendor, custom_build_options_prepend, custom_build_options_append);
 
         char * build_options_string = (char *)malloc(build_options_length);
 
         create_ocl_build_options(build_options_string,
                                  build_options_length,
                                  ocl_device_vendor,
-                                 custom_build_options_prepend,NULL);
+								 custom_build_options_prepend, custom_build_options_append);
 
         size_t build_log_size       = 0;
         
@@ -592,6 +644,7 @@ ocl_compile_program(
             }
         }
         free(build_options_string);
+		if (custom_build_options_append != NULL) free(custom_build_options_append);
     }
 
     return build_status | cl_error;
