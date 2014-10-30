@@ -225,7 +225,7 @@ create_ocl_build_options(char *             build_options_string,
 static size_t  get_ocl_kernel_source_file_info(kernel_source_index_t kernel_src_id)
 {
     char * kernel_pathname=NULL;
-	if ((kernel_pathname = getenv("OCL_FILE_PATH")) != NULL) return (strlen(kernel_pathname) + strlen(kernel_filenames[kernel_src_id]) + strlen(include_path_list[0] + 3)); /* 2 separators and null char */
+	if ((kernel_pathname = getenv("OCL_FILE_PATH")) != NULL) return (strlen(kernel_pathname) + strlen(kernel_filenames[kernel_src_id]) + strlen(include_path_list[0]) + 2); /* separator and null char */
     else
     {
         /* Note we add 1 for the separator and 1 for the termination null char in the resulting string */
@@ -268,6 +268,7 @@ static void get_ocl_kernel_source_path(
 		ocl_kernel_filename[chars_copied++] = '\0';
 
 		assert(chars_copied == kernel_filename_len);
+		
 
         //Try to open the file to check that it exists
 		file_ok = fopen(ocl_kernel_filename, "rb");
