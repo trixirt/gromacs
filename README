@@ -1,6 +1,8 @@
 This is a modified version of GROMACS 5.1 adding OpenCL support.
 All CUDA accelerated features have been ported to OpenCL 1.1.
 
+Official GROMACS website: http://www.gromacs.org/
+
 TABLE OF CONTENTS
 1. SUPPORTED OPENCL DEVICES
 2. GENERAL PROJECT SETUP
@@ -9,20 +11,20 @@ TABLE OF CONTENTS
 5. TESTED CONFIGURATIONS
 
 1. SUPPORTED OPENCL DEVICES
-===========================
+   ========================
 The current version works with NVIDIA GPUs and GCN based AMD GPUs.
 Make sure that you have the latest drivers installed.
 Also check "Known Limitations" chapter.
 
 2. GENERAL PROJECT SETUP
-========================
+   =====================
 Check GROMACS website for how to build the project:
 http://www.gromacs.org/Documentation/Installation_Instructions
 You can find additional information here:
 https://github.com/StreamComputing/gromacs/wiki/GROMACS-GPU-ACCELERATION-USING-OPENCL#General_Project_Setup
 
 3. OPENCL SETUP
-===============
+   ============
 Build Gromacs with OpenCL support enabled
 -----------------------------------------
 To build Gromacs with OpenCL support enabled, an OpenCL SDK must be installed
@@ -90,7 +92,7 @@ compilation of OpenCL kernels, but they are also used on the device selection.
 	compiler options.
 
 4. KNOWN LIMITATIONS
-====================
+   =================
 - Intel CPUs are not supported
 - Intel GPUs are not supported
 - The current implementation is not compatible with OpenCL devices that are not using warp/wavefronts or for which the warp/wavefront size is not a multiple of 32
@@ -99,7 +101,7 @@ compilation of OpenCL kernels, but they are also used on the device selection.
 	nbnxn_kernel_ElecEwQSTab_VdwLJ_F_prune_opencl
 
 5. TESTED CONFIGURATIONS
-========================
+   =====================
 Tested devices:
 	NVIDIA GPUs: GeForce GTX 660M, GeForce GTX 750Ti
 	AMD GPUs: FirePro W5100, HD 7950, FirePro W9100, Radeon R7 M260
@@ -119,25 +121,6 @@ nbnxn_kernel_ElecEwQSTab_VdwLJ_F_prune_opencl	|adh_cubic_vsites with pme_verlet_
 
 Input data used for testing - Benchmark data sets available here:
 ftp://ftp.gromacs.org/pub/benchmarks
-
-
-
-
-               Welcome to the official version of GROMACS!
-
-If you are familiar with Unix, it should be fairly trivial to compile and
-install GROMACS. GROMACS uses only the CMake build sytem, and our
-installation guide can be found at
-http://www.gromacs.org/Documentation/Installation_Instructions.
-
-Of course we will do our utmost to help you with any problems, but PLEASE 
-READ THE INSTALLATION INSTRUCTIONS BEFORE CONTACTING US!
-
-There are also several other online resources available from the homepage, 
-and special information for developers.
-
-If you are a developer, or change the source for any other reason, check
-out http://www.gromacs.org/Developer_Zone.
 
                                * * * * *
 
