@@ -107,21 +107,29 @@ Tested devices:
 	AMD GPUs: FirePro W5100, HD 7950, FirePro W9100, Radeon R7 M260
 	
 Tested kernels:
-Kernel											|Benchmark test									|Remarks
+Kernel                                          |Benchmark test                                 |Remarks
 --------------------------------------------------------------------------------------------------------
-nbnxn_kernel_ElecCut_VdwLJ_VF_prune_opencl		|d.poly-ch2										|
-nbnxn_kernel_ElecCut_VdwLJ_F_opencl				|d.poly-ch2										|
-nbnxn_kernel_ElecCut_VdwLJ_F_prune_opencl		|d.poly-ch2										|
-nbnxn_kernel_ElecCut_VdwLJ_VF_opencl			|d.poly-ch2										|
-nbnxn_kernel_ElecRF_VdwLJ_VF_prune_opencl		|adh_cubic with rf_verlet.mdp					|
-nbnxn_kernel_ElecRF_VdwLJ_F_opencl				|adh_cubic with rf_verlet.mdp					|
-nbnxn_kernel_ElecRF_VdwLJ_F_prune_opencl		|adh_cubic with rf_verlet.mdp				 	|
-nbnxn_kernel_ElecEwQSTab_VdwLJ_VF_prune_opencl	|adh_cubic_vsites with pme_verlet_vsites.mdp	|Failed
-nbnxn_kernel_ElecEwQSTab_VdwLJ_F_prune_opencl	|adh_cubic_vsites with pme_verlet_vsites.mdp	|Failed
+nbnxn_kernel_ElecCut_VdwLJ_VF_prune_opencl      |d.poly-ch2                                     |
+nbnxn_kernel_ElecCut_VdwLJ_F_opencl             |d.poly-ch2                                     |
+nbnxn_kernel_ElecCut_VdwLJ_F_prune_opencl       |d.poly-ch2                                     |
+nbnxn_kernel_ElecCut_VdwLJ_VF_opencl            |d.poly-ch2                                     |
+nbnxn_kernel_ElecRF_VdwLJ_VF_prune_opencl       |adh_cubic with rf_verlet.mdp                   |
+nbnxn_kernel_ElecRF_VdwLJ_F_opencl              |adh_cubic with rf_verlet.mdp                   |
+nbnxn_kernel_ElecRF_VdwLJ_F_prune_opencl        |adh_cubic with rf_verlet.mdp                   |
+nbnxn_kernel_ElecEwQSTab_VdwLJ_VF_prune_opencl  |adh_cubic_vsites with pme_verlet_vsites.mdp    |Failed
+nbnxn_kernel_ElecEwQSTab_VdwLJ_F_prune_opencl   |adh_cubic_vsites with pme_verlet_vsites.mdp    |Failed
 
 Input data used for testing - Benchmark data sets available here:
 ftp://ftp.gromacs.org/pub/benchmarks
 
+                               * * * * *
+The GROMACS OpenCL team
+	StreamComputing - www.streamcomputing.eu
+		Vincent Hindriksen
+		Teemu Virolainen
+		Anca Hamuraru
+	Contributors
+		Dimitris Karkoulis
                                * * * * *
 
 GROMACS is free software, distributed under the GNU Lesser General
@@ -149,37 +157,3 @@ sure support questions are directed to you instead of the GROMACS developers.
 Sorry for the hard wording, but it is meant to protect YOUR reseach results!
 
                                * * * * *
-
-The development of GROMACS is mainly funded by academic research grants. 
-To help us fund development, we humbly ask that you cite the GROMACS papers:
-
-* GROMACS: A message-passing parallel molecular dynamics implementation
-  H.J.C. Berendsen, D. van der Spoel and R. van Drunen
-  Comp. Phys. Comm. 91, 43-56 (1995)
-  DOI: 10.1016/0010-4655(95)00042-E
- 
-* GROMACS 4: Algorithms for highly efficient, load-balanced, and scalable
-  molecular simulation
-  B. Hess and C. Kutzner and D. van der Spoel and E. Lindahl
-  J. Chem. Theory Comput. 4 (2008) pp. 435-447
-  DOI: 10.1021/ct700301q
-
-* GROMACS 4.5: a high-throughput and highly parallel open source
-  molecular simulation toolkit
-  Sander Pronk, Szilárd Páll, Roland Schulz, Per Larsson, Pär Bjelkmar,
-  Rossen Apostolov, Michael R. Shirts, Jeremy C. Smith, Peter M. Kasson,
-  David van der Spoel, Berk Hess, Erik Lindahl.
-  Bioinformatics 29 (2013) pp. 845-54
-  DOI: 10.1093/bioinformatics/btt055
-
-There are a lot of cool features we'd like to include in future versions,
-but our resources are limited. All kinds of donations are welcome, both in 
-form of code, hardware and funding! Industrial users who choose to pay
-for a license pro bono (it is still LGPL and can be redistributed freely) or
-contribute in other ways are listed as GROMACS supporters on our webpages. 
-Don't hesitate to contact us if you are interested.
-
-
-                       Good luck with your simulations!
-
-                              The GROMACS Crew
