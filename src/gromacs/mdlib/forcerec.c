@@ -1804,7 +1804,7 @@ static void pick_nbnxn_resources(const t_commrec     *cr,
 
     *bUseGPU = FALSE;
 
-    bOclDoFastGen        = (getenv("OCL_FASTGEN") != NULL);
+    bOclDoFastGen        = (getenv("OCL_NOFASTGEN") == NULL);
     bEmulateGPUEnvVarSet = (getenv("GMX_EMULATE_GPU") != NULL);
 
     /* Run GPU emulation mode if GMX_EMULATE_GPU is defined. Because
