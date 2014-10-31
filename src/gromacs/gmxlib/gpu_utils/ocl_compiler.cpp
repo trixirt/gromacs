@@ -42,7 +42,7 @@ const char* build_options_list[] = {
 };
 /* Include paths when using the OCL_FILE_PATH to point to the gromacs source tree */
 #define INCLUDE_PATH_COUNT 4
-const char* include_path_list[]
+const char* include_path_list[] =
 {
 	"gromacs" SSEPARATOR "mdlib" SSEPARATOR "nbnxn_ocl",
 	"gromacs" SSEPARATOR "gmxlib" SSEPARATOR "ocl_tools",
