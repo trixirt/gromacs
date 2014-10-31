@@ -32,6 +32,11 @@
 # To help us fund GROMACS development, we humbly ask that you cite
 # the research papers on the package. Check out http://www.gromacs.org.
 
-file(GLOB GPU_UTILS_SOURCES *.cu)
+if(GMX_GPU AND NOT GMX_USE_OPENCL)
+    file(GLOB GPU_UTILS_SOURCES *.cu)
+elseif(GMX_GPU AND GMX_USE_OPENCL)
+    file(GLOB GPU_UTILS_SOURCES *.cpp)
+    SET_SOURCE_FILES_PROPERTIES( ${GPU_UTILS_SOURCES} PROPERTIES LANGUAGE CXX )
+endif()    
 set(GMXLIB_SOURCES ${GMXLIB_SOURCES} ${GPU_UTILS_SOURCES} PARENT_SCOPE)
 

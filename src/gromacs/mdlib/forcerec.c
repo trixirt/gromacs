@@ -77,6 +77,7 @@
 #include "types/nbnxn_cuda_types_ext.h"
 #include "gpu_utils.h"
 #include "gromacs/mdlib/nbnxn_cuda/nbnxn_cuda_data_mgmt.h"
+#include "gromacs/mdlib/nbnxn_ocl/nbnxn_ocl_data_mgmt.h"
 #include "pmalloc_cuda.h"
 #include "nb_verlet.h"
 
@@ -176,8 +177,8 @@ static real *make_ljpme_c6grid(const gmx_ffparams_t *idef, t_forcerec *fr)
             if (fr->ljpme_combination_rule == eljpmeLB
                 && !gmx_numzero(c6) && !gmx_numzero(c12i) && !gmx_numzero(c12j))
             {
-                sigmai = pow(c12i / c6i, 1.0/6.0);
-                sigmaj = pow(c12j / c6j, 1.0/6.0);
+                sigmai = pow(c12i / c6i, (real)(1.0/6.0));
+                sigmaj = pow(c12j / c6j, (real)(1.0/6.0));
                 epsi   = c6i * c6i / c12i;
                 epsj   = c6j * c6j / c12j;
                 c6     = sqrt(epsi * epsj) * pow(0.5*(sigmai+sigmaj), 6);
@@ -213,8 +214,8 @@ static real *mk_nbfp_combination_rule(const gmx_ffparams_t *idef, int comb_rule)
             if (comb_rule == eCOMB_ARITHMETIC
                 && !gmx_numzero(c6) && !gmx_numzero(c12))
             {
-                sigmai = pow(c12i / c6i, 1.0/6.0);
-                sigmaj = pow(c12j / c6j, 1.0/6.0);
+                sigmai = pow(c12i / c6i, (real)(1.0/6.0));
+                sigmaj = pow(c12j / c6j, (real)(1.0/6.0));
                 epsi   = c6i * c6i / c12i;
                 epsj   = c6j * c6j / c12j;
                 c6     = sqrt(epsi * epsj) * pow(0.5*(sigmai+sigmaj), 6);
@@ -1791,13 +1792,19 @@ static void pick_nbnxn_resources(const t_commrec     *cr,
                                  gmx_bool             bDoNonbonded,
                                  gmx_bool            *bUseGPU,
                                  gmx_bool            *bEmulateGPU,
-                                 const gmx_gpu_opt_t *gpu_opt)
+                                 const gmx_gpu_opt_t *gpu_opt,
+                                 const int            eeltype,
+                                 const int            vdwtype,
+                                 const int            vdw_modifier,
+                                 const int            ljpme_comb_rule
+                                )
 {
-    gmx_bool bEmulateGPUEnvVarSet;
+    gmx_bool bEmulateGPUEnvVarSet, bOclDoFastGen = FALSE;
     char     gpu_err_str[STRLEN];
 
     *bUseGPU = FALSE;
 
+    bOclDoFastGen        = (getenv("OCL_NOFASTGEN") == NULL);
     bEmulateGPUEnvVarSet = (getenv("GMX_EMULATE_GPU") != NULL);
 
     /* Run GPU emulation mode if GMX_EMULATE_GPU is defined. Because
@@ -1817,20 +1824,38 @@ static void pick_nbnxn_resources(const t_commrec     *cr,
 
     /* Enable GPU mode when GPUs are available or no GPU emulation is requested.
      */
+#ifdef GMX_USE_OPENCL
+    if (gpu_opt->nocl_dev_use > 0 && !(*bEmulateGPU))
+#else
     if (gpu_opt->ncuda_dev_use > 0 && !(*bEmulateGPU))
+#endif
     {
         /* Each PP node will use the intra-node id-th device from the
          * list of detected/selected GPUs. */
-        if (!init_gpu(cr->rank_pp_intranode, gpu_err_str,
+
+#ifdef GMX_USE_OPENCL
+        if (!init_ocl_gpu(cr->rank_pp_intranode, gpu_err_str,
+                      &hwinfo->gpu_info, gpu_opt, eeltype, vdwtype, vdw_modifier, ljpme_comb_rule, bOclDoFastGen))
+#else
+        if (!init_cuda_gpu(cr->rank_pp_intranode, gpu_err_str,
                       &hwinfo->gpu_info, gpu_opt))
+#endif
         {
             /* At this point the init should never fail as we made sure that
              * we have all the GPUs we need. If it still does, we'll bail. */
-            gmx_fatal(FARGS, "On rank %d failed to initialize GPU #%d: %s",
+#ifdef GMX_USE_OPENCL
+            gmx_fatal(FARGS, "On rank %d failed to initialize GPU #%s: %s",
                       cr->nodeid,
-                      get_gpu_device_id(&hwinfo->gpu_info, gpu_opt,
+                      get_ocl_gpu_device_name(&hwinfo->gpu_info, gpu_opt,
                                         cr->rank_pp_intranode),
                       gpu_err_str);
+#else
+            gmx_fatal(FARGS, "On rank %d failed to initialize GPU #%d: %s",
+                      cr->nodeid,
+                      get_cuda_gpu_device_id(&hwinfo->gpu_info, gpu_opt,
+                                        cr->rank_pp_intranode),
+                      gpu_err_str);
+#endif
         }
 
         /* Here we actually turn on hardware GPU acceleration */
@@ -2006,14 +2031,14 @@ init_interaction_const(FILE                       *fp,
     {
         case eintmodPOTSHIFT:
             /* Only shift the potential, don't touch the force */
-            ic->dispersion_shift.cpot = -pow(ic->rvdw, -6.0);
-            ic->repulsion_shift.cpot  = -pow(ic->rvdw, -12.0);
+            ic->dispersion_shift.cpot = -pow(ic->rvdw, (real)(-6.0));
+            ic->repulsion_shift.cpot  = -pow(ic->rvdw, (real)(-12.0));
             if (EVDW_PME(ic->vdwtype))
             {
                 real crc2;
 
                 crc2            = sqr(ic->ewaldcoeff_lj*ic->rvdw);
-                ic->sh_lj_ewald = (exp(-crc2)*(1 + crc2 + 0.5*crc2*crc2) - 1)*pow(ic->rvdw, -6.0);
+                ic->sh_lj_ewald = (exp(-crc2)*(1 + crc2 + 0.5*crc2*crc2) - 1)*pow(ic->rvdw, (real)(-6.0));
             }
             break;
         case eintmodFORCESWITCH:
@@ -2104,7 +2129,11 @@ init_interaction_const(FILE                       *fp,
 
     if (fr->nbv != NULL && fr->nbv->bUseGPU)
     {
+#ifdef GMX_USE_OPENCL
+        nbnxn_ocl_init_const(fr->nbv->ocl_nbv, ic, fr->nbv->grp);
+#else
         nbnxn_cuda_init_const(fr->nbv->cu_nbv, ic, fr->nbv->grp);
+#endif
 
         /* With tMPI + GPUs some ranks may be sharing GPU(s) and therefore
          * also sharing texture references. To keep the code simple, we don't
@@ -2152,7 +2181,12 @@ static void init_nb_verlet(FILE                *fp,
                          fr->bNonbonded,
                          &nbv->bUseGPU,
                          &bEmulateGPU,
-                         fr->gpu_opt);
+                         fr->gpu_opt,
+                         fr->eeltype,
+                         fr->vdwtype,
+                         fr->vdw_modifier,
+                         fr->ljpme_combination_rule
+                        );
 
     nbv->nbs = NULL;
 
@@ -2197,10 +2231,17 @@ static void init_nb_verlet(FILE                *fp,
     {
         /* init the NxN GPU data; the last argument tells whether we'll have
          * both local and non-local NB calculation on GPU */
+#ifdef GMX_USE_OPENCL
+        nbnxn_ocl_init(fp, &nbv->ocl_nbv,
+                        &fr->hwinfo->gpu_info, fr->gpu_opt,
+                        cr->rank_pp_intranode,
+                        (nbv->ngrp > 1) && !bHybridGPURun);
+#else
         nbnxn_cuda_init(fp, &nbv->cu_nbv,
                         &fr->hwinfo->gpu_info, fr->gpu_opt,
                         cr->rank_pp_intranode,
                         (nbv->ngrp > 1) && !bHybridGPURun);
+#endif
 
         if ((env = getenv("GMX_NB_MIN_CI")) != NULL)
         {
@@ -2220,7 +2261,11 @@ static void init_nb_verlet(FILE                *fp,
         }
         else
         {
+#ifdef GMX_USE_OPENCL
+            nbv->min_ci_balanced = nbnxn_ocl_min_ci_balanced(nbv->ocl_nbv);
+#else
             nbv->min_ci_balanced = nbnxn_cuda_min_ci_balanced(nbv->cu_nbv);
+#endif
             if (debug)
             {
                 fprintf(debug, "Neighbor-list balancing parameter: %d (auto-adjusted to the number of GPU multi-processors)\n",
@@ -2245,8 +2290,13 @@ static void init_nb_verlet(FILE                *fp,
     {
         if (nbv->grp[0].kernel_type == nbnxnk8x8x8_CUDA)
         {
+#if defined(GMX_GPU) && defined(GMX_USE_OPENCL)
+            nb_alloc = &ocl_pmalloc;
+            nb_free  = &ocl_pfree;
+#else
             nb_alloc = &pmalloc;
-            nb_free  = &pfree;
+            nb_free  = &pfree;            
+#endif            
         }
         else
         {
@@ -3340,7 +3390,11 @@ void free_gpu_resources(const t_forcerec *fr,
     if (bIsPPrankUsingGPU)
     {
         /* free nbnxn data in GPU memory */
+#ifdef GMX_USE_OPENCL
+        nbnxn_ocl_free(fr->nbv->ocl_nbv);
+#else
         nbnxn_cuda_free(fr->nbv->cu_nbv);
+#endif
 
         /* With tMPI we need to wait for all ranks to finish deallocation before
          * destroying the context in free_gpu() as some ranks may be sharing

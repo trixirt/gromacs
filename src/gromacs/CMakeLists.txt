@@ -161,7 +161,7 @@ if(GMX_USE_GCC44_BUG_WORKAROUND)
    gmx_apply_gcc44_bug_workaround("mdlib/constr.c")
 endif()
 
-if (GMX_GPU)
+if (GMX_GPU AND NOT GMX_USE_OPENCL)
     cuda_add_library(libgromacs ${LIBGROMACS_SOURCES}
             OPTIONS
             RELWITHDEBINFO -g
@@ -201,7 +201,7 @@ target_link_libraries(libgromacs
                       ${TNG_IO_LIBRARIES}
                       ${FFT_LIBRARIES} ${LINEAR_ALGEBRA_LIBRARIES}
                       ${XML_LIBRARIES}
-                      ${THREAD_LIB} ${GMX_SHARED_LINKER_FLAGS})
+                      ${THREAD_LIB} ${GMX_SHARED_LINKER_FLAGS} ${OPENCL_LIBRARIES})
 set_target_properties(libgromacs PROPERTIES
                       OUTPUT_NAME "gromacs${GMX_LIBS_SUFFIX}"
                       SOVERSION ${LIBRARY_SOVERSION}
@@ -224,7 +224,7 @@ if (NOT GMX_BUILD_MDRUN_ONLY)
 endif()
 
 if (INSTALL_CUDART_LIB) #can be set manual by user
-    if (GMX_GPU)
+    if (GMX_GPU AND NOT GMX_USE_OPENCL)
         foreach(CUDA_LIB ${CUDA_LIBRARIES})
             string(REGEX MATCH "cudart" IS_CUDART ${CUDA_LIB})
             if(IS_CUDART) #libcuda should not be installed
@@ -237,4 +237,21 @@ if (INSTALL_CUDART_LIB) #can be set manual by user
     else()
         message(WARNING "INSTALL_CUDART_LIB only makes sense with GMX_GPU")
     endif()
+endif()
+
+if(GMX_GPU AND GMX_USE_OPENCL)
+    #if (INSTALL_OPENCL_KERNELS)
+        set(OPENCL_KERNELS ${GMXLIB_OPENCL_KERNELS} ${MDLIB_OPENCL_KERNELS})       
+        
+        message(STATUS "Will Install OpenCL kernels: " ${OPENCL_KERNELS} " in " ${OCL_INSTALL_DIR} )
+        install(FILES ${OPENCL_KERNELS} DESTINATION
+            ${OCL_INSTALL_DIR} COMPONENT development)
+            
+        set(OPENCL_KERNEL_DEPENDENCIES ${PBCUTIL_OPENCL_KERNEL_DEPENDENCIES} ${MDLIB_OPENCL_KERNEL_DEPENDENCIES})
+        message(STATUS "Will Install OpenCL kernel dependencies: " ${OPENCL_KERNEL_DEPENDENCIES} " in " ${OCL_INSTALL_DIR} )
+        install(FILES ${OPENCL_KERNEL_DEPENDENCIES} DESTINATION
+            ${OCL_INSTALL_DIR} COMPONENT development)                
+    #elseif(EMBED_OPENCL_KERNELS)
+        #...
+    #endif()
 endif()

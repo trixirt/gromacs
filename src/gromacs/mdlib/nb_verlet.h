@@ -38,6 +38,7 @@
 
 #include "nbnxn_pairlist.h"
 #include "types/nbnxn_cuda_types_ext.h"
+#include "types/nbnxn_ocl_types_ext.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -103,6 +104,9 @@ typedef struct nonbonded_verlet_t {
 
     gmx_bool                 bUseGPU;         /* TRUE when GPU acceleration is used */
     nbnxn_cuda_ptr_t         cu_nbv;          /* pointer to CUDA nb verlet data     */
+#ifdef GMX_USE_OPENCL
+    nbnxn_opencl_ptr_t       ocl_nbv;
+#endif
     int                      min_ci_balanced; /* pair list balancing parameter
                                                  used for the 8x8x8 CUDA kernels    */
 } nonbonded_verlet_t;

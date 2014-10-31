@@ -105,11 +105,18 @@ texture<float, 1, cudaReadModeElementType> coulomb_tab_texref;
 #undef CALC_ENERGIES
 #undef PRUNE_NBL
 
+
+/* Specifies which kernel run to debug */
+#define DEBUG_RUN_STEP 2
+
+//#define DEBUG_CUDA
+
 /*! Nonbonded kernel function pointer type */
 typedef void (*nbnxn_cu_kfunc_ptr_t)(const cu_atomdata_t,
                                      const cu_nbparam_t,
                                      const cu_plist_t,
-                                     bool);
+                                     bool,
+                                     float*);
 
 /*********************************/
 
@@ -299,6 +306,12 @@ void nbnxn_cuda_launch_kernel(nbnxn_cuda_ptr_t        cu_nb,
     bool                 bCalcFshift = flags & GMX_FORCE_VIRIAL;
     bool                 bDoTime     = cu_nb->bDoTime;
 
+#ifdef DEBUG_CUDA
+        float* debug_buffer_h;
+        size_t debug_buffer_size;
+#endif
+    float* debug_buffer_d = NULL;
+
     /* turn energy calculation always on/off (for debugging/testing only) */
     bCalcEner = (bCalcEner || always_ener) && !never_ener;
 
@@ -381,7 +394,25 @@ void nbnxn_cuda_launch_kernel(nbnxn_cuda_ptr_t        cu_nb,
                 NCL_PER_SUPERCL, plist->na_c);
     }
 
-    nb_kernel<<< dim_grid, dim_block, shmem, stream>>> (*adat, *nbp, *plist, bCalcFshift);
+#ifdef DEBUG_CUDA
+    {
+        static int run_step = 1;
+
+        if (DEBUG_RUN_STEP == run_step)
+        {
+            debug_buffer_size = dim_grid.x * dim_block.x * dim_grid.y * dim_block.y * dim_grid.z * sizeof(float);
+            debug_buffer_h = (float*)calloc(1, debug_buffer_size);
+            assert(NULL != debug_buffer_h);
+
+            cudaMalloc(&debug_buffer_d, debug_buffer_size);
+            cu_copy_H2D_async(debug_buffer_d, debug_buffer_h, debug_buffer_size, stream);
+        }
+
+        run_step++;
+    }
+#endif
+
+    nb_kernel<<< dim_grid, dim_block, shmem, stream>>> (*adat, *nbp, *plist, bCalcFshift, debug_buffer_d);
     CU_LAUNCH_ERR("k_calc_nb");
 
     if (bDoTime)
@@ -389,6 +420,104 @@ void nbnxn_cuda_launch_kernel(nbnxn_cuda_ptr_t        cu_nb,
         stat = cudaEventRecord(t->stop_nb_k[iloc], stream);
         CU_RET_ERR(stat, "cudaEventRecord failed");
     }
+
+#ifdef DEBUG_CUDA
+    {
+        static int run_step = 1;
+
+        if (DEBUG_RUN_STEP == run_step)
+        {
+            FILE *pf;
+            char file_name[256] = {0};
+
+            cu_copy_D2H_async(debug_buffer_h, debug_buffer_d,
+                    debug_buffer_size, stream);
+
+            // Make sure all data has been transfered back from device
+            cudaStreamSynchronize(stream); 
+
+            printf("\nWriting debug_buffer to debug_buffer_cuda.txt...");
+        
+            sprintf(file_name, "debug_buffer_cuda_%d.txt", DEBUG_RUN_STEP);
+            pf = fopen(file_name, "wt");
+            assert(pf != NULL);
+
+            fprintf(pf,"%20s", "");
+            for (int j = 0; j < dim_grid.x * dim_block.x; j++)
+            {
+                char label[20];
+                sprintf(label, "(wIdx=%2d thIdx=%2d)", j / dim_block.x, j % dim_block.x);
+                fprintf(pf, "%20s", label);
+            }
+
+            for (int i = 0; i < dim_grid.y * dim_block.y; i++)
+            {
+                char label[20];
+                sprintf(label, "(wIdy=%2d thIdy=%2d)", i / dim_block.y, i % dim_block.y);
+                fprintf(pf, "\n%20s", label);
+
+                for (int j = 0; j < dim_grid.x * dim_block.x; j++)
+                    fprintf(pf, "%20.5f", debug_buffer_h[i * dim_grid.x * dim_block.x + j]);
+
+                //fprintf(pf, "\n");
+            }
+
+            fclose(pf);
+
+            printf(" done.\n");
+
+            free(debug_buffer_h);
+            debug_buffer_h = NULL;
+
+            cudaFree(debug_buffer_d);
+            debug_buffer_d = NULL;
+        }
+
+        run_step++;
+    }
+#endif
+}
+
+void dump_cj4(nbnxn_cj4_t *results, int cnt, char* out_file)
+{    
+    FILE *pf;        
+
+    pf = fopen(out_file, "wt");
+    assert(pf != NULL);
+       
+    fprintf(pf, "%20s%20s%20s%20s%20s%20s%20s%20s\n",
+        "cj[0]", "cj[1]", "cj[2]", "cj[3]",
+        "imei[0].imask", "imei[0].excl_ind",
+        "imei[1].imask", "imei[1].excl_ind");
+
+    for (int index = 0; index < cnt; index++)
+    {
+        fprintf(pf, "%20d%20d%20d%20d%20d%20u%20d%20u\n",
+            results[index].cj[0], results[index].cj[1], results[index].cj[2], results[index].cj[3],
+            results[index].imei[0].excl_ind, results[index].imei[0].imask,
+            results[index].imei[1].excl_ind, results[index].imei[1].imask);
+    }
+
+    fclose(pf);
+
+    printf("\nWrote results to %s", out_file);
+}
+
+void dump_results_f(float* results, int cnt, char* out_file)
+{    
+    FILE *pf;        
+
+    pf = fopen(out_file, "wt");
+    assert(pf != NULL);
+                
+    for (int index = 0; index < cnt; index++)
+    {
+        fprintf(pf, "%15.5f\n", results[index]);
+    }
+
+    fclose(pf);
+
+    printf("\nWrote results to %s", out_file);
 }
 
 void nbnxn_cuda_launch_cpyback(nbnxn_cuda_ptr_t        cu_nb,
@@ -521,6 +650,81 @@ void nbnxn_cuda_launch_cpyback(nbnxn_cuda_ptr_t        cu_nb,
                               sizeof(*cu_nb->nbst.e_el), stream);
         }
     }
+
+/* Uncomment this define to enable cj4 debugging for the first kernel run */
+//#define DEBUG_DUMP_CJ4_CUDA
+#ifdef DEBUG_DUMP_CJ4_CUDA
+    {
+        static int run_step = 1;
+
+        if (DEBUG_RUN_STEP == run_step)
+        {         
+            nbnxn_cj4_t *temp_cj4;
+            int cnt;
+            size_t size;       
+            char file_name[256];
+
+            cnt = cu_nb->plist[0]->ncj4;
+            size = cnt * sizeof(nbnxn_cj4_t);
+            temp_cj4 = (nbnxn_cj4_t*)malloc(size);
+
+            cu_copy_D2H_async(temp_cj4, cu_nb->plist[0]->cj4,
+                size, stream);
+
+            // Make sure all data has been transfered back from device
+            cudaStreamSynchronize(stream);
+
+            sprintf(file_name, "cuda_cj4_%d.txt", DEBUG_RUN_STEP);
+            dump_cj4(temp_cj4, cnt, file_name);
+
+            free(temp_cj4);
+        }
+
+        run_step++;
+    }
+#endif
+
+/* Uncomment this define to enable f debugging for the first kernel run */
+//#define DEBUG_DUMP_F_CUDA
+#ifdef DEBUG_DUMP_F_CUDA
+    {
+        static int run_step = 1;
+
+        if (DEBUG_RUN_STEP == run_step)
+        {
+            char file_name[256];
+
+            // Make sure all data has been transfered back from device
+            cudaStreamSynchronize(stream);
+
+            sprintf(file_name, "cuda_f_%d.txt", DEBUG_RUN_STEP);
+            dump_results_f(nbatom->out[0].f + adat_begin * 3, (adat_len) * 3, file_name);
+        }
+
+        run_step++;
+    }
+#endif
+
+/* Uncomment this define to enable fshift debugging for the first kernel run */
+//#define DEBUG_DUMP_FSHIFT_CUDA
+#ifdef DEBUG_DUMP_FSHIFT_CUDA
+    {
+        static int run_step = 1;
+
+        if (DEBUG_RUN_STEP == run_step)
+        {
+            char file_name[256] = {0};
+
+            // Make sure all data has been transfered back from device
+            cudaStreamSynchronize(stream);
+
+            sprintf(file_name, "cuda_fshift_%d.txt", DEBUG_RUN_STEP);
+            dump_results_f((float*)(cu_nb->nbst.fshift), 3 * SHIFTS, file_name);
+        }
+
+        run_step++;
+    }
+#endif
 
     if (bDoTime)
     {

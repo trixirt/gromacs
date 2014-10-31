@@ -80,6 +80,7 @@
 
 #include "gromacs/legacyheaders/types/commrec.h"
 #include "gromacs/mdlib/nbnxn_cuda/nbnxn_cuda_data_mgmt.h"
+#include "gromacs/mdlib/nbnxn_ocl/nbnxn_ocl_data_mgmt.h"
 #include "gromacs/pbcutil/ishift.h"
 #include "gromacs/pbcutil/mshift.h"
 #include "gromacs/timing/wallcycle.h"
@@ -96,6 +97,7 @@
 #include "gmx_omp_nthreads.h"
 
 #include "nbnxn_cuda/nbnxn_cuda.h"
+#include "nbnxn_ocl/nbnxn_ocl.h"
 
 #include "nb_verlet.h"
 
@@ -616,7 +618,11 @@ static void do_nb_verlet(t_forcerec *fr,
             break;
 
         case nbnxnk8x8x8_CUDA:
+#ifdef GMX_USE_OPENCL
+            nbnxn_ocl_launch_kernel(fr->nbv->ocl_nbv, nbvg->nbat, flags, ilocality);
+#else
             nbnxn_cuda_launch_kernel(fr->nbv->cu_nbv, nbvg->nbat, flags, ilocality);
+#endif
             break;
 
         case nbnxnk8x8x8_PlainC:
@@ -646,9 +652,14 @@ static void do_nb_verlet(t_forcerec *fr,
     {
         enr_nbnxn_kernel_ljc = eNR_NBNXN_LJ_RF;
     }
+#if defined(GMX_GPU) && defined(GMX_USE_OPENCL)
+    else if ((!bCUDA && nbvg->ewald_excl == ewaldexclAnalytical) ||
+             (bCUDA && nbnxn_ocl_is_kernel_ewald_analytical(fr->nbv->ocl_nbv)))    
+#else    
     else if ((!bCUDA && nbvg->ewald_excl == ewaldexclAnalytical) ||
              (bCUDA && nbnxn_cuda_is_kernel_ewald_analytical(fr->nbv->cu_nbv)))
-    {
+#endif        
+    {        
         enr_nbnxn_kernel_ljc = eNR_NBNXN_LJ_EWALD;
     }
     else
@@ -1006,12 +1017,20 @@ void do_force_cutsVERLET(FILE *fplog, t_commrec *cr,
         if (bNS)
         {
             wallcycle_start_nocount(wcycle, ewcLAUNCH_GPU_NB);
+#ifdef GMX_USE_OPENCL
+            nbnxn_ocl_init_atomdata(nbv->ocl_nbv, nbv->grp[eintLocal].nbat);
+#else
             nbnxn_cuda_init_atomdata(nbv->cu_nbv, nbv->grp[eintLocal].nbat);
+#endif
             wallcycle_stop(wcycle, ewcLAUNCH_GPU_NB);
         }
 
         wallcycle_start_nocount(wcycle, ewcLAUNCH_GPU_NB);
+#ifdef GMX_USE_OPENCL
+        nbnxn_ocl_upload_shiftvec(nbv->ocl_nbv, nbv->grp[eintLocal].nbat);
+#else
         nbnxn_cuda_upload_shiftvec(nbv->cu_nbv, nbv->grp[eintLocal].nbat);
+#endif
         wallcycle_stop(wcycle, ewcLAUNCH_GPU_NB);
     }
 
@@ -1033,9 +1052,15 @@ void do_force_cutsVERLET(FILE *fplog, t_commrec *cr,
         if (bUseGPU)
         {
             /* initialize local pair-list on the GPU */
+#ifdef GMX_USE_OPENCL
+            nbnxn_ocl_init_pairlist(nbv->ocl_nbv,
+                                     nbv->grp[eintLocal].nbl_lists.nbl[0],
+                                     eintLocal);
+#else
             nbnxn_cuda_init_pairlist(nbv->cu_nbv,
                                      nbv->grp[eintLocal].nbl_lists.nbl[0],
                                      eintLocal);
+#endif
         }
         wallcycle_stop(wcycle, ewcNS);
     }
@@ -1146,11 +1171,21 @@ void do_force_cutsVERLET(FILE *fplog, t_commrec *cr,
         wallcycle_start_nocount(wcycle, ewcLAUNCH_GPU_NB);
         if (DOMAINDECOMP(cr) && !bDiffKernels)
         {
+#if defined(GMX_GPU) && defined(GMX_USE_OPENCL) 
+            nbnxn_ocl_launch_cpyback(nbv->ocl_nbv, nbv->grp[eintNonlocal].nbat,
+                                      flags, eatNonlocal);
+#else
             nbnxn_cuda_launch_cpyback(nbv->cu_nbv, nbv->grp[eintNonlocal].nbat,
                                       flags, eatNonlocal);
+#endif
         }
+#if defined(GMX_GPU) && defined(GMX_USE_OPENCL) 
+        nbnxn_ocl_launch_cpyback(nbv->ocl_nbv, nbv->grp[eintLocal].nbat,
+                                  flags, eatLocal);
+#else
         nbnxn_cuda_launch_cpyback(nbv->cu_nbv, nbv->grp[eintLocal].nbat,
                                   flags, eatLocal);
+#endif
         cycles_force += wallcycle_stop(wcycle, ewcLAUNCH_GPU_NB);
     }
 
@@ -1384,11 +1419,19 @@ void do_force_cutsVERLET(FILE *fplog, t_commrec *cr,
                 float cycles_tmp;
 
                 wallcycle_start(wcycle, ewcWAIT_GPU_NB_NL);
+#if defined(GMX_GPU) && !defined(GMX_USE_OPENCL)                        
                 nbnxn_cuda_wait_gpu(nbv->cu_nbv,
                                     nbv->grp[eintNonlocal].nbat,
                                     flags, eatNonlocal,
                                     enerd->grpp.ener[egLJSR], enerd->grpp.ener[egCOULSR],
                                     fr->fshift);
+#elif defined(GMX_GPU) && defined(GMX_USE_OPENCL)    
+                nbnxn_ocl_wait_gpu(nbv->ocl_nbv,
+                                    nbv->grp[eintNonlocal].nbat,
+                                    flags, eatNonlocal,
+                                    enerd->grpp.ener[egLJSR], enerd->grpp.ener[egCOULSR],
+                                    fr->fshift);
+#endif                
                 cycles_tmp       = wallcycle_stop(wcycle, ewcWAIT_GPU_NB_NL);
                 cycles_wait_gpu += cycles_tmp;
                 cycles_force    += cycles_tmp;
@@ -1445,6 +1488,7 @@ void do_force_cutsVERLET(FILE *fplog, t_commrec *cr,
         /* wait for local forces (or calculate in emulation mode) */
         if (bUseGPU)
         {
+#if defined(GMX_GPU) && !defined(GMX_USE_OPENCL)            
             wallcycle_start(wcycle, ewcWAIT_GPU_NB_L);
             nbnxn_cuda_wait_gpu(nbv->cu_nbv,
                                 nbv->grp[eintLocal].nbat,
@@ -1458,6 +1502,20 @@ void do_force_cutsVERLET(FILE *fplog, t_commrec *cr,
             wallcycle_start_nocount(wcycle, ewcLAUNCH_GPU_NB);
             nbnxn_cuda_clear_outputs(nbv->cu_nbv, flags);
             wallcycle_stop(wcycle, ewcLAUNCH_GPU_NB);
+#elif defined(GMX_GPU) && defined(GMX_USE_OPENCL)    
+            wallcycle_start(wcycle, ewcWAIT_GPU_NB_L);
+			nbnxn_ocl_wait_gpu(nbv->ocl_nbv,
+				nbv->grp[eintLocal].nbat,
+				flags, eatLocal,
+				enerd->grpp.ener[egLJSR], enerd->grpp.ener[egCOULSR],
+				fr->fshift);
+			cycles_wait_gpu += wallcycle_stop(wcycle, ewcWAIT_GPU_NB_L);
+
+            /* now clear the GPU outputs while we finish the step on the CPU */
+            wallcycle_start_nocount(wcycle, ewcLAUNCH_GPU_NB);
+			nbnxn_ocl_clear_outputs(nbv->ocl_nbv, flags);
+            wallcycle_stop(wcycle, ewcLAUNCH_GPU_NB);
+#endif            
         }
         else
         {
@@ -2715,9 +2773,15 @@ void finish_run(FILE *fplog, t_commrec *cr,
     }
 
     if (SIMMASTER(cr))
-    {
+    {              
         wallclock_gpu_t* gputimes = use_GPU(nbv) ?
-            nbnxn_cuda_get_timings(nbv->cu_nbv) : NULL;
+#if defined(GMX_GPU) && defined(GMX_USE_OPENCL)
+                nbnxn_ocl_get_timings(nbv->ocl_nbv)
+#else
+                nbnxn_cuda_get_timings(nbv->cu_nbv)
+#endif
+                : NULL;
+
         wallcycle_print(fplog, cr->nnodes, cr->npmenodes,
                         elapsed_time_over_all_ranks,
                         wcycle, gputimes);

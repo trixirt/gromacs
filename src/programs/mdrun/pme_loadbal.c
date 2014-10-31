@@ -33,13 +33,14 @@
  * the research papers on the package. Check out http://www.gromacs.org.
  */
 #include "config.h"
-
+#include "assert.h"
 #include "types/commrec.h"
 #include "network.h"
 #include "calcgrid.h"
 #include "pme.h"
 #include "domdec.h"
 #include "gromacs/mdlib/nbnxn_cuda/nbnxn_cuda_data_mgmt.h"
+#include "gromacs/mdlib/nbnxn_ocl/nbnxn_ocl_data_mgmt.h"
 #include "force.h"
 #include "macros.h"
 #include "md_logging.h"
@@ -448,6 +449,10 @@ gmx_bool pme_load_balance(pme_load_balancing_t        pme_lb,
     real         rtab;
     gmx_bool     bUsesSimpleTables = TRUE;
 
+#if defined(GMX_GPU) && defined(GMX_USE_OPENCL)
+    assert(!"Not implemented nbnxn_ocl_pme_loadbal_update_param !!");
+#endif    
+    
     if (pme_lb->stage == pme_lb->nstage)
     {
         return FALSE;

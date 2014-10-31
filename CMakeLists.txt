@@ -215,13 +215,26 @@ gmx_add_cache_dependency(GMX_COOL_QUOTES BOOL "NOT GMX_FAHCORE" OFF)
 
 # Decide on GPU settings based on user-settings and GPU/CUDA detection.
 # We support CUDA >=v4.0 on *nix, but <= v4.1 doesn't work with MSVC
-if(MSVC)
-    set(REQUIRED_CUDA_VERSION 4.1)
-else()
-    set(REQUIRED_CUDA_VERSION 4.0)
-endif()
-set(REQUIRED_CUDA_COMPUTE_CAPABILITY 2.0)
-include(gmxManageGPU)
+option(GMX_USE_OPENCL "Enable OpenCL accelerators" OFF)
+if(NOT GMX_USE_OPENCL)
+    if(MSVC)
+        set(REQUIRED_CUDA_VERSION 4.1)
+    else()
+        set(REQUIRED_CUDA_VERSION 4.0)
+    endif()
+    set(REQUIRED_CUDA_COMPUTE_CAPABILITY 2.0)
+    include(gmxManageGPU)
+else(NOT GMX_USE_OPENCL)
+    #Now the OpenCL path
+    if(GMX_GPU)
+        #1.1 For nvidia, 1.2 for amd/intel. 2.0 cannot test
+        #set(REQUIRED_OPENCL_MIN_VERSION 1.1)
+        #set(REQUIRED_OPENCL_MAX_VERSION 1.2)
+        include(gmxManageOpenCL)
+    else(GMX_GPU)
+        message(FATAL_ERROR "OpenCL requested but GPU option is not enabled (try -DGMX_GPU=on) ")
+    endif(GMX_GPU)    
+endif(NOT GMX_USE_OPENCL)
 
 # Detect the architecture the compiler is targetting, detect
 # SIMD instructions possibilities on that hardware, suggest SIMD instruction set
@@ -285,6 +298,7 @@ option(GMX_LOAD_PLUGINS "Compile with plugin support, needed to read VMD support
 mark_as_advanced(GMX_LOAD_PLUGINS)
 
 option(GMX_GPU  "Enable GPU acceleration" ON)
+option(GMX_USE_OPENCL "Enable OpenCL accelerators" OFF)
 option(GMX_OPENMP "Enable OpenMP-based multithreading" ON)
 
 option(GMX_USE_TNG "Use the TNG library for trajectory I/O" ON)
@@ -817,6 +831,8 @@ set(LIB_INSTALL_DIR  ${GMX_LIB_INSTALL_DIR})
 set(BIN_INSTALL_DIR  bin)
 set(DATA_INSTALL_DIR share/${GMX_DATA_INSTALL_DIR})
 set(MAN_INSTALL_DIR  share/man)
+set(OCL_INSTALL_DIR_NAME opencl) #Used as define in the source
+set(OCL_INSTALL_DIR  ${BIN_INSTALL_DIR}/${OCL_INSTALL_DIR_NAME})
 set(INCL_INSTALL_DIR include)
 
 # These variables get written into config.h for use in finding the data

@@ -41,7 +41,11 @@
 #include "types/nbnxn_cuda_types_ext.h"
 #include "types/hw_info.h"
 
-#ifdef GMX_GPU
+/* TODO This needs to be fixed
+ *      Use universal generic interface functions for all OpenCL/CUDA ops here
+ *      Handle specifics inside the functions-> CUDA/OpenCL path
+ */
+#if defined(GMX_GPU) && !defined(GMX_USE_OPENCL)
 #define FUNC_TERM ;
 #define FUNC_QUALIFIER
 #else
@@ -56,6 +60,7 @@ extern "C" {
 struct nonbonded_verlet_group_t;
 struct nbnxn_pairlist_t;
 struct nbnxn_atomdata_t;
+
 
 /** Initializes the data structures related to CUDA nonbonded calculations. */
 FUNC_QUALIFIER
@@ -122,7 +127,7 @@ void nbnxn_cuda_reset_timings(struct nonbonded_verlet_t gmx_unused *nbv) FUNC_TE
  *  with CUDA non-bonded kernels. */
 FUNC_QUALIFIER
 int nbnxn_cuda_min_ci_balanced(nbnxn_cuda_ptr_t gmx_unused cu_nb)
-#ifdef GMX_GPU
+#if defined(GMX_GPU) && !defined(GMX_USE_OPENCL)
 ;
 #else
 {
@@ -133,7 +138,7 @@ int nbnxn_cuda_min_ci_balanced(nbnxn_cuda_ptr_t gmx_unused cu_nb)
 /** Returns if analytical Ewald CUDA kernels are used. */
 FUNC_QUALIFIER
 gmx_bool nbnxn_cuda_is_kernel_ewald_analytical(const nbnxn_cuda_ptr_t gmx_unused cu_nb)
-#ifdef GMX_GPU
+#if defined(GMX_GPU) && !defined(GMX_USE_OPENCL)
 ;
 #else
 {

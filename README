@@ -1,20 +1,135 @@
+This is a modified version of GROMACS 5.1 adding OpenCL support.
+All CUDA accelerated features have been ported to OpenCL 1.1.
 
-               Welcome to the official version of GROMACS!
+Official GROMACS website: http://www.gromacs.org/
 
-If you are familiar with Unix, it should be fairly trivial to compile and
-install GROMACS. GROMACS uses only the CMake build sytem, and our
-installation guide can be found at
-http://www.gromacs.org/Documentation/Installation_Instructions.
+TABLE OF CONTENTS
+1. SUPPORTED OPENCL DEVICES
+2. GENERAL PROJECT SETUP
+3. OPENCL SETUP
+4. KNOWN LIMITATIONS
+5. TESTED CONFIGURATIONS
 
-Of course we will do our utmost to help you with any problems, but PLEASE 
-READ THE INSTALLATION INSTRUCTIONS BEFORE CONTACTING US!
+1. SUPPORTED OPENCL DEVICES
+   ========================
+The current version works with NVIDIA GPUs and GCN based AMD GPUs.
+Make sure that you have the latest drivers installed.
+Also check "Known Limitations" chapter.
 
-There are also several other online resources available from the homepage, 
-and special information for developers.
+2. GENERAL PROJECT SETUP
+   =====================
+Check GROMACS website for how to build the project:
+http://www.gromacs.org/Documentation/Installation_Instructions
+You can find additional information here:
+https://github.com/StreamComputing/gromacs/wiki/GROMACS-GPU-ACCELERATION-USING-OPENCL#General_Project_Setup
 
-If you are a developer, or change the source for any other reason, check
-out http://www.gromacs.org/Developer_Zone.
+3. OPENCL SETUP
+   ============
+Build Gromacs with OpenCL support enabled
+-----------------------------------------
+To build Gromacs with OpenCL support enabled, an OpenCL SDK must be installed
+and the following cmake flags must be set:
+	GMX_GPU
+	GMX_USE_OPENCL
+After setting these flags, if an OpenCL implementation has been detected on
+your system, the following cmake entries will be defined:
+	OPENCL_INCLUDE_DIR - the OpenCL include directory
+	OPENCL_LIBRARY - the OpenCL library directory
+The two paths will be automatically used to configure the project. 
 
+Run Gromacs with OpenCL accelerations enabled
+---------------------------------------------
+Gromacs loads and builds at runtime the OpenCL kernels. To do so, it needs to
+know the location of the OpenCL source files.
+If you want to run the installed version, the path to the OpenCL files is
+automatically defined.
+If you do not wish to install Gromacs, but run the version built from sources,
+you need to provide the path to the source tree with the OpenCL kernels like
+below:
+	export OCL_FILE_PATH=/path-to-gromacs/src/
+
+OpenCL Device Selection
+-----------------------
+The same option used to select a CUDA device can be used to select an OpenCL
+GPU device: -gpu_id.
+For the example below, running mdrun with -gpu_id 1 will select the NVIDIA GPU.
+
+ gmx mdrun -gpu_id 1
+ 
+ 3 GPUs detected:
+   #0: name: Bonaire, vendor: Advanced Micro Devices, Inc. device version: OpenCL 1.2 AMD-APP (1411.4), comp.  units: 12, stat: compatible
+   #1: name: GeForce GTX 750 Ti, vendor: NVIDIA Corporation device version: OpenCL 1.1 CUDA, comp. units: 5, stat:  compatible
+   #2: name: Intel(R) HD Graphics 4600, vendor: Intel(R) Corporation device version: OpenCL 1.2 , comp. units: 20,  stat: compatible
+ 
+ 1 GPU user-selected for this run.
+ Mapping of GPU ID to the 1 PP rank in this node: GeForce GTX 750 Ti
+
+Environment Variables For OpenCL
+--------------------------------
+Currently, several environment variables exist that help customize some aspects
+of the OpenCL version of Gromacs. They are mostly related to the runtime
+compilation of OpenCL kernels, but they are also used on the device selection.
+
+	OCL_FORCE_CPU - Force the selection of a CPU device instead of a GPU. This
+	exists only for debugging purposes. Do not expect Gromacs to function
+	properly with this option on, it is solely for the simplicity of stepping
+	in a kernel and see what is happening.
+	
+	OCL_FILE_PATH - Is the full path to Gromacs src folder. Useful when gmx is
+	called from a folder other than the installation/bin folder.
+	
+	OCL_NOFASTGEN - Generates and compiles all algorithm flavors, otherwise
+	only the flavor required for the simulation is generated and compiled.
+	
+	OCL_DEBUG - Use in conjunction with OCL_FORCE_CPU or with an AMD device.
+	It adds the debug flag to the compiler options (-g).
+	
+	OCL_FASTMATH - Adds the option cl-fast-relaxed-math to the compiler options
+	(in the CUDA version this is enabled by default, it is likely that the same
+	will happen with the OpenCL version soon)
+	
+	OCL_NOOPT - Disable optimisations. Adds the option cl-opt-disable to the
+	compiler options.
+
+4. KNOWN LIMITATIONS
+   =================
+- Intel CPUs are not supported
+- Intel GPUs are not supported
+- The current implementation is not compatible with OpenCL devices that are not using warp/wavefronts or for which the warp/wavefront size is not a multiple of 32
+- The following kernels are known to produce incorrect results:
+	nbnxn_kernel_ElecEwQSTab_VdwLJ_VF_prune_opencl
+	nbnxn_kernel_ElecEwQSTab_VdwLJ_F_prune_opencl
+
+5. TESTED CONFIGURATIONS
+   =====================
+Tested devices:
+	NVIDIA GPUs: GeForce GTX 660M, GeForce GTX 750Ti
+	AMD GPUs: FirePro W5100, HD 7950, FirePro W9100, Radeon R7 M260
+	
+Tested kernels:
+Kernel                                          |Benchmark test                                 |Remarks
+--------------------------------------------------------------------------------------------------------
+nbnxn_kernel_ElecCut_VdwLJ_VF_prune_opencl      |d.poly-ch2                                     |
+nbnxn_kernel_ElecCut_VdwLJ_F_opencl             |d.poly-ch2                                     |
+nbnxn_kernel_ElecCut_VdwLJ_F_prune_opencl       |d.poly-ch2                                     |
+nbnxn_kernel_ElecCut_VdwLJ_VF_opencl            |d.poly-ch2                                     |
+nbnxn_kernel_ElecRF_VdwLJ_VF_prune_opencl       |adh_cubic with rf_verlet.mdp                   |
+nbnxn_kernel_ElecRF_VdwLJ_F_opencl              |adh_cubic with rf_verlet.mdp                   |
+nbnxn_kernel_ElecRF_VdwLJ_F_prune_opencl        |adh_cubic with rf_verlet.mdp                   |
+nbnxn_kernel_ElecEwQSTab_VdwLJ_VF_prune_opencl  |adh_cubic_vsites with pme_verlet_vsites.mdp    |Failed
+nbnxn_kernel_ElecEwQSTab_VdwLJ_F_prune_opencl   |adh_cubic_vsites with pme_verlet_vsites.mdp    |Failed
+
+Input data used for testing - Benchmark data sets available here:
+ftp://ftp.gromacs.org/pub/benchmarks
+
+                               * * * * *
+The GROMACS OpenCL team
+	StreamComputing - www.streamcomputing.eu
+		Vincent Hindriksen
+		Teemu Virolainen
+		Anca Hamuraru
+	Contributors
+		Dimitris Karkoulis
                                * * * * *
 
 GROMACS is free software, distributed under the GNU Lesser General
@@ -42,37 +157,3 @@ sure support questions are directed to you instead of the GROMACS developers.
 Sorry for the hard wording, but it is meant to protect YOUR reseach results!
 
                                * * * * *
-
-The development of GROMACS is mainly funded by academic research grants. 
-To help us fund development, we humbly ask that you cite the GROMACS papers:
-
-* GROMACS: A message-passing parallel molecular dynamics implementation
-  H.J.C. Berendsen, D. van der Spoel and R. van Drunen
-  Comp. Phys. Comm. 91, 43-56 (1995)
-  DOI: 10.1016/0010-4655(95)00042-E
- 
-* GROMACS 4: Algorithms for highly efficient, load-balanced, and scalable
-  molecular simulation
-  B. Hess and C. Kutzner and D. van der Spoel and E. Lindahl
-  J. Chem. Theory Comput. 4 (2008) pp. 435-447
-  DOI: 10.1021/ct700301q
-
-* GROMACS 4.5: a high-throughput and highly parallel open source
-  molecular simulation toolkit
-  Sander Pronk, Szilárd Páll, Roland Schulz, Per Larsson, Pär Bjelkmar,
-  Rossen Apostolov, Michael R. Shirts, Jeremy C. Smith, Peter M. Kasson,
-  David van der Spoel, Berk Hess, Erik Lindahl.
-  Bioinformatics 29 (2013) pp. 845-54
-  DOI: 10.1093/bioinformatics/btt055
-
-There are a lot of cool features we'd like to include in future versions,
-but our resources are limited. All kinds of donations are welcome, both in 
-form of code, hardware and funding! Industrial users who choose to pay
-for a license pro bono (it is still LGPL and can be redistributed freely) or
-contribute in other ways are listed as GROMACS supporters on our webpages. 
-Don't hesitate to contact us if you are interested.
-
-
-                       Good luck with your simulations!
-
-                              The GROMACS Crew
