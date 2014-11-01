@@ -217,10 +217,9 @@ create_ocl_build_options_length(
  *          automatically enable some vendor specific options
  * \param custom_build_options_prepend Prepend options string
  * \param custom_build_options_append  Append  options string
- * \return size_t containing the size in bytes of the composed
- *             build options string including null termination
+ * \return The string build_options_string with the build options
  */
-static void
+static char *
 create_ocl_build_options(
     char *             build_options_string,
     size_t             build_options_length,
@@ -308,7 +307,7 @@ create_ocl_build_options(
  * Otherwise the following full path size is returned (OCL_INSTALL_DIR_NAME is provided by CMAKE
  *  installation prefix path) :
  *  strlen( OCL_INSTALL_DIR_NAME ) + strlen(kernel_id.cl) + separator + null term
- * \param kernel_src_id Id of the kernel source (nvidia,amd,nowarp)
+ * \param kernel_src_id Id of the kernel source (auto,nvidia,amd,nowarp)
  * \return Size in bytes of the full kernel source file path and name including
  *          separators and null termination
  */
@@ -341,10 +340,11 @@ get_ocl_kernel_source_file_info(kernel_source_index_t kernel_src_id)
  *  installation prefix path):
  *  OCL_INSTALL_DIR_NAME/kernel_id.cl
  * \param ocl_kernel_filename   String where the full path and name will be saved
- * \param kernel_src_id         Id of the kernel source (nvidia,amd,nowarp)
+ * \param kernel_src_id         Id of the kernel source (default)
  * \param kernel_filename_len   Size of the full path and name string
+ * \return The ocl_kernel_filename complete with the full path and name
  */
-static void
+static char * ocl_kernel_filename
 get_ocl_kernel_source_path(
     char *                  ocl_kernel_filename,
     kernel_source_index_t   kernel_src_id,
@@ -417,7 +417,14 @@ get_ocl_kernel_source_path(
 #undef SEPARATOR
 #endif
 
-
+/**
+ * \brief Loades the src inside the file filename onto a string in memory
+ * \param filename The name of the file to be read
+ * \param p_source_length Pointer to the size of the source in bytes
+ *                          (without null termination)
+ * \return A string with the contents of the file with name filename,
+ *  or NULL if there was a problem opening/reading the file
+ */
 char* load_ocl_source(const char* filename, size_t* p_source_length)
 {
     FILE* filestream = NULL;
@@ -448,10 +455,26 @@ char* load_ocl_source(const char* filename, size_t* p_source_length)
     return ocl_source;
 }
 
+/**
+ * \brief Handles the dumping of the OpenCL JIT compilation log
+ * In a debug build:
+ *  -Success: Save to file kernel_id.SUCCEEDED in the run folder.
+ *  -Fail   : Save to file kernel_id.FAILED in the run folder.
+ *            Dump to stderr
+ * In a release build:
+ *  -Success: Nothing is logged.
+ *  -Fail   : Save to a file kernel_id.FAILED in the run folder.
+ * If GMX_OCL_JIT_DUMP_FILE is set, log is always dumped to file
+ * If GMX_OCL_JIT_DUMP_STDERR is set, log is always dumped to stderr
+ * \param build_log String containing the OpenCL JIT compilation log
+ * \param build_options_string String containing the options used for the build
+ * \param build_status The OpenCL type status of the build (CL_SUCCESS etc)
+ * \param kernel_src_id The id of the kernel src used for the build (default)
+ */
 void handle_ocl_build_log(const char*   build_log,
                           const char*   build_options_string,
                           cl_int        build_status,
-                          kernel_source_index_t kernel_filename_id)
+                          kernel_source_index_t kernel_src_id)
 {
     bool dumpFile  = false;
     bool dumpStdErr= false;
@@ -461,6 +484,12 @@ void handle_ocl_build_log(const char*   build_log,
     dumpFile = true;
     if(build_status != CL_SUCCESS) dumpStdErr = true;
 #endif
+
+    /* Override default handling */
+    if(getenv("GMX_OCL_JIT_DUMP_FILE") != NULL )
+        dumpFile = true;
+    if(getenv("GMX_OCL_JIT_DUMP_STDERR") != NULL )
+        dumpStdErr = true;
 
     if(dumpFile || dumpStdErr)
     {
@@ -480,11 +509,11 @@ void handle_ocl_build_log(const char*   build_log,
         {
             strncpy(status_suffix, (build_status==CL_SUCCESS)?"SUCCEEDED":"FAILED",10);
 
-            log_fname = (char*)malloc(strlen(kernel_filenames[kernel_filename_id])
+            log_fname = (char*)malloc(strlen(kernel_filenames[kernel_src_id])
                                      + strlen(status_suffix) + 2
                                    );
 
-            sprintf(log_fname,"%s.%s",kernel_filenames[kernel_filename_id],status_suffix);
+            sprintf(log_fname,"%s.%s",kernel_filenames[kernel_src_id],status_suffix);
             build_log_file = fopen(log_fname,"w");
         }
 
@@ -534,7 +563,8 @@ void handle_ocl_build_log(const char*   build_log,
  *  \param  device_id OpenCL device with the context
  *  \return cl_int value of the warp size
  */
-static cl_int ocl_get_warp_size(cl_context context, cl_device_id device_id)
+static cl_int
+ocl_get_warp_size(cl_context context, cl_device_id device_id)
 {
     cl_int cl_error = CL_SUCCESS;
     size_t warp_size = 0;
@@ -565,7 +595,8 @@ static cl_int ocl_get_warp_size(cl_context context, cl_device_id device_id)
  * \param ocl_vendor_id_t Vendor id enumerator (amd,nvidia,intel,unknown)
  * \return Vendor-specific kernel version
  */
-static kernel_vendor_spec_t ocl_autoselect_kernel_from_vendor(ocl_vendor_id_t vendor_id)
+static kernel_vendor_spec_t
+ocl_autoselect_kernel_from_vendor(ocl_vendor_id_t vendor_id)
 {
     kernel_vendor_spec_t kernel_vendor;
     printf("Selecting kernel source automatically\n");
@@ -592,7 +623,8 @@ static kernel_vendor_spec_t ocl_autoselect_kernel_from_vendor(ocl_vendor_id_t ve
  * \param kernel_spec Kernel vendor specification
  * \return String with the define for the spec
  */
-static const char * ocl_get_vendor_specific_define(kernel_vendor_spec_t kernel_spec)
+static const char *
+ocl_get_vendor_specific_define(kernel_vendor_spec_t kernel_spec)
 {
     assert(kernel_spec < _auto_vendor_kernels_ );
     printf("Setting up kernel vendor spec definitions:  %s \n",kernel_vendor_spec_definitions[kernel_spec]);
@@ -613,7 +645,8 @@ static const char * ocl_get_vendor_specific_define(kernel_vendor_spec_t kernel_s
  * \param p_kernel_algo_family Pointer to algo_family structure (eel,vdw)
  * \param p_algo_defines       String to populate with the defines
  */
-static void ocl_get_fastgen_define(
+static void
+ocl_get_fastgen_define(
     gmx_algo_family_t * p_gmx_algo_family,
     char *              p_algo_defines)
 {
@@ -637,6 +670,21 @@ static void ocl_get_fastgen_define(
     printf(" %s \n",p_algo_defines);
 }
 
+/**
+ * \brief Compile the kernels as described by kernel src id and vendor spec
+ * \param kernel_source_file Index of the kernel src to be used (default)
+ * \param kernel_vendor_spec Vendor specific compilation (auto,nvidia,amd,nowarp)
+ * \param p_gmx_algo_family  Flavor of kernels requested
+ * \param DoFastGen          Use the info on the required flavor of kernels to reduce
+ *                            JIT compilation time
+ * \param result_str         Gromacs error string
+ * \param context            Current context on the device to compile for
+ * \param device_id          OpenCL device id of the device to compile for
+ * \param ocl_device_vendor  Enumarator of the device vendor to compile for
+ * \param p_program          Pointer to the cl_program where the compiled
+ *                            cl_program will be stored
+ * \return cl_int with the build status AND any other OpenCL error appended to it
+ */
 cl_int
 ocl_compile_program(
     kernel_source_index_t       kernel_source_file,
