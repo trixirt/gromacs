@@ -82,13 +82,25 @@ const char* include_path_list[] =
 	"gromacs" SSEPARATOR "pbcutil",
 	"gromacs" SSEPARATOR "mdlib"
 };
-/* Available sources */
+
+/**
+ * \brief Available sources
+ */
 static const char * kernel_filenames[]         = {"nbnxn_ocl_kernels.cl"};
 
-/* Defines to enable specific kernels based on vendor */
+/**
+ * \brief Defines to enable specific kernels based on vendor
+ */
 static const char * kernel_vendor_spec_definitions[] = {"-D_WARPLESS_SOURCE_", "-D_NVIDIA_SOURCE_", "-D_AMD_SOURCE_"};
 
+/**
+ * \brief enumarator type for electrostatic flavor
+ */
 typedef enum eelOcl  eelOcl_t;
+
+/**
+ * \brief Array of the defines needed to generate a specific eel flavor
+ */
 static const char * kernel_electrostatic_family_definitions[] =
     {"-DEL_CUTOFF -D_EELNAME=_ElecCut",
      "-DEL_RF -D_EELNAME=_ElecRF",
@@ -97,7 +109,14 @@ static const char * kernel_electrostatic_family_definitions[] =
      "-DEL_EWALD_ANA -D_EELNAME=_ElecEw",
      "-DEL_EWALD_ANA -DLJ_CUTOFF_CHECK -D_EELNAME=_ElecEwTwinCut"};
 
+/**
+ * \brief enumarator type for vdw flavor
+ */
 typedef enum evdwOcl evdwOcl_t;
+
+/**
+ * \brief Array of the defines needed to generate a specific vdw flavor
+ */
 static const char * kernel_VdW_family_definitions[] =
     {"-D_VDWNAME=_VdwLJ",
      "-DLJ_FORCE_SWITCH -D_VDWNAME=_VdwLJFsw",
@@ -121,6 +140,12 @@ static const char* get_ocl_build_option(build_options_index_t build_option_id)
         return build_options_list[_invalid_option_];
 }
 
+/**
+ * \brief Get the size of the string (without null termination) required
+ *  for the build option of the specific id
+ * \param  build_option_id  The option id as defines in the header
+ * \return size_t containing the size in bytes of the build option string
+ */
 static size_t get_ocl_build_option_length(build_options_index_t build_option_id)
 {
 
@@ -130,22 +155,31 @@ static size_t get_ocl_build_option_length(build_options_index_t build_option_id)
         return strlen(build_options_list[_invalid_option_]);
 }
 
+/**
+ * \brief Get the size of final composed build options literal
+ * \param build_device_vendor_id  Device vendor id. Used to
+ *          automatically enable some vendor specific options
+ * \param custom_build_options_prepend Prepend options string
+ * \param custom_build_options_append  Append  options string
+ * \return size_t containing the size in bytes of the composed
+ *             build options string including null termination
+ */
 static size_t
 create_ocl_build_options_length(
-    ocl_vendor_id_t vendor_id,
+    ocl_vendor_id_t build_device_vendor_id,
     const char *    custom_build_options_prepend,
     const char *    custom_build_options_append)
 {
     size_t build_options_length = 0;
     size_t whitespace = 1;
 
-    assert(vendor_id <= _OCL_VENDOR_UNKNOWN_);
+    assert(build_device_vendor_id <= _OCL_VENDOR_UNKNOWN_);
 
     if(custom_build_options_prepend)
         build_options_length +=
             strlen(custom_build_options_prepend)+whitespace;
 
-    if ( (vendor_id == _OCL_VENDOR_AMD_) && getenv("OCL_DEBUG") && getenv("OCL_FORCE_CPU") )
+    if ( (build_device_vendor_id == _OCL_VENDOR_AMD_) && getenv("OCL_DEBUG") && getenv("OCL_FORCE_CPU") )
     {
         build_options_length += get_ocl_build_option_length(_generic_debug_symbols_)+whitespace;
     }
@@ -174,12 +208,25 @@ create_ocl_build_options_length(
     return build_options_length+1;
 }
 
+/**
+ * \brief Get the size of final composed build options literal
+ * \param build_options_string The string where to save the
+ *                                  resulting build options in
+ * \param build_options_length The size of the build options
+ * \param build_device_vendor_id  Device vendor id. Used to
+ *          automatically enable some vendor specific options
+ * \param custom_build_options_prepend Prepend options string
+ * \param custom_build_options_append  Append  options string
+ * \return size_t containing the size in bytes of the composed
+ *             build options string including null termination
+ */
 static void
-create_ocl_build_options(char *             build_options_string,
-                         size_t             build_options_length,
-                         ocl_vendor_id_t    build_device_vendor_id,
-                         const char *       custom_build_options_prepend,
-                         const char *       custom_build_options_append)
+create_ocl_build_options(
+    char *             build_options_string,
+    size_t             build_options_length,
+    ocl_vendor_id_t    build_device_vendor_id,
+    const char *       custom_build_options_prepend,
+    const char *       custom_build_options_append)
 {
     size_t char_added=0;
 
@@ -254,24 +301,54 @@ create_ocl_build_options(char *             build_options_string,
 
 }
 
-/* TODO comments .. */
-static size_t  get_ocl_kernel_source_file_info(kernel_source_index_t kernel_src_id)
+/**
+ * \brief Get the size of the full kernel source file path and name
+ * If OCL_FILE_PATH is defined in the environent the following full path size is returned:
+ *  strlen($OCL_FILE_PATH) + strlen(kernel_id.cl) + separator + null term
+ * Otherwise the following full path size is returned (OCL_INSTALL_DIR_NAME is provided by CMAKE
+ *  installation prefix path) :
+ *  strlen( OCL_INSTALL_DIR_NAME ) + strlen(kernel_id.cl) + separator + null term
+ * \param kernel_src_id Id of the kernel source (nvidia,amd,nowarp)
+ * \return Size in bytes of the full kernel source file path and name including
+ *          separators and null termination
+ */
+static size_t
+get_ocl_kernel_source_file_info(kernel_source_index_t kernel_src_id)
 {
-    char * kernel_pathname=NULL;
-	if ((kernel_pathname = getenv("OCL_FILE_PATH")) != NULL) return (strlen(kernel_pathname) + strlen(kernel_filenames[kernel_src_id]) + strlen(include_path_list[0]) + 2); /* separator and null char */
+    char * gmx_pathname=NULL;
+	if ( (gmx_pathname = getenv("OCL_FILE_PATH")) != NULL)
+    {
+        return (strlen(gmx_pathname)                        /* Path to gromacs source    */
+                + strlen(kernel_filenames[kernel_src_id])   /* Kernel source filename   */
+                + strlen(include_path_list[0])              /* Path from gmx src to kernel src */
+                + 2                                         /* separator and null char  */
+               );
+    }
     else
     {
-        /* Note we add 1 for the separator and 1 for the termination null char in the resulting string */
-        return( strlen(kernel_filenames[kernel_src_id]) + strlen(OCL_INSTALL_DIR_NAME) + 2);
+        /* Kernel source are located in the installation folder of Gromacs */
+        return( strlen(kernel_filenames[kernel_src_id])     /* Kernel source filename     */
+                + strlen(OCL_INSTALL_DIR_NAME)              /* Full path to kernel source */
+                + 2);                                       /* separator and null char    */
     }
 }
 
-/* TODO comments .. */
-static void get_ocl_kernel_source_path(
-    char * ocl_kernel_filename,
-    kernel_source_index_t kernel_src_id,
-    size_t kernel_filename_len
-)
+/**
+ * \brief Compose and the full path and name of the kernel src to be used
+ * If OCL_FILE_PATH is defined in the environent the following full path size is composed:
+ *  $OCL_FILE_PATH/kernel_id.cl
+ * Otherwise the following full path is composed (OCL_INSTALL_DIR_NAME is provided by CMAKE
+ *  installation prefix path):
+ *  OCL_INSTALL_DIR_NAME/kernel_id.cl
+ * \param ocl_kernel_filename   String where the full path and name will be saved
+ * \param kernel_src_id         Id of the kernel source (nvidia,amd,nowarp)
+ * \param kernel_filename_len   Size of the full path and name string
+ */
+static void
+get_ocl_kernel_source_path(
+    char *                  ocl_kernel_filename,
+    kernel_source_index_t   kernel_src_id,
+    size_t                  kernel_filename_len)
 {
     char *filepath = NULL;
 
@@ -333,11 +410,13 @@ static void get_ocl_kernel_source_path(
     }
 }
 
+/* Undefine the separators */
 #if defined(__linux__) || (defined(__APPLE__)&&defined(__MACH__))
 #undef SEPARATOR
 #elif defined(_WIN32)
 #undef SEPARATOR
 #endif
+
 
 char* load_ocl_source(const char* filename, size_t* p_source_length)
 {
