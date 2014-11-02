@@ -302,7 +302,7 @@ create_ocl_build_options(
 
 /**
  * \brief Get the size of the full kernel source file path and name
- * If OCL_FILE_PATH is defined in the environent the following full path size is returned:
+ * If OCL_FILE_PATH is defined in the environment the following full path size is returned:
  *  strlen($OCL_FILE_PATH) + strlen(kernel_id.cl) + separator + null term
  * Otherwise the following full path size is returned (OCL_INSTALL_DIR_NAME is provided by CMAKE
  *  installation prefix path) :
@@ -334,7 +334,7 @@ get_ocl_kernel_source_file_info(kernel_source_index_t kernel_src_id)
 
 /**
  * \brief Compose and the full path and name of the kernel src to be used
- * If OCL_FILE_PATH is defined in the environent the following full path size is composed:
+ * If OCL_FILE_PATH is defined in the environment the following full path size is composed:
  *  $OCL_FILE_PATH/kernel_id.cl
  * Otherwise the following full path is composed (OCL_INSTALL_DIR_NAME is provided by CMAKE
  *  installation prefix path):
@@ -418,7 +418,7 @@ get_ocl_kernel_source_path(
 #endif
 
 /**
- * \brief Loades the src inside the file filename onto a string in memory
+ * \brief Loads the src inside the file filename onto a string in memory
  * \param filename The name of the file to be read
  * \param p_source_length Pointer to the size of the source in bytes
  *                          (without null termination)
@@ -464,8 +464,8 @@ char* load_ocl_source(const char* filename, size_t* p_source_length)
  * In a release build:
  *  -Success: Nothing is logged.
  *  -Fail   : Save to a file kernel_id.FAILED in the run folder.
- * If GMX_OCL_JIT_DUMP_FILE is set, log is always dumped to file
- * If GMX_OCL_JIT_DUMP_STDERR is set, log is always dumped to stderr
+ * If OCL_JIT_DUMP_FILE is set, log is always dumped to file
+ * If OCL_JIT_DUMP_STDERR is set, log is always dumped to stderr
  * \param build_log String containing the OpenCL JIT compilation log
  * \param build_options_string String containing the options used for the build
  * \param build_status The OpenCL type status of the build (CL_SUCCESS etc)
@@ -486,9 +486,9 @@ void handle_ocl_build_log(const char*   build_log,
 #endif
 
     /* Override default handling */
-    if(getenv("GMX_OCL_JIT_DUMP_FILE") != NULL )
+    if(getenv("OCL_JIT_DUMP_FILE") != NULL )
         dumpFile = true;
-    if(getenv("GMX_OCL_JIT_DUMP_STDERR") != NULL )
+    if(getenv("OCL_JIT_DUMP_STDERR") != NULL )
         dumpStdErr = true;
 
     if(dumpFile || dumpStdErr)
@@ -632,16 +632,16 @@ ocl_get_vendor_specific_define(kernel_vendor_spec_t kernel_spec)
 }
 
 /**
- * \brief Populates algo_defines with the compiler defines required to avoid all flavor generation
- * For example if flavor eelOclRF with evdwOclFSWITCH, the output will be such that the corresponding
- * kernel flavor is generated:
- * -D_OCL_FASTGEN_ (will replace flavor generator kernels.clh with the fastgen one kernels_fastgen.clh)
- * -DEL_RF             (The eelOclRF flavor)
+ * \brief Populates algo_defines with the compiler defines required to avoid all flavour generation
+ * For example if flavour eelOclRF with evdwOclFSWITCH, the output will be such that the corresponding
+ * kernel flavour is generated:
+ * -D_OCL_FASTGEN_ (will replace flavour generator kernels.clh with the fastgen one kernels_fastgen.clh)
+ * -DEL_RF             (The eelOclRF flavour)
  * -D_EELNAME=_ElecRF  (The first part of the generated kernel name )
- * -DLJ_EWALD_COMB_GEOM (The evdwOclFSWITCH flavor)
+ * -DLJ_EWALD_COMB_GEOM (The evdwOclFSWITCH flavour)
  * -D_VDWNAME=_VdwLJEwCombGeom (The second part of the generated kernel name )
- * prune/energy are still generated as originally. It is only the the flavor-level that has changed, so that
- * only the required flavor for the simulation is compiled.
+ * prune/energy are still generated as originally. It is only the the flavour-level that has changed, so that
+ * only the required flavour for the simulation is compiled.
  * \param p_kernel_algo_family Pointer to algo_family structure (eel,vdw)
  * \param p_algo_defines       String to populate with the defines
  */
@@ -674,13 +674,13 @@ ocl_get_fastgen_define(
  * \brief Compile the kernels as described by kernel src id and vendor spec
  * \param kernel_source_file Index of the kernel src to be used (default)
  * \param kernel_vendor_spec Vendor specific compilation (auto,nvidia,amd,nowarp)
- * \param p_gmx_algo_family  Flavor of kernels requested
- * \param DoFastGen          Use the info on the required flavor of kernels to reduce
+ * \param p_gmx_algo_family  Flavour of kernels requested
+ * \param DoFastGen          Use the info on the required flavour of kernels to reduce
  *                            JIT compilation time
  * \param result_str         Gromacs error string
  * \param context            Current context on the device to compile for
  * \param device_id          OpenCL device id of the device to compile for
- * \param ocl_device_vendor  Enumarator of the device vendor to compile for
+ * \param ocl_device_vendor  Enumerator of the device vendor to compile for
  * \param p_program          Pointer to the cl_program where the compiled
  *                            cl_program will be stored
  * \return cl_int with the build status AND any other OpenCL error appended to it
@@ -701,6 +701,7 @@ ocl_compile_program(
     cl_int cl_error     = CL_SUCCESS;
     cl_int warp_size    = 0;
 
+    /* Get the reported warp size. Compile a small dummy kernel to do so */
     warp_size = ocl_get_warp_size(context,device_id);
 
     char* ocl_source        = NULL;
@@ -709,14 +710,18 @@ ocl_compile_program(
     size_t ocl_source_length    = 0;
     size_t kernel_filename_len  = 0;
 
+    /* Select vendor specific kernels automatically */
     if ( kernel_vendor_spec == _auto_vendor_kernels_)
         kernel_vendor_spec = ocl_autoselect_kernel_from_vendor(ocl_device_vendor);
 
+    /* Get the size of the kernel source filename */
     kernel_filename_len = get_ocl_kernel_source_file_info(kernel_source_file);
     if(kernel_filename_len) kernel_filename = (char*)malloc(kernel_filename_len);
 
+    /* Get the actual full path and name of the source file with the kernels */
     get_ocl_kernel_source_path(kernel_filename, kernel_source_file, kernel_filename_len);
 
+    /* Load the above source file and store its contents in ocl_source */
     ocl_source = load_ocl_source(kernel_filename, &kernel_filename_len);
 
     if (!ocl_source)
@@ -725,89 +730,153 @@ ocl_compile_program(
         return CL_BUILD_PROGRAM_FAILURE;
     }
 
+    /* The sources are loaded so the filename is not needed anymore */
     free(kernel_filename);
 
-    *p_program = clCreateProgramWithSource(context, 1, (const char**)(&ocl_source), &ocl_source_length, &cl_error);
+    /* Load the source in an OpenCL program */
+    *p_program = 
+        clCreateProgramWithSource(
+            context, 
+            1, 
+            (const char**)(&ocl_source), 
+            &ocl_source_length, 
+            &cl_error
+        );
 
-    // Build the program
+    /* Prepare compilation and compile */
     cl_int build_status         = CL_SUCCESS;
     {
         char custom_build_options_prepend[512] = {0};
 		char *custom_build_options_append = NULL;
 		char *oclpath = NULL;
+        
+        /* Create include paths for non-standard location of the kernel sources */
 		if ((oclpath = getenv("OCL_FILE_PATH")) != NULL)
 		{
 			size_t chars = 0;
-			custom_build_options_append = (char*)calloc((strlen(oclpath) + 32)*INCLUDE_PATH_COUNT, 1);
+			custom_build_options_append = 
+                (char*)calloc((strlen(oclpath) + 32)*INCLUDE_PATH_COUNT, 1);
+                
 			for (int i = 0; i < INCLUDE_PATH_COUNT; i++)
 			{
 				strncpy(&custom_build_options_append[chars], "-I", strlen("-I"));
 				chars += strlen("-I");
+                
 				strncpy(&custom_build_options_append[chars], oclpath, strlen(oclpath));
 				chars += strlen(oclpath);
-				strncpy(&custom_build_options_append[chars], include_path_list[i], strlen(include_path_list[i]));
+                
+				strncpy(
+                    &custom_build_options_append[chars], 
+                    include_path_list[i], 
+                    strlen(include_path_list[i])
+                );                
 				chars += strlen(include_path_list[i]);
+                
 				strncpy(&custom_build_options_append[chars], " ", 1);
 				chars += 1;
 			}
 			printf("OCL_FILE_PATH includes: %s\n", custom_build_options_append);
 		}
 
-
+		/* Get vendor specific define (amd,nvidia,nowarp) */
         const char * kernel_vendor_spec_define =
             ocl_get_vendor_specific_define(kernel_vendor_spec);
 
+        /* Use the fastgen flavour-level kernel generator instead of the original */
         char kernel_fastgen_define[128] = {0};
         if(DoFastGen)
             ocl_get_fastgen_define(p_gmx_algo_family, kernel_fastgen_define);
 
-        sprintf(custom_build_options_prepend, "-DWARP_SIZE_TEST=%d %s %s", warp_size, kernel_vendor_spec_define, kernel_fastgen_define);
+        /* Compose the build options to be prepended */
+        sprintf(custom_build_options_prepend, 
+                "-DWARP_SIZE_TEST=%d %s %s", 
+                warp_size, 
+                kernel_vendor_spec_define, 
+                kernel_fastgen_define
+        );
 
+        /* Get the size of the complete build options string */
         size_t build_options_length =
-			create_ocl_build_options_length(ocl_device_vendor, custom_build_options_prepend, custom_build_options_append);
+			create_ocl_build_options_length(
+                ocl_device_vendor, 
+                custom_build_options_prepend, 
+                custom_build_options_append
+            );
 
         char * build_options_string = (char *)malloc(build_options_length);
 
-        create_ocl_build_options(build_options_string,
-                                 build_options_length,
-                                 ocl_device_vendor,
-								 custom_build_options_prepend, custom_build_options_append);
+        /* Compose the complete build options */
+        create_ocl_build_options(
+            build_options_string,
+            build_options_length,
+            ocl_device_vendor,
+            custom_build_options_prepend, 
+            custom_build_options_append
+        );
 
-        size_t build_log_size       = 0;
-        
-        build_status = clBuildProgram(*p_program, 0, NULL, build_options_string, NULL, NULL);
+        /* Now we are ready to launch the build */
+        build_status = 
+            clBuildProgram(*p_program, 0, NULL, build_options_string, NULL, NULL);
 
         // Get log string size
-        cl_error = clGetProgramBuildInfo(*p_program, device_id, CL_PROGRAM_BUILD_LOG, 0, NULL, &build_log_size);
+        size_t build_log_size       = 0;        
+        cl_error = 
+            clGetProgramBuildInfo(
+                *p_program, 
+                device_id, 
+                CL_PROGRAM_BUILD_LOG, 
+                0, 
+                NULL, 
+                &build_log_size
+            );
 
+        /* Regardless of success or failure, if there is something in the log 
+         *  we might need to display it */
         if (build_log_size && (cl_error == CL_SUCCESS) )
         {
             char *build_log = NULL;
 
-            // Allocate memory to fit the build log - it can be very large in case of errors
+            /* Allocate memory to fit the build log, 
+                it can be very large in case of errors */
             build_log = (char*)malloc(build_log_size);
+            
             if (build_log)
             {
-                cl_error = clGetProgramBuildInfo(*p_program, device_id, CL_PROGRAM_BUILD_LOG, build_log_size, build_log, NULL);
+                /* Get the actual compilation log */
+                cl_error = 
+                    clGetProgramBuildInfo(
+                        *p_program, 
+                        device_id, 
+                        CL_PROGRAM_BUILD_LOG, 
+                        build_log_size, 
+                        build_log, 
+                        NULL
+                    );
 
+                /* Save or display the log */
                 if(!cl_error)
                 {
-                    handle_ocl_build_log(build_log,
-                                         build_options_string,
-                                         build_status,
-                                         kernel_source_file
+                    handle_ocl_build_log(
+                        build_log,
+                        build_options_string,
+                        build_status,
+                        kernel_source_file
                     );
                 }
 
-                // Free buildLog buffer
+                /* Build_log not needed anymore */
                 free(build_log);
             }
         }
+        
+        /*  Final clean up */
         free(build_options_string);
-		if (custom_build_options_append != NULL) free(custom_build_options_append);
+        
+		if (custom_build_options_append != NULL) 
+            free(custom_build_options_append);
     }
 
+    /* Append any other error to the build_status */
     return build_status | cl_error;
-
 }
 
