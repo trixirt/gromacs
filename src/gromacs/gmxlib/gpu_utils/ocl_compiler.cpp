@@ -33,6 +33,10 @@
 * the research papers on the package. Check out http://www.gromacs.org.
 */
 
+/** \file ocl_compiler.cpp
+ *  \brief OpenCL JIT compilation for Gromacs
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -60,22 +64,46 @@
 #define SSEPARATOR "\\"
 #endif
 
-const char* build_options_list[] = {
+/**
+ * \brief Compiler options index
+ */
+typedef enum{
+    _invalid_option_          =0,
+    _amd_cpp_                   ,
+    _nvidia_verbose_ptxas_       ,
+    _generic_cl11_        ,
+    _generic_cl12_        ,
+    _generic_fast_relaxed_math_ ,
+    _generic_noopt_compilation_ ,
+    _generic_debug_symbols_,
+    _include_install_opencl_dir_,
+    _include_source_opencl_dirs_,
+    _num_build_options_
+} build_options_index_t;
+
+/** 
+ * \brief List of available OpenCL compiler options
+ */
+static const char* build_options_list[] = {
     "",
-    "-x clc++",
-    "-cl-nv-verbose",
-    "-cl-std=CL1.1",
-    "-cl-std=CL1.2",
-    "-cl-fast-relaxed-math",
-    "-cl-opt-disable",
-    "-g",
-    "-I"OCL_INSTALL_DIR_NAME /*,
+    "-x clc++",                 /**< AMD C++ extension */
+    "-cl-nv-verbose",           /**< Nvidia verbose ptxas */
+    "-cl-std=CL1.1",            /**< Force CL 1.1  */
+    "-cl-std=CL1.2",            /**< Force CL 1.2  */
+    "-cl-fast-relaxed-math",    /**< Fast math */
+    "-cl-opt-disable",          /**< Disable optimisations */
+    "-g",                       /**< Debug symbols */
+    "-I"OCL_INSTALL_DIR_NAME    /**< Include path to kernel sources */
+    /*, 
     "-I../../src/gromacs/gmxlib/ocl_tools           -I../../src/gromacs/mdlib/nbnxn_ocl            -I../../src/gromacs/pbcutil            -I../../src/gromacs/mdlib"
     -I../../../gromacs/src/gromacs/gmxlib/ocl_tools -I../../../gromacs/src/gromacs/mdlib/nbnxn_ocl -I../../../gromacs/src/gromacs/pbcutil -I../../../gromacs/src/gromacs/mdlib" */
 };
 /* Include paths when using the OCL_FILE_PATH to point to the gromacs source tree */
 #define INCLUDE_PATH_COUNT 4
-const char* include_path_list[] =
+/**
+ * \brief List of include paths relative to the path defined by \ref{OCL_FILE_PATH}
+ */ 
+static const char* include_path_list[] =
 {
 	"gromacs" SSEPARATOR "mdlib" SSEPARATOR "nbnxn_ocl",
 	"gromacs" SSEPARATOR "gmxlib" SSEPARATOR "ocl_tools",
@@ -86,20 +114,24 @@ const char* include_path_list[] =
 /**
  * \brief Available sources
  */
-static const char * kernel_filenames[]         = {"nbnxn_ocl_kernels.cl"};
+static const char * kernel_filenames[] = {"nbnxn_ocl_kernels.cl"};
 
 /**
  * \brief Defines to enable specific kernels based on vendor
  */
-static const char * kernel_vendor_spec_definitions[] = {"-D_WARPLESS_SOURCE_", "-D_NVIDIA_SOURCE_", "-D_AMD_SOURCE_"};
+static const char * kernel_vendor_spec_definitions[] = {
+        "-D_WARPLESS_SOURCE_", /**< nbnxn_ocl_kernel_nowarp.clh  */
+        "-D_NVIDIA_SOURCE_",   /**< nbnxn_ocl_kernel_nvidia.clh  */
+        "-D_AMD_SOURCE_"       /**< nbnxn_ocl_kernel_amd.clh     */
+    };
 
 /**
- * \brief enumarator type for electrostatic flavor
+ * \brief Enumerator type for electrostatic flavour
  */
 typedef enum eelOcl  eelOcl_t;
 
 /**
- * \brief Array of the defines needed to generate a specific eel flavor
+ * \brief Array of the defines needed to generate a specific eel flavour
  */
 static const char * kernel_electrostatic_family_definitions[] =
     {"-DEL_CUTOFF -D_EELNAME=_ElecCut",
@@ -110,12 +142,12 @@ static const char * kernel_electrostatic_family_definitions[] =
      "-DEL_EWALD_ANA -DLJ_CUTOFF_CHECK -D_EELNAME=_ElecEwTwinCut"};
 
 /**
- * \brief enumarator type for vdw flavor
+ * \brief Enumerator type for vdw flavour
  */
 typedef enum evdwOcl evdwOcl_t;
 
 /**
- * \brief Array of the defines needed to generate a specific vdw flavor
+ * \brief Array of the defines needed to generate a specific vdw flavour
  */
 static const char * kernel_VdW_family_definitions[] =
     {"-D_VDWNAME=_VdwLJ",
@@ -157,6 +189,7 @@ static size_t get_ocl_build_option_length(build_options_index_t build_option_id)
 
 /**
  * \brief Get the size of final composed build options literal
+ * 
  * \param build_device_vendor_id  Device vendor id. Used to
  *          automatically enable some vendor specific options
  * \param custom_build_options_prepend Prepend options string
@@ -210,6 +243,7 @@ create_ocl_build_options_length(
 
 /**
  * \brief Get the size of final composed build options literal
+ * 
  * \param build_options_string The string where to save the
  *                                  resulting build options in
  * \param build_options_length The size of the build options
@@ -302,11 +336,13 @@ create_ocl_build_options(
 
 /**
  * \brief Get the size of the full kernel source file path and name
+ * 
  * If OCL_FILE_PATH is defined in the environment the following full path size is returned:
  *  strlen($OCL_FILE_PATH) + strlen(kernel_id.cl) + separator + null term
  * Otherwise the following full path size is returned (OCL_INSTALL_DIR_NAME is provided by CMAKE
  *  installation prefix path) :
  *  strlen( OCL_INSTALL_DIR_NAME ) + strlen(kernel_id.cl) + separator + null term
+ * 
  * \param kernel_src_id Id of the kernel source (auto,nvidia,amd,nowarp)
  * \return Size in bytes of the full kernel source file path and name including
  *          separators and null termination
@@ -334,11 +370,13 @@ get_ocl_kernel_source_file_info(kernel_source_index_t kernel_src_id)
 
 /**
  * \brief Compose and the full path and name of the kernel src to be used
+ * 
  * If OCL_FILE_PATH is defined in the environment the following full path size is composed:
  *  $OCL_FILE_PATH/kernel_id.cl
  * Otherwise the following full path is composed (OCL_INSTALL_DIR_NAME is provided by CMAKE
  *  installation prefix path):
  *  OCL_INSTALL_DIR_NAME/kernel_id.cl
+ * 
  * \param ocl_kernel_filename   String where the full path and name will be saved
  * \param kernel_src_id         Id of the kernel source (default)
  * \param kernel_filename_len   Size of the full path and name string
@@ -419,13 +457,15 @@ get_ocl_kernel_source_path(
 
 /**
  * \brief Loads the src inside the file filename onto a string in memory
+ * 
  * \param filename The name of the file to be read
  * \param p_source_length Pointer to the size of the source in bytes
  *                          (without null termination)
  * \return A string with the contents of the file with name filename,
  *  or NULL if there was a problem opening/reading the file
  */
-char* load_ocl_source(const char* filename, size_t* p_source_length)
+static char* 
+load_ocl_source(const char* filename, size_t* p_source_length)
 {
     FILE* filestream = NULL;
     char* ocl_source;
@@ -457,6 +497,7 @@ char* load_ocl_source(const char* filename, size_t* p_source_length)
 
 /**
  * \brief Handles the dumping of the OpenCL JIT compilation log
+ * 
  * In a debug build:
  *  -Success: Save to file kernel_id.SUCCEEDED in the run folder.
  *  -Fail   : Save to file kernel_id.FAILED in the run folder.
@@ -466,15 +507,18 @@ char* load_ocl_source(const char* filename, size_t* p_source_length)
  *  -Fail   : Save to a file kernel_id.FAILED in the run folder.
  * If OCL_JIT_DUMP_FILE is set, log is always dumped to file
  * If OCL_JIT_DUMP_STDERR is set, log is always dumped to stderr
+ * 
  * \param build_log String containing the OpenCL JIT compilation log
  * \param build_options_string String containing the options used for the build
  * \param build_status The OpenCL type status of the build (CL_SUCCESS etc)
  * \param kernel_src_id The id of the kernel src used for the build (default)
  */
-void handle_ocl_build_log(const char*   build_log,
-                          const char*   build_options_string,
-                          cl_int        build_status,
-                          kernel_source_index_t kernel_src_id)
+static void 
+handle_ocl_build_log(
+    const char*   build_log,
+    const char*   build_options_string,
+    cl_int        build_status,
+    kernel_source_index_t kernel_src_id)
 {
     bool dumpFile  = false;
     bool dumpStdErr= false;
@@ -557,8 +601,10 @@ void handle_ocl_build_log(const char*   build_log,
 
 /**
  *  \brief Get the warp size reported by device
+ * 
  *  This is platform implementation dependant and seems to only work on the Nvidia and Amd platforms!
  *  Nvidia reports 32, Amd for GPU 64. Ignore the rest
+ * 
  *  \param  context   Current OpenCL context
  *  \param  device_id OpenCL device with the context
  *  \return cl_int value of the warp size
@@ -592,6 +638,7 @@ ocl_get_warp_size(cl_context context, cl_device_id device_id)
 
 /**
  * \brief Automatically select vendor-specific kernel from vendor id
+ * 
  * \param ocl_vendor_id_t Vendor id enumerator (amd,nvidia,intel,unknown)
  * \return Vendor-specific kernel version
  */
@@ -620,6 +667,7 @@ ocl_autoselect_kernel_from_vendor(ocl_vendor_id_t vendor_id)
 
 /**
  * \brief Returns the compiler define string needed to activate vendor-specific kernels
+ * 
  * \param kernel_spec Kernel vendor specification
  * \return String with the define for the spec
  */
@@ -633,6 +681,7 @@ ocl_get_vendor_specific_define(kernel_vendor_spec_t kernel_spec)
 
 /**
  * \brief Populates algo_defines with the compiler defines required to avoid all flavour generation
+ * 
  * For example if flavour eelOclRF with evdwOclFSWITCH, the output will be such that the corresponding
  * kernel flavour is generated:
  * -D_OCL_FASTGEN_ (will replace flavour generator kernels.clh with the fastgen one kernels_fastgen.clh)
@@ -642,6 +691,7 @@ ocl_get_vendor_specific_define(kernel_vendor_spec_t kernel_spec)
  * -D_VDWNAME=_VdwLJEwCombGeom (The second part of the generated kernel name )
  * prune/energy are still generated as originally. It is only the the flavour-level that has changed, so that
  * only the required flavour for the simulation is compiled.
+ * 
  * \param p_kernel_algo_family Pointer to algo_family structure (eel,vdw)
  * \param p_algo_defines       String to populate with the defines
  */
@@ -672,6 +722,7 @@ ocl_get_fastgen_define(
 
 /**
  * \brief Compile the kernels as described by kernel src id and vendor spec
+ * 
  * \param kernel_source_file Index of the kernel src to be used (default)
  * \param kernel_vendor_spec Vendor specific compilation (auto,nvidia,amd,nowarp)
  * \param p_gmx_algo_family  Flavour of kernels requested
