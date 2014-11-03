@@ -253,7 +253,7 @@ create_ocl_build_options_length(
  * \param custom_build_options_append  Append  options string
  * \return The string build_options_string with the build options
  */
-static char *
+static void
 create_ocl_build_options(
     char *             build_options_string,
     size_t             build_options_length,
@@ -382,8 +382,8 @@ get_ocl_kernel_source_file_info(kernel_source_index_t kernel_src_id)
  * \param kernel_filename_len   Size of the full path and name string
  * \return The ocl_kernel_filename complete with the full path and name
  */
-static char * ocl_kernel_filename
-get_ocl_kernel_source_path(
+//static char * ocl_kernel_filename;
+void get_ocl_kernel_source_path(
     char *                  ocl_kernel_filename,
     kernel_source_index_t   kernel_src_id,
     size_t                  kernel_filename_len)
