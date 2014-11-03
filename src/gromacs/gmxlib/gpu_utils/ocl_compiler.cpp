@@ -164,8 +164,6 @@ static const char * kernel_VdW_family_definitions[] =
  */
 static const char* get_ocl_build_option(build_options_index_t build_option_id)
 {
-	char * kernel_pathname = NULL;
-
     if(build_option_id<_num_build_options_)
         return build_options_list[build_option_id];
     else
@@ -331,7 +329,8 @@ create_ocl_build_options(
     build_options_string[char_added++] = '\0';
 
     assert(char_added == build_options_length);
-
+    
+    return build_options_string;
 }
 
 /**
@@ -382,7 +381,7 @@ get_ocl_kernel_source_file_info(kernel_source_index_t kernel_src_id)
  * \param kernel_filename_len   Size of the full path and name string
  * \return The ocl_kernel_filename complete with the full path and name
  */
-static char * ocl_kernel_filename
+static char *
 get_ocl_kernel_source_path(
     char *                  ocl_kernel_filename,
     kernel_source_index_t   kernel_src_id,
@@ -446,6 +445,7 @@ get_ocl_kernel_source_path(
         assert(chars_copied == kernel_filename_len);
 
     }
+    return ocl_kernel_filename;
 }
 
 /* Undefine the separators */
