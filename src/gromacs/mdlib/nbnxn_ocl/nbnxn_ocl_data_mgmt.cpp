@@ -267,9 +267,7 @@ void ocl_realloc_buffered(cl_mem *d_dest, void *h_src,
     and the table GPU array. If called with an already allocated table,
     it just re-uploads the table.
  */
-static void init_ewald_coulomb_force_table(//cu_nbparam_t          *nbp,
-                                           //const cuda_dev_info_t *dev_info
-                                           cl_nbparam_t             *nbp,                                           
+static void init_ewald_coulomb_force_table(cl_nbparam_t             *nbp,                                           
                                            const ocl_gpu_info_t *dev_info)
 {
     float       *ftmp;//, *coul_tab;
@@ -294,9 +292,6 @@ static void init_ewald_coulomb_force_table(//cu_nbparam_t          *nbp,
     coul_tab = nbp->coulomb_tab_climg2d;
     if (coul_tab == NULL)
     {
-        //stat = cudaMalloc((void **)&coul_tab, tabsize*sizeof(*coul_tab));
-        //CU_RET_ERR(stat, "cudaMalloc failed on coul_tab");
-        //coul_tab = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, tabsize * sizeof(float), NULL, &cl_error);
         // TO DO: handle errors, check clCreateBuffer flags
         
         cl_image_format array_format;
@@ -313,43 +308,9 @@ static void init_ewald_coulomb_force_table(//cu_nbparam_t          *nbp,
         nbp->coulomb_tab_climg2d = coul_tab;
         nbp->coulomb_tab_size     = tabsize;
         nbp->coulomb_tab_scale    = tabscale; 
-
-////#ifdef TEXOBJ_SUPPORTED
-////        /* Only device CC >= 3.0 (Kepler and later) support texture objects */
-////        //if (dev_info->prop.major >= 3)
-////        if (HAS_CC_3_0_OR_LATER)
-////        {
-////            cudaResourceDesc rd;
-////            memset(&rd, 0, sizeof(rd));
-////            rd.resType                  = cudaResourceTypeLinear;
-////            rd.res.linear.devPtr        = nbp->coulomb_tab;
-////            rd.res.linear.desc.f        = cudaChannelFormatKindFloat;
-////            rd.res.linear.desc.x        = 32;
-////            rd.res.linear.sizeInBytes   = tabsize*sizeof(*coul_tab);
-////
-////            cudaTextureDesc td;
-////            memset(&td, 0, sizeof(td));
-////            td.readMode                 = cudaReadModeElementType;
-////            stat = cudaCreateTextureObject(&nbp->coulomb_tab_texobj, &rd, &td, NULL);
-////            CU_RET_ERR(stat, "cudaCreateTextureObject on coulomb_tab_texobj failed");
-////        }
-////        else
-////#endif
-////        {
-////            GMX_UNUSED_VALUE(dev_info);
-////            cudaChannelFormatDesc cd   = cudaCreateChannelDesc<float>();
-////            stat = cudaBindTexture(NULL, &nbnxn_cuda_get_coulomb_tab_texref(),
-////                                   coul_tab, &cd, tabsize*sizeof(*coul_tab));
-////            CU_RET_ERR(stat, "cudaBindTexture on coulomb_tab_texref failed");
-////        }
     }
-////
-////    cu_copy_H2D(coul_tab, ftmp, tabsize*sizeof(*coul_tab));
-////
-////    nbp->coulomb_tab_size     = tabsize;
-////    nbp->coulomb_tab_scale    = tabscale;
-////
-////    pfree(ftmp);
+
+    ocl_pfree(ftmp);
 }
 
 
@@ -414,15 +375,17 @@ static int pick_ewald_kernel_type(bool bTwinCut)
                    "requested through environment variables.");
     }
 
-    /* By default, on SM 3.0 and later use analytical Ewald, on earlier tabulated. */
+    /* CUDA: By default, on SM 3.0 and later use analytical Ewald, on earlier tabulated. */
+    /* OpenCL: By default, use analytical Ewald, on earlier tabulated. */
+    // TO DO: decide if dev_info parameter should be added to recognize NVIDIA CC>=3.0 devices.
     //if ((dev_info->prop.major >= 3 || bForceAnalyticalEwald) && !bForceTabulatedEwald)
-    if ((HAS_CC_3_0_OR_LATER || bForceAnalyticalEwald) && !bForceTabulatedEwald)    
+    if ((1                         || bForceAnalyticalEwald) && !bForceTabulatedEwald)    
     {
         bUseAnalyticalEwald = true;
 
         if (debug)
         {
-            fprintf(debug, "Using analytical Ewald CUDA kernels\n");
+            fprintf(debug, "Using analytical Ewald OpenCL kernels\n");
         }
     }
     else
@@ -431,7 +394,7 @@ static int pick_ewald_kernel_type(bool bTwinCut)
 
         if (debug)
         {
-            fprintf(debug, "Using tabulated Ewald CUDA kernels\n");
+            fprintf(debug, "Using tabulated Ewald OpenCL kernels\n");
         }
     }
 
@@ -555,7 +518,7 @@ static void init_nbparam(/*cu_nbparam_t*/cl_nbparam_t  *nbp,
         ic->vdw_modifier,
         ic->ljpme_comb_rule,
         &(nbp->eeltype),
-        &(nbp->vdwtype) );
+        &(nbp->vdwtype)/*, dev_info*/);
 
     if(ic->vdwtype == evdwPME)
     {
@@ -708,25 +671,24 @@ static void init_nbparam(/*cu_nbparam_t*/cl_nbparam_t  *nbp,
 ////    }
 }
 
-///*! Re-generate the GPU Ewald force table, resets rlist, and update the
-// *  electrostatic type switching to twin cut-off (or back) if needed. */
-//void nbnxn_cuda_pme_loadbal_update_param(const nonbonded_verlet_t    *nbv,
-//                                         const interaction_const_t   *ic)
-//{
-//    if (!nbv || nbv->grp[0].kernel_type != nbnxnk8x8x8_CUDA)
-//    {
-//        return;
-//    }
-//    nbnxn_cuda_ptr_t cu_nb = nbv->cu_nbv;
-//    cu_nbparam_t    *nbp   = cu_nb->nbparam;
-//
-//    set_cutoff_parameters(nbp, ic);
-//
-//    nbp->eeltype        = pick_ewald_kernel_type(ic->rcoulomb != ic->rvdw,
-//                                                 cu_nb->dev_info);
-//
-//    init_ewald_coulomb_force_table(cu_nb->nbparam, cu_nb->dev_info);
-//}
+/*! Re-generate the GPU Ewald force table, resets rlist, and update the
+ *  electrostatic type switching to twin cut-off (or back) if needed. */
+void nbnxn_ocl_pme_loadbal_update_param(const nonbonded_verlet_t    *nbv,
+                                         const interaction_const_t   *ic)
+{
+    if (!nbv || nbv->grp[0].kernel_type != nbnxnk8x8x8_CUDA)
+    {
+        return;
+    }
+    nbnxn_opencl_ptr_t ocl_nb = nbv->ocl_nbv;
+    cl_nbparam_t    *nbp   = ocl_nb->nbparam;      
+
+    set_cutoff_parameters(nbp, ic);
+
+    nbp->eeltype        = pick_ewald_kernel_type(ic->rcoulomb != ic->rvdw);//, ocl_nb->dev_info);
+
+    init_ewald_coulomb_force_table(ocl_nb->nbparam, ocl_nb->dev_info);
+}
 
 /*! Initializes the pair list data structure. */
 static void init_plist(cl_plist_t *pl)

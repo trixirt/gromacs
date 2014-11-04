@@ -97,11 +97,11 @@ FUNC_QUALIFIER
 void nbnxn_ocl_init_atomdata(const nbnxn_opencl_ptr_t       gmx_unused   cu_nb,
                               const struct nbnxn_atomdata_t gmx_unused *atomdata) FUNC_TERM
 
-///////*! \brief Update parameters during PP-PME load balancing. */
-//////FUNC_QUALIFIER
-//////void nbnxn_cuda_pme_loadbal_update_param(const struct nonbonded_verlet_t gmx_unused *nbv,
-//////                                         const interaction_const_t gmx_unused       *ic) FUNC_TERM
-//////
+/*! \brief Update parameters during PP-PME load balancing. */
+FUNC_QUALIFIER
+void nbnxn_ocl_pme_loadbal_update_param(const struct nonbonded_verlet_t gmx_unused *nbv,
+                                         const interaction_const_t gmx_unused       *ic) FUNC_TERM
+
 /** Uploads shift vector to the GPU if the box is dynamic (otherwise just returns). */
 FUNC_QUALIFIER
 void nbnxn_ocl_upload_shiftvec(nbnxn_opencl_ptr_t       gmx_unused         cu_nb,

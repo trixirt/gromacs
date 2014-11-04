@@ -49,11 +49,6 @@ extern "C" {
 } /* fixes auto-indentation problems */
 #endif
 
-/* ?? Why force EWALD analytical ??
-#define HAS_CC_3_0_OR_LATER 1
-*/
-#define HAS_CC_3_0_OR_LATER 0
-
 #if defined(GMX_GPU) && defined(GMX_USE_OPENCL)
 #include <CL/opencl.h>
 #endif
