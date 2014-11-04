@@ -1457,12 +1457,7 @@ int nbnxn_ocl_min_ci_balanced(nbnxn_opencl_ptr_t ocl_nb)
 }
 
 gmx_bool nbnxn_ocl_is_kernel_ewald_analytical(const nbnxn_opencl_ptr_t ocl_nb)
-{
-    /* No analytical == warp_shuffle on OpenCL, always false */
-    assert(ocl_nb->nbparam->eeltype != eelOclEWALD_ANA);
-    assert(ocl_nb->nbparam->eeltype != eelOclEWALD_ANA_TWIN);
-    return 0;
-    /*
+{   
     return ((ocl_nb->nbparam->eeltype == eelOclEWALD_ANA) ||
-            (ocl_nb->nbparam->eeltype == eelOclEWALD_ANA_TWIN));*/
+            (ocl_nb->nbparam->eeltype == eelOclEWALD_ANA_TWIN));
 }
