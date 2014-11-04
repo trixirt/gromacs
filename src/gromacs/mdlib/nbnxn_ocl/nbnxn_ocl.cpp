@@ -424,6 +424,25 @@ void wait_ocl_event(cl_event *ocl_event)
     *ocl_event = 0;
 }
 
+/* Equivalent to Cuda Stream Sync. Enqueues a wait for event completion.
+ * Then it releases the event and sets it to 0.
+ * Don't use this function when more than one wait will be issued for the event.
+ */
+void sync_ocl_event(cl_command_queue stream, cl_event *ocl_event)
+{
+    cl_int cl_error;
+
+    /* Enqueue wait */
+    cl_error = clEnqueueWaitForEvents(stream,1,ocl_event);
+
+    assert(CL_SUCCESS == cl_error);
+
+    /* Release event and reset it to 0. It is ok to release it as enqueuewaitforevents performs implicit retain for events. */
+    cl_error = clReleaseEvent(*ocl_event);
+    assert(CL_SUCCESS == cl_error);
+    *ocl_event = 0;
+}
+
 /* Returns the duration in miliseconds for the command associated with the event.
  * It then releases the event and sets it to 0.
  * Before calling this function, make sure the command has finished either by
@@ -539,8 +558,7 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
         }
         else
         {
-            wait_ocl_event(&(ocl_nb->misc_ops_done));
-        	 //clEnqueueWaitForEvents(stream,1,&(ocl_nb->misc_ops_done));
+            sync_ocl_event(stream, &(ocl_nb->misc_ops_done));
         }
     }
 
@@ -902,7 +920,7 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t        ocl_nb,
        has been launched. */
     if (iloc == eintLocal && ocl_nb->bUseTwoStreams)
     {
-        wait_ocl_event(&(ocl_nb->nonlocal_done));        
+        sync_ocl_event(stream, &(ocl_nb->nonlocal_done));
     }
 
     /* DtoH f */    
