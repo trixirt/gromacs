@@ -1,4 +1,4 @@
-This is a modified version of GROMACS 5.1 adding OpenCL support.
+This is a modified version of GROMACS 5.0 adding OpenCL support.
 All CUDA accelerated features have been ported to OpenCL 1.1.
 
 Official GROMACS website: http://www.gromacs.org/
