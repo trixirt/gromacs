@@ -540,13 +540,14 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
         else
         {
             wait_ocl_event(&(ocl_nb->misc_ops_done));
+        	 //clEnqueueWaitForEvents(stream,1,&(ocl_nb->misc_ops_done));
         }
     }
 
     /* beginning of timed HtoD section */
 
     /* HtoD x, q */
-    ocl_copy_H2D_async(adat->xq, nbatom->x + adat_begin * 4, adat_begin,
+    ocl_copy_H2D_async(adat->xq, nbatom->x + adat_begin * 4, adat_begin*sizeof(float)*4,
         adat_len * sizeof(float) * 4, stream, bDoTime ? (&(t->nb_h2d[iloc])) : NULL);
 
     /* beginning of timed nonbonded calculation section */
@@ -629,7 +630,6 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
 
     if(cl_error)
         printf("ClERROR! %d\n",cl_error);
-
     cl_error = clEnqueueNDRangeKernel(stream, nb_kernel, 3, NULL, dim_grid, dim_block, 0, NULL, bDoTime ? &(t->nb_k[iloc]) : NULL);
     assert(cl_error == CL_SUCCESS);
 
@@ -906,7 +906,7 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t        ocl_nb,
     }
 
     /* DtoH f */    
-    ocl_copy_D2H_async(nbatom->out[0].f + adat_begin * 3, adat->f, adat_begin,
+    ocl_copy_D2H_async(nbatom->out[0].f + adat_begin * 3, adat->f, adat_begin*3*sizeof(float),
                       (adat_len)*sizeof(float) * 3, stream, bDoTime ? &(t->nb_d2h_f[iloc]) : NULL);
 
     /* After the non-local D2H is launched the nonlocal_done event can be
@@ -1104,6 +1104,7 @@ void nbnxn_ocl_wait_gpu(nbnxn_opencl_ptr_t cu_nb,
 
     if (cu_nb->bUseStreamSync)
     {
+
         /* Actual sync point. Waits for everything to be finished in the command queue. TODO: Find out if a more fine grained solution is needed */
         cl_error = clFinish(cu_nb->stream[iloc]);
         assert(CL_SUCCESS == cl_error);
