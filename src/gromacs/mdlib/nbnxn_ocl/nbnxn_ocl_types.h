@@ -119,9 +119,9 @@ typedef struct cl_nb_staging
 {
     float   *e_lj;      /**< LJ energy            */
     float   *e_el;      /**< electrostatic energy */
-    // TO DO: see how this field is used and fix its data type
+    // TODO: see how this field is used and fix its data type
     //float3  *fshift;    /**< shift forces         */
-    // TO DO: review fshift data type and how its size is computed
+    // TODO: review fshift data type and how its size is computed
     float *fshift;
 }cl_nb_staging_t;
 
@@ -204,7 +204,7 @@ typedef struct cl_nbparam
 
 // Data structure shared between the OpenCL device code and OpenCL host code
 // Must not contain OpenCL objects (buffers)
-// TO DO: review, improve
+// TODO: review, improve
 typedef struct cl_nbparam_params
 {
 

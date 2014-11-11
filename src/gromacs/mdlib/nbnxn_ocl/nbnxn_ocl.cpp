@@ -329,7 +329,7 @@ static inline cl_kernel select_nbnxn_kernel(nbnxn_opencl_ptr_t ocl_nb,
         *kernel_ptr = clCreateKernel(ocl_nb->dev_info->program, kernel_name_to_run, &cl_error);
         assert(cl_error == CL_SUCCESS);
     }
-    // TO DO: handle errors
+    // TODO: handle errors
 
     return *kernel_ptr;
 }
@@ -341,7 +341,7 @@ static inline int calc_nb_kernel_nblock(int nwork_units, ocl_gpu_info_t *dinfo)
 
     assert(dinfo);
 
-    // TO DO: fix for OpenCL implementation
+    // TODO: fix for OpenCL implementation
     //max_grid_x_size = dinfo->prop.maxGridSize[0];
 
     ///* do we exceed the grid x dimension limit? */
@@ -943,7 +943,7 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t        ocl_nb,
         /* DtoH fshift */
         if (bCalcFshift)
         {            
-             // TO DO: review fshift data type and how its size is computed
+             // TODO: review fshift data type and how its size is computed
             ocl_copy_D2H_async(ocl_nb->nbst.fshift, adat->fshift, 0,
                               3 * SHIFTS * sizeof(float), stream, bDoTime ? &(t->nb_d2h_fshift[iloc]) : NULL);
         }

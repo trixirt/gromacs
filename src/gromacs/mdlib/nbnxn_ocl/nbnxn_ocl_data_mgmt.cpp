@@ -119,7 +119,7 @@ static int ocl_copy_H2D_generic(cl_mem d_dest, void* h_src, size_t offset, size_
         //CU_RET_ERR(stat, "HtoD cudaMemcpyAsync failed");
         cl_error = clEnqueueWriteBuffer(command_queue, d_dest, CL_FALSE, offset, bytes, h_src, 0, NULL, copy_event);
         assert(cl_error == CL_SUCCESS);
-        // TO DO: handle errors
+        // TODO: handle errors
     }
     else
     {
@@ -127,7 +127,7 @@ static int ocl_copy_H2D_generic(cl_mem d_dest, void* h_src, size_t offset, size_
         //CU_RET_ERR(stat, "HtoD cudaMemcpy failed");
         cl_error = clEnqueueWriteBuffer(command_queue, d_dest, CL_TRUE, offset, bytes, h_src, 0, NULL, copy_event);
         assert(cl_error == CL_SUCCESS);        
-        // TO DO: handle errors
+        // TODO: handle errors
     }
 
     return 0;
@@ -158,13 +158,13 @@ int ocl_copy_D2H_generic(void * h_dest, cl_mem d_src, size_t offset, size_t byte
     {        
         cl_error = clEnqueueReadBuffer(command_queue, d_src, CL_FALSE, offset, bytes, h_dest, 0, NULL, copy_event);
         assert(cl_error == CL_SUCCESS);        
-        // TO DO: handle errors
+        // TODO: handle errors
     }
     else
     {        
         cl_error = clEnqueueReadBuffer(command_queue, d_src, CL_TRUE, offset, bytes, h_dest, 0, NULL, copy_event);
         assert(cl_error == CL_SUCCESS);        
-        // TO DO: handle errors
+        // TODO: handle errors
     }
 
     return 0;
@@ -186,7 +186,7 @@ void ocl_free_buffered(cl_mem d_ptr, int *n, int *nalloc)
     {
         cl_error = clReleaseMemObject(d_ptr);
         assert(cl_error == CL_SUCCESS);        
-        // TO DO: handle errors,
+        // TODO: handle errors,
         //stat = cudaFree(d_ptr);
         //CU_RET_ERR(stat, "cudaFree failed");
     }
@@ -243,7 +243,7 @@ void ocl_realloc_buffered(cl_mem *d_dest, void *h_src,
 
         *d_dest = clCreateBuffer(context, CL_MEM_READ_WRITE, *curr_alloc_size * type_size, NULL, &cl_error);
         assert(cl_error == CL_SUCCESS);
-        // TO DO: handle errors, check clCreateBuffer flags
+        // TODO: handle errors, check clCreateBuffer flags
     }
 
     /* size could have changed without actual reallocation */
@@ -292,7 +292,7 @@ static void init_ewald_coulomb_force_table(cl_nbparam_t             *nbp,
     coul_tab = nbp->coulomb_tab_climg2d;
     if (coul_tab == NULL)
     {
-        // TO DO: handle errors, check clCreateBuffer flags
+        // TODO: handle errors, check clCreateBuffer flags
         
         cl_image_format array_format;
 
@@ -303,7 +303,7 @@ static void init_ewald_coulomb_force_table(cl_nbparam_t             *nbp,
             &array_format, tabsize, 1, 0, ftmp, &cl_error);*/
 		coul_tab = clCreateBuffer(dev_info->context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, tabsize*sizeof(cl_float), ftmp, &cl_error);
         assert(cl_error == CL_SUCCESS);
-        // TO DO: handle errors
+        // TODO: handle errors
 
         nbp->coulomb_tab_climg2d = coul_tab;
         nbp->coulomb_tab_size     = tabsize;
@@ -327,25 +327,25 @@ static void init_atomdata_first(/*cu_atomdata_t*/cl_atomdata_t *ad, int ntypes, 
     ad->shift_vec = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, SHIFTS * sizeof(rvec), NULL, &cl_error);        
     assert(cl_error == CL_SUCCESS);
     ad->bShiftVecUploaded = false;
-    // TO DO: handle errors, check clCreateBuffer flags
+    // TODO: handle errors, check clCreateBuffer flags
 
     //stat = cudaMalloc((void**)&ad->fshift, SHIFTS*sizeof(*ad->fshift));
     //CU_RET_ERR(stat, "cudaMalloc failed on ad->fshift");
     ad->fshift = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, SHIFTS * sizeof(rvec), NULL, &cl_error);
     assert(cl_error == CL_SUCCESS);    
-    // TO DO: handle errors, check clCreateBuffer flags
+    // TODO: handle errors, check clCreateBuffer flags
 
     //stat = cudaMalloc((void**)&ad->e_lj, sizeof(*ad->e_lj));
     //CU_RET_ERR(stat, "cudaMalloc failed on ad->e_lj");
     ad->e_lj = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, sizeof(float), NULL, &cl_error);
     assert(cl_error == CL_SUCCESS);    
-    // TO DO: handle errors, check clCreateBuffer flags
+    // TODO: handle errors, check clCreateBuffer flags
 
     //stat = cudaMalloc((void**)&ad->e_el, sizeof(*ad->e_el));
     //CU_RET_ERR(stat, "cudaMalloc failed on ad->e_el");
     ad->e_el = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, sizeof(float), NULL, &cl_error);
     assert(cl_error == CL_SUCCESS);    
-    // TO DO: handle errors, check clCreateBuffer flags
+    // TODO: handle errors, check clCreateBuffer flags
 
     /* initialize to NULL poiters to data that is not allocated here and will
        need reallocation in nbnxn_cuda_init_atomdata */
@@ -377,7 +377,7 @@ static int pick_ewald_kernel_type(bool bTwinCut)
 
     /* CUDA: By default, on SM 3.0 and later use analytical Ewald, on earlier tabulated. */
     /* OpenCL: By default, use analytical Ewald, on earlier tabulated. */
-    // TO DO: decide if dev_info parameter should be added to recognize NVIDIA CC>=3.0 devices.
+    // TODO: decide if dev_info parameter should be added to recognize NVIDIA CC>=3.0 devices.
     //if ((dev_info->prop.major >= 3 || bForceAnalyticalEwald) && !bForceTabulatedEwald)
     if ((1                         || bForceAnalyticalEwald) && !bForceTabulatedEwald)    
     {
@@ -534,7 +534,7 @@ static void init_nbparam(/*cu_nbparam_t*/cl_nbparam_t  *nbp,
         init_ewald_coulomb_force_table(nbp, dev_info);
     }
     else
-    // TO DO: improvement needed.
+    // TODO: improvement needed.
     // The image2d is created here even if eeltype is not eelCuEWALD_TAB or eelCuEWALD_TAB_TWIN because the OpenCL kernels
     // don't accept NULL values for image2D parameters.
     {
@@ -546,7 +546,7 @@ static void init_nbparam(/*cu_nbparam_t*/cl_nbparam_t  *nbp,
         /*nbp->coulomb_tab_climg2d = clCreateImage2D(dev_info->context, CL_MEM_READ_WRITE,
             &array_format, 1, 1, 0, NULL, &cl_error);*/
 		nbp->coulomb_tab_climg2d = clCreateBuffer(dev_info->context, CL_MEM_READ_ONLY, sizeof(cl_float), NULL, &cl_error);
-        // TO DO: handle errors        
+        // TODO: handle errors        
     }
 
     nnbfp      = 2*ntypes*ntypes;
@@ -564,10 +564,10 @@ static void init_nbparam(/*cu_nbparam_t*/cl_nbparam_t  *nbp,
     //cu_copy_H2D(nbp->nbfp, nbat->nbfp, nnbfp*sizeof(*nbp->nbfp));
 
     ////nbp->nbfp = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, nnbfp * sizeof(float), NULL, &cl_error);
-    ////// TO DO: handle errors, check clCreateBuffer flags
+    ////// TODO: handle errors, check clCreateBuffer flags
     ////cl_error = clEnqueueWriteBuffer(dev_info->command_queue, nbp->nbfp, CL_TRUE,
 				////	0, (size_t)(nnbfp * sizeof(float)), (void*)(nbat->nbfp), 0, NULL, NULL);
-    ////// TO DO: handle errors
+    ////// TODO: handle errors
 
 
     if (ic->vdwtype == evdwPME)
@@ -578,10 +578,10 @@ static void init_nbparam(/*cu_nbparam_t*/cl_nbparam_t  *nbp,
 
         
         ////    nbp->nbfp_comb = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, nnbfp_comb * sizeof(float), NULL, &cl_error);
-        ////    // TO DO: handle errors, check clCreateBuffer flags
+        ////    // TODO: handle errors, check clCreateBuffer flags
         ////    cl_error = clEnqueueWriteBuffer(dev_info->command_queue, nbp->nbfp_comb, CL_TRUE,
 				    ////0, (size_t)(nnbfp_comb * sizeof(float)), (void*)(nbat->nbfp_comb), 0, NULL, NULL);
-        ////    // TO DO: handle errors
+        ////    // TODO: handle errors
     }
 
     {
@@ -593,7 +593,7 @@ static void init_nbparam(/*cu_nbparam_t*/cl_nbparam_t  *nbp,
             &array_format, nnbfp, 1, 0, nbat->nbfp, &cl_error);*/
 		nbp->nbfp_climg2d = clCreateBuffer(dev_info->context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, nnbfp*sizeof(cl_float), nbat->nbfp, &cl_error);
         assert(cl_error == CL_SUCCESS);
-        // TO DO: handle errors
+        // TODO: handle errors
 
         if (ic->vdwtype == evdwPME)
         {
@@ -603,11 +603,11 @@ static void init_nbparam(/*cu_nbparam_t*/cl_nbparam_t  *nbp,
 
 
             assert(cl_error == CL_SUCCESS);            
-            // TO DO: handle errors
+            // TODO: handle errors
         }
         else
         {
-            // TO DO: improvement needed.
+            // TODO: improvement needed.
             // The image2d is created here even if vdwtype is not evdwPME because the OpenCL kernels
             // don't accept NULL values for image2D parameters.
            /* nbp->nbfp_comb_climg2d = clCreateImage2D(dev_info->context, CL_MEM_READ_WRITE,
@@ -616,7 +616,7 @@ static void init_nbparam(/*cu_nbparam_t*/cl_nbparam_t  *nbp,
 
 
             assert(cl_error == CL_SUCCESS);
-            // TO DO: handle errors
+            // TODO: handle errors
         }
     }
 
@@ -809,12 +809,12 @@ void nbnxn_ocl_init(FILE                 *fplog,
     ocl_pmalloc((void**)&nb->nbst.e_lj, sizeof(*nb->nbst.e_lj));
     ocl_pmalloc((void**)&nb->nbst.e_el, sizeof(*nb->nbst.e_el));
 
-    // TO DO: review fshift data type and how its size is computed
+    // TODO: review fshift data type and how its size is computed
     ocl_pmalloc((void**)&nb->nbst.fshift, 3 * SHIFTS * sizeof(*nb->nbst.fshift));
 
     init_plist(nb->plist[eintLocal]);
 
-    // TO DO: Update the code below for OpenCL and for NVIDIA GPUs.
+    // TODO: Update the code below for OpenCL and for NVIDIA GPUs.
     // For now, bUseStreamSync will always be true.    
     nb->bUseStreamSync = true;
 
@@ -944,7 +944,7 @@ void nbnxn_ocl_init(FILE                 *fplog,
     /* local/non-local GPU streams */
     nb->stream[eintLocal] = clCreateCommandQueue(nb->dev_info->context, nb->dev_info->ocl_gpu_id.ocl_device_id, queue_properties, &cl_error);
     assert(cl_error == CL_SUCCESS);
-    // TO DO: check for errors        
+    // TODO: check for errors        
     //stat = cudaStreamCreate(&nb->stream[eintLocal]);
     //CU_RET_ERR(stat, "cudaStreamCreate on stream[eintLocal] failed");
     if (nb->bUseTwoStreams)
@@ -971,7 +971,7 @@ void nbnxn_ocl_init(FILE                 *fplog,
         //stat = cudaStreamCreate(&nb->stream[eintNonlocal]);
         nb->stream[eintNonlocal] = clCreateCommandQueue(nb->dev_info->context, nb->dev_info->ocl_gpu_id.ocl_device_id, queue_properties, &cl_error);
         assert(cl_error == CL_SUCCESS);        
-        // TO DO: check for errors        
+        // TODO: check for errors        
         //CU_RET_ERR(stat, "cudaStreamCreate on stream[eintNonlocal] failed");
 #endif
     }
@@ -982,7 +982,7 @@ void nbnxn_ocl_init(FILE                 *fplog,
         init_timings(nb->timings);
     }
 
-    // TO DO: check if it's worth implementing for NVIDIA GPUs
+    // TODO: check if it's worth implementing for NVIDIA GPUs
     ///////////* set the kernel type for the current GPU */
     ///////////* pick L1 cache configuration */
     //////////nbnxn_cuda_set_cacheconfig(nb->dev_info);
@@ -1185,15 +1185,15 @@ void nbnxn_ocl_init_atomdata(nbnxn_opencl_ptr_t        ocl_nb,
         
         d_atdat->f = clCreateBuffer(ocl_nb->dev_info->context, CL_MEM_READ_WRITE, nalloc * sizeof(rvec), NULL, &cl_error);
         assert(CL_SUCCESS == cl_error);
-        // TO DO: handle errors, check clCreateBuffer flags
+        // TODO: handle errors, check clCreateBuffer flags
                 
         d_atdat->xq = clCreateBuffer(ocl_nb->dev_info->context, CL_MEM_READ_WRITE, nalloc * sizeof(cl_float4), NULL, &cl_error);
         assert(CL_SUCCESS == cl_error);
-        // TO DO: handle errors, check clCreateBuffer flags
+        // TODO: handle errors, check clCreateBuffer flags
         
         d_atdat->atom_types = clCreateBuffer(ocl_nb->dev_info->context, CL_MEM_READ_WRITE, nalloc * sizeof(int), NULL, &cl_error);
         assert(CL_SUCCESS == cl_error);
-        // TO DO: handle errors, check clCreateBuffer flags
+        // TODO: handle errors, check clCreateBuffer flags
 
         d_atdat->nalloc = nalloc;
         realloced       = true;
@@ -1237,7 +1237,7 @@ void free_kernels(cl_kernel *kernels, int count)
 
 void nbnxn_ocl_free(nbnxn_opencl_ptr_t ocl_nb)
 {
-    // TO DO: Implement this functions for OpenCL
+    // TODO: Implement this functions for OpenCL
     cl_int cl_error;
     int kernel_count;
 

@@ -72,12 +72,12 @@ __constant sampler_t generic_sampler     = CLK_NORMALIZED_COORDS_FALSE /* Natura
 
 
 ///////////////////////////////////////////////////////////////////////////////////////
-// TO DO: these data structures must be shared between the OpenCL device and OpenCL host code
+// TODO: these data structures must be shared between the OpenCL device and OpenCL host code
 // 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 
 // Data structures shared between OpenCL device code and OpenCL host code
-// TO DO: review, improve
+// TODO: review, improve
 // Replaced real by float for now, to avoid including any other header
 typedef struct {
     /*real*/float c2;
@@ -100,7 +100,7 @@ typedef struct {
 
 // Data structure shared between the OpenCL device code and OpenCL host code
 // Must not contain OpenCL objects (buffers)
-// TO DO: review, improve
+// TODO: review, improve
 typedef struct cl_nbparam_params
 {
 
@@ -131,7 +131,7 @@ typedef struct cl_nbparam_params
 }cl_nbparam_params_t;
 
 
-// TO DO: review, improve
+// TODO: review, improve
 typedef struct {
     int sci;            /* i-super-cluster       */
     int shift;          /* Shift vector index plus possible flags */
@@ -156,7 +156,7 @@ typedef struct {
                             */
 } nbnxn_excl_t;
 
-// TO DO: place these defines in one single place
+// TODO: place these defines in one single place
 //////// Currently WARP_SIZE is defined in nbnxn_ocl_kernel_utils.clh
 //////#define WARP_SIZE  32
 //////
