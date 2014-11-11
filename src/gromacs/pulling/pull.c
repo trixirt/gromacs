@@ -284,16 +284,17 @@ static double max_pull_distance2(const t_pull *pull, const t_pbc *pbc)
     return 0.25*max_d2;
 }
 
-static void low_get_pull_coord_dr(const t_pull *pull,
-                                  const t_pull_coord *pcrd,
-                                  const t_pbc *pbc, double t,
-                                  dvec xg, dvec xref, double max_dist2,
-                                  dvec dr)
+static gmx_bool low_get_pull_coord_dr(t_pull *pull,
+                                      t_pull_coord *pcrd,
+                                      const t_pbc *pbc, double t,
+                                      dvec xg, dvec xref, double max_dist2,
+                                      dvec dr)
 {
     const t_pull_group *pgrp0, *pgrp1;
     int                 m;
     dvec                xrefr, dref = {0, 0, 0};
     double              dr2;
+    gmx_bool            bDoFlip = FALSE;
 
     pgrp0 = &pull->group[pcrd->group[0]];
     pgrp1 = &pull->group[pcrd->group[1]];
@@ -326,25 +327,59 @@ static void low_get_pull_coord_dr(const t_pull *pull,
         dr[m] *= pull->dim[m];
         dr2   += dr[m]*dr[m];
     }
-    if (max_dist2 >= 0 && dr2 > 0.98*0.98*max_dist2)
+    //fprintf(stderr, "dr2 %f\n", dr2);
+    if (dr2 < 0.25)
     {
+        if (pcrd->bWasLastOutside)
+        {
+            /* We're now in the middle, pull out again */
+            bDoFlip = TRUE;
+            pcrd->bWasLastInMiddle = TRUE;
+            pcrd->bWasLastOutside = FALSE;
+        }
+        else
+        {
+            //fprintf(stderr, "Would flip but wasn't last in the middle\n");
+        }
+    }
+    if (dr2 > 7)
+    {
+        if (pcrd->bWasLastInMiddle)
+        {
+            /* We've gone out far enough, pull back in again */
+            bDoFlip = TRUE;
+            pcrd->bWasLastInMiddle = FALSE;
+            pcrd->bWasLastOutside = TRUE;
+        }
+        else
+        {
+            //fprintf(stderr, "Would flip but wasn't last outside\n");
+        }
+        /*
         gmx_fatal(FARGS, "Distance between pull groups %d and %d (%f nm) is larger than 0.49 times the box size (%f).\nYou might want to consider using \"pull-geometry = direction-periodic\" instead.\n",
                   pcrd->group[0], pcrd->group[1], sqrt(dr2), sqrt(max_dist2));
+        */
+    }
+    if (bDoFlip)
+    {
+        change_force_signs(pull);
     }
 
     if (pull->eGeom == epullgDIRPBC)
     {
         dvec_inc(dr, dref);
     }
+
+    return bDoFlip;
 }
 
-static void get_pull_coord_dr(const t_pull *pull,
-                              int coord_ind,
-                              const t_pbc *pbc, double t,
-                              dvec dr)
+static gmx_bool get_pull_coord_dr(t_pull *pull,
+                                  int coord_ind,
+                                  const t_pbc *pbc, double t,
+                                  dvec dr)
 {
     double              md2;
-    const t_pull_coord *pcrd;
+    t_pull_coord *pcrd;
 
     if (pull->eGeom == epullgDIRPBC)
     {
@@ -357,27 +392,28 @@ static void get_pull_coord_dr(const t_pull *pull,
 
     pcrd = &pull->coord[coord_ind];
 
-    low_get_pull_coord_dr(pull, pcrd, pbc, t,
-                          pull->group[pcrd->group[1]].x,
-                          PULL_CYL(pull) ? pull->dyna[coord_ind].x : pull->group[pcrd->group[0]].x,
-                          md2,
-                          dr);
+    return low_get_pull_coord_dr(pull, pcrd, pbc, t,
+                                 pull->group[pcrd->group[1]].x,
+                                 PULL_CYL(pull) ? pull->dyna[coord_ind].x : pull->group[pcrd->group[0]].x,
+                                 md2,
+                                 dr);
 }
 
-void get_pull_coord_distance(const t_pull *pull,
-                             int coord_ind,
-                             const t_pbc *pbc, double t,
-                             dvec dr, double *dev)
+gmx_bool get_pull_coord_distance(t_pull *pull,
+                                 int coord_ind,
+                                 const t_pbc *pbc, double t,
+                                 dvec dr, double *dev)
 {
     static gmx_bool     bWarned = FALSE; /* TODO: this should be fixed for thread-safety,
                                             but is fairly benign */
     const t_pull_coord *pcrd;
     int                 m;
     double              ref, drs, inpr;
+    gmx_bool            bDoFlip;
 
     pcrd = &pull->coord[coord_ind];
 
-    get_pull_coord_dr(pull, coord_ind, pbc, t, dr);
+    bDoFlip = get_pull_coord_dr(pull, coord_ind, pbc, t, dr);
 
     ref = pcrd->init + pcrd->rate*t;
 
@@ -416,6 +452,8 @@ void get_pull_coord_distance(const t_pull *pull,
             *dev = inpr - ref;
             break;
     }
+
+    return bDoFlip;
 }
 
 void clear_pull_forces(t_pull *pull)
@@ -757,14 +795,15 @@ static void do_constraint(t_pull *pull, t_pbc *pbc,
 }
 
 /* Pulling with a harmonic umbrella potential or constant force */
-static void do_pull_pot(int ePull,
-                        t_pull *pull, t_pbc *pbc, double t, real lambda,
-                        real *V, tensor vir, real *dVdl)
+static gmx_bool do_pull_pot(int ePull,
+                            t_pull *pull, t_pbc *pbc, double t, real lambda,
+                            real *V, tensor vir, real *dVdl)
 {
     int           c, j, m;
     double        dev, ndr, invdr;
     real          k, dkdl;
     t_pull_coord *pcrd;
+    gmx_bool      bDoFlip = FALSE;
 
     /* loop over the pull coordinates */
     *V    = 0;
@@ -773,7 +812,7 @@ static void do_pull_pot(int ePull,
     {
         pcrd = &pull->coord[c];
 
-        get_pull_coord_distance(pull, c, pbc, t, pcrd->dr, &dev);
+        bDoFlip = get_pull_coord_distance(pull, c, pbc, t, pcrd->dr, &dev);
 
         k    = (1.0 - lambda)*pcrd->k + lambda*pcrd->kB;
         dkdl = pcrd->kB - pcrd->k;
@@ -839,6 +878,8 @@ static void do_pull_pot(int ePull,
             }
         }
     }
+
+    return bDoFlip;
 }
 
 real pull_potential(int ePull, t_pull *pull, t_mdatoms *md, t_pbc *pbc,
@@ -846,11 +887,12 @@ real pull_potential(int ePull, t_pull *pull, t_mdatoms *md, t_pbc *pbc,
                     rvec *x, rvec *f, tensor vir, real *dvdlambda)
 {
     real V, dVdl;
+    gmx_bool bDoFlip;
 
     pull_calc_coms(cr, pull, md, pbc, t, x, NULL);
 
-    do_pull_pot(ePull, pull, pbc, t, lambda,
-                &V, pull->bVirial && MASTER(cr) ? vir : NULL, &dVdl);
+    bDoFlip = do_pull_pot(ePull, pull, pbc, t, lambda,
+                          &V, pull->bVirial && MASTER(cr) ? vir : NULL, &dVdl);
 
     /* Distribute forces over pulled groups */
     apply_forces(pull, md, f);
@@ -858,6 +900,11 @@ real pull_potential(int ePull, t_pull *pull, t_mdatoms *md, t_pbc *pbc,
     if (MASTER(cr))
     {
         *dvdlambda += dVdl;
+    }
+
+    if (bDoFlip && MASTER(cr))
+    {
+        fprintf(stderr, "Flipping the sign of all pull-coordinate force constants.\n");
     }
 
     return (MASTER(cr) ? V : 0.0);
@@ -1240,6 +1287,11 @@ void init_pull(FILE *fplog, t_inputrec *ir, int nfile, const t_filenm fnm[],
         snew(pull->dyna, pull->ncoord);
     }
 
+    for (c = 0; c < pull->ncoord; c++)
+    {
+        pull->coord[c].bWasLastInMiddle = TRUE;
+        pull->coord[c].bWasLastOutside  = TRUE;
+    }
     /* Only do I/O when we are doing dynamics and if we are the MASTER */
     pull->out_x = NULL;
     pull->out_f = NULL;
@@ -1266,5 +1318,29 @@ void finish_pull(t_pull *pull)
     if (pull->out_f)
     {
         gmx_fio_fclose(pull->out_f);
+    }
+}
+
+void change_force_signs(t_pull *pull)
+{
+    int i;
+
+    //fprintf(stderr, "Flipping the sign of all pull-coordinate force constants.\n");
+
+    for (i = 0; i != pull->ncoord; ++i)
+    {
+        if (pull->coord[i].k > 0)
+        {
+            /* Pulling back in is much easier, so be more gentle! */
+            pull->coord[i].rate *= 1;
+            pull->coord[i].k *= -1; //0.2;
+            dsvmul(1, pull->coord[i].dr, pull->coord[i].dr);
+        }
+        else
+        {
+            pull->coord[i].rate *= 1;
+            pull->coord[i].k *= -1; //5;
+            dsvmul(1, pull->coord[i].dr, pull->coord[i].dr);
+        }
     }
 }

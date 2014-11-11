@@ -217,6 +217,8 @@ double do_md(FILE *fplog, t_commrec *cr, int nfile, const t_filenm fnm[],
     double               cycles_pmes;
     gmx_bool             bPMETuneTry = FALSE, bPMETuneRunning = FALSE;
 
+    int                  nsteps_pull_flip = 0;
+
     /* Interactive MD */
     gmx_bool          bIMDstep = FALSE;
 
@@ -659,6 +661,20 @@ double do_md(FILE *fplog, t_commrec *cr, int nfile, const t_filenm fnm[],
         gmx_fatal( 3, __FILE__, __LINE__, "Checkpoint error on step %d\n", 0 );
     }
 #endif
+
+    {
+        char *nsteps_pull_flip_string;
+
+        nsteps_pull_flip_string = getenv("GMX_PULL_FLIP");
+        if (nsteps_pull_flip_string)
+        {
+            sscanf(nsteps_pull_flip_string, "%20d", &nsteps_pull_flip);
+            if (MASTER(cr) && fplog)
+            {
+                fprintf(fplog, "Will flip the sign of all pull-coordinate force constants every %d steps\n", nsteps_pull_flip);
+            }
+        }
+    }
 
     debug_gmx();
     /***********************************************************
@@ -1931,6 +1947,19 @@ double do_md(FILE *fplog, t_commrec *cr, int nfile, const t_filenm fnm[],
             max_hours                -= elapsed_time/(60.0*60.0);
             bResetCountersHalfMaxH    = FALSE;
             gs.set[eglsRESETCOUNTERS] = 0;
+        }
+
+        /* NB step is already updated */
+        if (do_per_step(step, nsteps_pull_flip))
+        {
+            /*
+            change_force_signs(ir->pull);
+            if (MASTER(cr) && fplog)
+            {
+                fprintf(fplog, "Flipping the sign of all pull-coordinate force constants at step %" GMX_PRId64 ".\n", step);
+                fprintf(stderr, "Flipping the sign of all pull-coordinate force constants at step %" GMX_PRId64 ".\n", step);
+            }
+            */
         }
 
         /* If bIMD is TRUE, the master updates the IMD energy record and sends positions to VMD client */

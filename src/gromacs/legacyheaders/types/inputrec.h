@@ -134,6 +134,8 @@ typedef struct {
     dvec        dr;         /* The distance from the reference group */
     double      f_scal;     /* Scalar force for directional pulling */
     dvec        f;          /* force due to the pulling/constraining */
+    gmx_bool    bWasLastInMiddle; /* TRUE at start of sim, and when the ligand was most recently in the middle */
+    gmx_bool    bWasLastOutside;  /* TRUE at start of sim, and when the ligand was most recently outside the receptor */
 } t_pull_coord;
 
 typedef struct {
