@@ -478,6 +478,18 @@ float pmecorrF(float z2)
 void reduce_force_j_generic(__local float *f_buf, __global float *fout,//__global float3 *fout,
                             int tidxi, int tidxj, int aidx)
 {
+#ifdef _NVIDIA_SOURCE_
+    if (tidxi < 3)
+    {
+        float f = 0.0f;
+        for (int j = tidxj * CL_SIZE; j < (tidxj + 1) * CL_SIZE; j++)
+        {
+            f += f_buf[FBUF_STRIDE * tidxi + j];            
+        }
+        
+        atomicAdd_g_f(&fout[3 * aidx + tidxi], f);
+    }
+#else
     if (tidxi == 0)
     {
         float3 f = (float3)(0.0f);
@@ -490,6 +502,7 @@ void reduce_force_j_generic(__local float *f_buf, __global float *fout,//__globa
 
         atomicAdd_g_f3(&fout[3 * aidx], f);        
     }
+#endif
 }
 
 /*! Final i-force reduction; this generic implementation works with
@@ -500,6 +513,29 @@ void reduce_force_i_generic(__local float *f_buf, __global float *fout,//__globa
                             float3 *fshift_buf, bool bCalcFshift,
                             int tidxi, int tidxj, int aidx)
 {
+#ifdef _NVIDIA_SOURCE_
+    if (tidxj < 3)
+    {
+        float f = 0.0f;
+        for (int j = tidxi; j < CL_SIZE_SQ; j += CL_SIZE)
+        {            
+            f += f_buf[tidxj * FBUF_STRIDE + j];
+        }
+
+        atomicAdd_g_f(&fout[3 * aidx + tidxj], f);
+
+        if (bCalcFshift)
+        {
+            if (0 == tidxj)
+                (*fshift_buf).x += f;
+            else
+                if (1 == tidxj)
+                    (*fshift_buf).y += f;
+                else
+                    (*fshift_buf).z += f;
+        }
+    }
+#else
     if (tidxj == 0)
     {
         float3 f = (float3)(0.0f);
@@ -517,6 +553,7 @@ void reduce_force_i_generic(__local float *f_buf, __global float *fout,//__globa
             *fshift_buf += f;
         }
     }
+#endif
 }
 
 /*! Final i-force reduction; this implementation works only with power of two
@@ -527,8 +564,7 @@ void reduce_force_i_pow2(volatile __local float *f_buf, __global float *fout,//_
                          float3 *fshift_buf, bool bCalcFshift,                         
                          int tidxi, int tidxj, int aidx)
 {
-    int     i, j;
-    float3  f = (float3)(0.0f);
+    int     i, j;    
     /* Reduce the initial CL_SIZE values for each i atom to half
      * every step by using CL_SIZE * i threads.
      * Can't just use i as loop variable because than nvcc refuses to unroll.
@@ -548,8 +584,28 @@ void reduce_force_i_pow2(volatile __local float *f_buf, __global float *fout,//_
     }
 
     /* i == 1, last reduction step, writing to global mem */
+#ifdef _NVIDIA_SOURCE_
+    if (tidxj < 3)
+    {
+        float f = f_buf[tidxj * FBUF_STRIDE + tidxi] + f_buf[tidxj * FBUF_STRIDE + i * CL_SIZE + tidxi];
+
+        atomicAdd_g_f(&fout[3 * aidx + tidxj], f);
+
+        if (bCalcFshift)
+        {
+            if (0 == tidxj)
+                (*fshift_buf).x += f;
+            else
+                if (1 == tidxj)
+                    (*fshift_buf).y += f;
+                else
+                    (*fshift_buf).z += f;
+        }
+    }
+#else
     if (tidxj == 0)
     {
+        float3  f;
         f.x = f_buf[                  tidxj * CL_SIZE + tidxi] + f_buf[                  (tidxj + i) * CL_SIZE + tidxi];
         f.y = f_buf[    FBUF_STRIDE + tidxj * CL_SIZE + tidxi] + f_buf[    FBUF_STRIDE + (tidxj + i) * CL_SIZE + tidxi];
         f.z = f_buf[2 * FBUF_STRIDE + tidxj * CL_SIZE + tidxi] + f_buf[2 * FBUF_STRIDE + (tidxj + i) * CL_SIZE + tidxi];
@@ -561,6 +617,7 @@ void reduce_force_i_pow2(volatile __local float *f_buf, __global float *fout,//_
             *fshift_buf += f;
         }
     }
+#endif
 }
 
 /*! Final i-force reduction wrapper; calls the generic or pow2 reduction depending

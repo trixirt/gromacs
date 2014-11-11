@@ -154,6 +154,7 @@ if (NOT DEFINED CUDA_NVCC_FLAGS_SET)
 
     # finally set the damn flags
     set(CUDA_NVCC_FLAGS
-        "${_CUDA_ARCH_STR};-use_fast_math;${_HOST_COMPILER_OPTION_STRING}${CUDA_HOST_COMPILER_OPTIONS}"
+		"-gencode;arch=compute_20,code=sm_20;-gencode;arch=compute_20,code=sm_21;-gencode;arch=compute_30,code=sm_30;-gencode;arch=compute_35,code=sm_35;-gencode;arch=compute_35,code=compute_35;-use_fast_math;; ;/arch:AVX;/wd4800;/wd4355;/wd4996;/wd4305;/wd4244;/wd4101;/wd4267;/wd4090;/D WIN32;/D _WINDOWS;/W3;/GR;/EHsc;/MD;/O2;/Ob2;/D NDEBUG"
+        #"${_CUDA_ARCH_STR};-use_fast_math;${_HOST_COMPILER_OPTION_STRING}${CUDA_HOST_COMPILER_OPTIONS}"
         CACHE STRING "Compiler flags for nvcc." FORCE)
 endif()
