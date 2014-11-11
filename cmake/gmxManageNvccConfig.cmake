@@ -153,7 +153,7 @@ if (NOT DEFINED CUDA_NVCC_FLAGS_SET)
     endif()
 
     # finally set the damn flags
-    set(CUDA_NVCC_FLAGS		
+    set(CUDA_NVCC_FLAGS
         "${_CUDA_ARCH_STR};-use_fast_math;${_HOST_COMPILER_OPTION_STRING}${CUDA_HOST_COMPILER_OPTIONS}"
         CACHE STRING "Compiler flags for nvcc." FORCE)
 endif()
