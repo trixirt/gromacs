@@ -761,6 +761,8 @@ ocl_compile_program(
     size_t ocl_source_length    = 0;
     size_t kernel_filename_len  = 0;
 
+	bool isLoadedFromBinary = false; /* If this kernel has been loaded from binary cache or not */
+
     /* Select vendor specific kernels automatically */
     if ( kernel_vendor_spec == _auto_vendor_kernels_)
         kernel_vendor_spec = ocl_autoselect_kernel_from_vendor(ocl_device_vendor);
@@ -795,7 +797,7 @@ ocl_compile_program(
 		strcat(binary_filename, ".bin");
 		FILE *f;
 
-		if (getenv("OCL_GENCACHE") == NULL && (f = fopen(binary_filename, "rb")) != NULL) /* If we are generating the cache then create from source as the kernel source might have changed */
+		if (getenv("OCL_NOGENCACHE") == NULL && (f = fopen(binary_filename, "rb")) != NULL) 
 		{
 			fseek(f, 0, SEEK_END);
 			binary_sizes[0] = ftell(f);
@@ -806,6 +808,7 @@ ocl_compile_program(
 
 			*p_program = clCreateProgramWithBinary(context, 1, &device_id, binary_sizes, (const unsigned char **)binary, NULL, &cl_error);
 			free(binary[0]);
+			isLoadedFromBinary = true;
 		}
 		else
 		{
@@ -899,9 +902,8 @@ ocl_compile_program(
             clBuildProgram(*p_program, 0, NULL, build_options_string, NULL, NULL);
 
 		/* Store the binary only if the build has been successful */
-		if (build_status == CL_SUCCESS && getenv("OCL_GENCACHE") != NULL)
+		if (build_status == CL_SUCCESS && isLoadedFromBinary == false && getenv("OCL_NOGENCACHE") == NULL)
 		{
-
 			size_t binaries[5] = { 0, 0, 0, 0, 0 };
 			unsigned char * binary[5] = { NULL, NULL, NULL, NULL, NULL };
 			clGetProgramInfo(*p_program, CL_PROGRAM_BINARY_SIZES, sizeof(size_t), binaries, NULL);
