@@ -757,7 +757,7 @@ ocl_compile_program(
 
     char* ocl_source        = NULL;
     char* kernel_filename   = NULL;
-
+	char binary_filename[256];
     size_t ocl_source_length    = 0;
     size_t kernel_filename_len  = 0;
 
@@ -784,15 +784,44 @@ ocl_compile_program(
     /* The sources are loaded so the filename is not needed anymore */
     free(kernel_filename);
 
-    /* Load the source in an OpenCL program */
-    *p_program = 
-        clCreateProgramWithSource(
-            context, 
-            1, 
-            (const char**)(&ocl_source), 
-            &ocl_source_length, 
-            &cl_error
-        );
+	/* See if the cached version of the kernel exists, if it does then create the program from binary. If not then use source. TODO: Save hash of the kernel source to see whether to update or not */
+	{
+		size_t binary_sizes[5] = { 0, 0, 0, 0, 0 };
+
+
+		unsigned char * binary[5] = { NULL, NULL, NULL, NULL, NULL };
+
+		clGetDeviceInfo(device_id, CL_DEVICE_NAME, 256, binary_filename, NULL);
+		strcat(binary_filename, ".bin");
+		FILE *f;
+
+		if (getenv("OCL_GENCACHE") == NULL && (f = fopen(binary_filename, "rb")) != NULL) /* If we are generating the cache then create from source as the kernel source might have changed */
+		{
+			fseek(f, 0, SEEK_END);
+			binary_sizes[0] = ftell(f);
+			binary[0] = (unsigned char*)malloc(binary_sizes[0]);
+			fseek(f, 0, SEEK_SET);
+			fread(binary[0], 1, binary_sizes[0], f);
+			fclose(f);
+
+			*p_program = clCreateProgramWithBinary(context, 1, &device_id, binary_sizes, (const unsigned char **)binary, NULL, &cl_error);
+			free(binary[0]);
+		}
+		else
+		{
+			/* Load the source in an OpenCL program */
+			*p_program =
+				clCreateProgramWithSource(
+				context,
+				1,
+				(const char**)(&ocl_source),
+				&ocl_source_length,
+				&cl_error
+				);
+		}
+	}
+
+
 
     /* Prepare compilation and compile */
     cl_int build_status         = CL_SUCCESS;
@@ -868,6 +897,24 @@ ocl_compile_program(
         /* Now we are ready to launch the build */
         build_status = 
             clBuildProgram(*p_program, 0, NULL, build_options_string, NULL, NULL);
+
+		/* Store the binary only if the build has been successful */
+		if (build_status == CL_SUCCESS && getenv("OCL_GENCACHE") != NULL)
+		{
+
+			size_t binaries[5] = { 0, 0, 0, 0, 0 };
+			unsigned char * binary[5] = { NULL, NULL, NULL, NULL, NULL };
+			clGetProgramInfo(*p_program, CL_PROGRAM_BINARY_SIZES, sizeof(size_t), binaries, NULL);
+
+			binary[0] = (unsigned char*)malloc(binaries[0] * 2);
+
+			clGetProgramInfo(*p_program, CL_PROGRAM_BINARIES, sizeof(unsigned char *)* 1, binary, NULL);
+			FILE *f = fopen(binary_filename, "wb");
+			fwrite(binary[0], 1, binaries[0], f);
+			fclose(f);
+			free(binary[0]);
+		}
+
 
         // Get log string size
         size_t build_log_size       = 0;        
