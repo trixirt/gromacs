@@ -72,12 +72,12 @@ __constant sampler_t generic_sampler     = CLK_NORMALIZED_COORDS_FALSE /* Natura
 
 
 ///////////////////////////////////////////////////////////////////////////////////////
-// TO DO: these data structures must be shared between the OpenCL device and OpenCL host code
+// TODO: these data structures must be shared between the OpenCL device and OpenCL host code
 // 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 
 // Data structures shared between OpenCL device code and OpenCL host code
-// TO DO: review, improve
+// TODO: review, improve
 // Replaced real by float for now, to avoid including any other header
 typedef struct {
     /*real*/float c2;
@@ -100,7 +100,7 @@ typedef struct {
 
 // Data structure shared between the OpenCL device code and OpenCL host code
 // Must not contain OpenCL objects (buffers)
-// TO DO: review, improve
+// TODO: review, improve
 typedef struct cl_nbparam_params
 {
 
@@ -131,7 +131,7 @@ typedef struct cl_nbparam_params
 }cl_nbparam_params_t;
 
 
-// TO DO: review, improve
+// TODO: review, improve
 typedef struct {
     int sci;            /* i-super-cluster       */
     int shift;          /* Shift vector index plus possible flags */
@@ -156,7 +156,7 @@ typedef struct {
                             */
 } nbnxn_excl_t;
 
-// TO DO: place these defines in one single place
+// TODO: place these defines in one single place
 //////// Currently WARP_SIZE is defined in nbnxn_ocl_kernel_utils.clh
 //////#define WARP_SIZE  32
 //////
@@ -478,17 +478,20 @@ float pmecorrF(float z2)
 void reduce_force_j_generic(__local float *f_buf, __global float *fout,//__global float3 *fout,
                             int tidxi, int tidxj, int aidx)
 {
-    if (tidxi == 0)
+    /* Split the reduction between the first 3 column threads
+       Threads with column id 0 will do the reduction for (float3).x components
+       Threads with column id 1 will do the reduction for (float3).y components
+       Threads with column id 2 will do the reduction for (float3).z components.
+       The reduction is performed for each line tidxj of f_buf. */
+    if (tidxi < 3)
     {
-        float3 f = (float3)(0.0f);
+        float f = 0.0f;
         for (int j = tidxj * CL_SIZE; j < (tidxj + 1) * CL_SIZE; j++)
         {
-            f.x += f_buf[                  j];
-            f.y += f_buf[    FBUF_STRIDE + j];
-            f.z += f_buf[2 * FBUF_STRIDE + j];
+            f += f_buf[FBUF_STRIDE * tidxi + j];            
         }
-
-        atomicAdd_g_f3(&fout[3 * aidx], f);        
+        
+        atomicAdd_g_f(&fout[3 * aidx + tidxi], f);
     }
 }
 
@@ -500,21 +503,29 @@ void reduce_force_i_generic(__local float *f_buf, __global float *fout,//__globa
                             float3 *fshift_buf, bool bCalcFshift,
                             int tidxi, int tidxj, int aidx)
 {
-    if (tidxj == 0)
+    /* Split the reduction between the first 3 line threads
+    Threads with line id 0 will do the reduction for (float3).x components
+    Threads with line id 1 will do the reduction for (float3).y components
+    Threads with line id 2 will do the reduction for (float3).z components. */
+    if (tidxj < 3)
     {
-        float3 f = (float3)(0.0f);
+        float f = 0.0f;
         for (int j = tidxi; j < CL_SIZE_SQ; j += CL_SIZE)
-        {
-            f.x += f_buf[                  j];
-            f.y += f_buf[    FBUF_STRIDE + j];
-            f.z += f_buf[2 * FBUF_STRIDE + j];
+        {            
+            f += f_buf[tidxj * FBUF_STRIDE + j];
         }
-                
-        atomicAdd_g_f3(&fout[3 * aidx], f);
+
+        atomicAdd_g_f(&fout[3 * aidx + tidxj], f);
 
         if (bCalcFshift)
         {
-            *fshift_buf += f;
+            if (0 == tidxj)
+                (*fshift_buf).x += f;
+            else
+                if (1 == tidxj)
+                    (*fshift_buf).y += f;
+                else
+                    (*fshift_buf).z += f;
         }
     }
 }
@@ -527,8 +538,7 @@ void reduce_force_i_pow2(volatile __local float *f_buf, __global float *fout,//_
                          float3 *fshift_buf, bool bCalcFshift,                         
                          int tidxi, int tidxj, int aidx)
 {
-    int     i, j;
-    float3  f = (float3)(0.0f);
+    int     i, j;    
     /* Reduce the initial CL_SIZE values for each i atom to half
      * every step by using CL_SIZE * i threads.
      * Can't just use i as loop variable because than nvcc refuses to unroll.
@@ -548,17 +558,25 @@ void reduce_force_i_pow2(volatile __local float *f_buf, __global float *fout,//_
     }
 
     /* i == 1, last reduction step, writing to global mem */
-    if (tidxj == 0)
+    /* Split the reduction between the first 3 line threads
+    Threads with line id 0 will do the reduction for (float3).x components
+    Threads with line id 1 will do the reduction for (float3).y components
+    Threads with line id 2 will do the reduction for (float3).z components. */
+    if (tidxj < 3)
     {
-        f.x = f_buf[                  tidxj * CL_SIZE + tidxi] + f_buf[                  (tidxj + i) * CL_SIZE + tidxi];
-        f.y = f_buf[    FBUF_STRIDE + tidxj * CL_SIZE + tidxi] + f_buf[    FBUF_STRIDE + (tidxj + i) * CL_SIZE + tidxi];
-        f.z = f_buf[2 * FBUF_STRIDE + tidxj * CL_SIZE + tidxi] + f_buf[2 * FBUF_STRIDE + (tidxj + i) * CL_SIZE + tidxi];
-        
-        atomicAdd_g_f3(&fout[3 * aidx], f);
+        float f = f_buf[tidxj * FBUF_STRIDE + tidxi] + f_buf[tidxj * FBUF_STRIDE + i * CL_SIZE + tidxi];
+
+        atomicAdd_g_f(&fout[3 * aidx + tidxj], f);
 
         if (bCalcFshift)
         {
-            *fshift_buf += f;
+            if (0 == tidxj)
+                (*fshift_buf).x += f;
+            else
+                if (1 == tidxj)
+                    (*fshift_buf).y += f;
+                else
+                    (*fshift_buf).z += f;
         }
     }
 }
