@@ -503,29 +503,21 @@ void reduce_force_i_generic(__local float *f_buf, __global float *fout,//__globa
                             float3 *fshift_buf, bool bCalcFshift,
                             int tidxi, int tidxj, int aidx)
 {
-    /* Split the reduction between the first 3 line threads
-    Threads with line id 0 will do the reduction for (float3).x components
-    Threads with line id 1 will do the reduction for (float3).y components
-    Threads with line id 2 will do the reduction for (float3).z components. */
-    if (tidxj < 3)
+    if (tidxj == 0)
     {
-        float f = 0.0f;
+        float3 f = (float3)(0.0f);
         for (int j = tidxi; j < CL_SIZE_SQ; j += CL_SIZE)
-        {            
-            f += f_buf[tidxj * FBUF_STRIDE + j];
+        {
+            f.x += f_buf[                  j];
+            f.y += f_buf[    FBUF_STRIDE + j];
+            f.z += f_buf[2 * FBUF_STRIDE + j];
         }
-
-        atomicAdd_g_f(&fout[3 * aidx + tidxj], f);
+                
+        atomicAdd_g_f3(&fout[3 * aidx], f);
 
         if (bCalcFshift)
         {
-            if (0 == tidxj)
-                (*fshift_buf).x += f;
-            else
-                if (1 == tidxj)
-                    (*fshift_buf).y += f;
-                else
-                    (*fshift_buf).z += f;
+            *fshift_buf += f;
         }
     }
 }
@@ -558,25 +550,17 @@ void reduce_force_i_pow2(volatile __local float *f_buf, __global float *fout,//_
     }
 
     /* i == 1, last reduction step, writing to global mem */
-    /* Split the reduction between the first 3 line threads
-    Threads with line id 0 will do the reduction for (float3).x components
-    Threads with line id 1 will do the reduction for (float3).y components
-    Threads with line id 2 will do the reduction for (float3).z components. */
-    if (tidxj < 3)
+    if (tidxj == 0)
     {
-        float f = f_buf[tidxj * FBUF_STRIDE + tidxi] + f_buf[tidxj * FBUF_STRIDE + i * CL_SIZE + tidxi];
-
-        atomicAdd_g_f(&fout[3 * aidx + tidxj], f);
+        f.x = f_buf[                  tidxj * CL_SIZE + tidxi] + f_buf[                  (tidxj + i) * CL_SIZE + tidxi];
+        f.y = f_buf[    FBUF_STRIDE + tidxj * CL_SIZE + tidxi] + f_buf[    FBUF_STRIDE + (tidxj + i) * CL_SIZE + tidxi];
+        f.z = f_buf[2 * FBUF_STRIDE + tidxj * CL_SIZE + tidxi] + f_buf[2 * FBUF_STRIDE + (tidxj + i) * CL_SIZE + tidxi];
+        
+        atomicAdd_g_f3(&fout[3 * aidx], f);
 
         if (bCalcFshift)
         {
-            if (0 == tidxj)
-                (*fshift_buf).x += f;
-            else
-                if (1 == tidxj)
-                    (*fshift_buf).y += f;
-                else
-                    (*fshift_buf).z += f;
+            *fshift_buf += f;
         }
     }
 }
