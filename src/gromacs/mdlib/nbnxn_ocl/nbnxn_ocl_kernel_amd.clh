@@ -530,18 +530,11 @@ __global float *restrict fshift,            /* stores float3 values */     /* OU
         barrier(CLK_LOCAL_MEM_FENCE);
     }
 
-    /* add up local shift forces into global mem */
-    /* Instead of having one thread calling atomicAdd_g_f3, 3 threads will
-       issue one atomicAdd_g_f call each. */
-    if (bCalcFshift)
-        if (0 == tidxi)
-            atomicAdd_g_f(&(fshift[3 * nb_sci.shift]), fshift_buf.x);
-        else
-            if (1 == tidxi)
-                atomicAdd_g_f(&(fshift[3 * nb_sci.shift + 1]), fshift_buf.y);
-            else
-                if (2 == tidxi)
-                    atomicAdd_g_f(&(fshift[3 * nb_sci.shift + 2]), fshift_buf.z);
+    /* add up local shift forces into global mem */    
+    if (bCalcFshift && tidxj == 0)
+    {        
+        atomicAdd_g_f3(&(fshift[3 * nb_sci.shift]),fshift_buf);
+    }
 
 #ifdef CALC_ENERGIES
     /* flush the energies to shmem and reduce them */
