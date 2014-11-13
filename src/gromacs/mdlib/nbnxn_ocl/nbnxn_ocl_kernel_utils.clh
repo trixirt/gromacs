@@ -552,6 +552,8 @@ void reduce_force_i_pow2(volatile __local float *f_buf, __global float *fout,//_
     /* i == 1, last reduction step, writing to global mem */
     if (tidxj == 0)
     {
+        float3 f;
+
         f.x = f_buf[                  tidxj * CL_SIZE + tidxi] + f_buf[                  (tidxj + i) * CL_SIZE + tidxi];
         f.y = f_buf[    FBUF_STRIDE + tidxj * CL_SIZE + tidxi] + f_buf[    FBUF_STRIDE + (tidxj + i) * CL_SIZE + tidxi];
         f.z = f_buf[2 * FBUF_STRIDE + tidxj * CL_SIZE + tidxi] + f_buf[2 * FBUF_STRIDE + (tidxj + i) * CL_SIZE + tidxi];
