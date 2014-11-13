@@ -32,6 +32,11 @@
  * To help us fund GROMACS development, we humbly ask that you cite
  * the research papers on the package. Check out http://www.gromacs.org.
  */
+
+/** \file nbnxn_ocl_data_mgmt.cpp
+ *  \brief OpenCL equivalent of nbnxn_cuda.cu
+ */
+
 #include "config.h"
 
 #include <stdlib.h>
@@ -40,8 +45,6 @@
 #if defined(_MSVC)
 #include <limits>
 #endif
-
-//#include <cuda.h>
 
 #include "types/simple.h"
 #include "gromacs/mdlib/nbnxn_pairlist.h"
@@ -54,17 +57,11 @@
 #include "thread_mpi/atomic.h"
 #endif
 
-//#include "nbnxn_cuda_types.h"
-
 #include <CL/opencl.h>
 
 #include "nbnxn_ocl_types.h"
-//#include "../../gmxlib/cuda_tools/cudautils.cuh"
-//#include "nbnxn_cuda.h"
-//#include "../nbnxn_cuda/nbnxn_cuda.h"
 
 #include "nbnxn_ocl.h"
-//#include "gromacs/mdlib/nbnxn_cuda/nbnxn_cuda_data_mgmt.h"
 #include "gromacs/mdlib/nbnxn_ocl/nbnxn_ocl_data_mgmt.h"
 
 #include "gromacs/pbcutil/ishift.h"
@@ -75,58 +72,9 @@
 #define USE_TEXOBJ
 #endif
 
-/////*! Texture reference for LJ C6/C12 parameters; bound to cu_nbparam_t.nbfp */
-////texture<float, 1, cudaReadModeElementType> nbfp_texref;
-////
-/////*! Texture reference for LJ-PME parameters; bound to cu_nbparam_t.nbfp_comb */
-////texture<float, 1, cudaReadModeElementType> nbfp_comb_texref;
-////
-/////*! Texture reference for Ewald coulomb force table; bound to cu_nbparam_t.coulomb_tab */
-////texture<float, 1, cudaReadModeElementType> coulomb_tab_texref;
-
 /* Convenience defines */
 #define NCL_PER_SUPERCL         (NBNXN_GPU_NCLUSTER_PER_SUPERCLUSTER)
 #define CL_SIZE                 (NBNXN_GPU_CLUSTER_SIZE)
-
-/***** The kernels come here *****/
-//#include "nbnxn_cuda_kernel_utils.cuh"
-
-/* Top-level kernel generation: will generate through multiple inclusion the
- * following flavors for all kernels:
- * - force-only output;
- * - force and energy output;
- * - force-only with pair list pruning;
- * - force and energy output with pair list pruning.
- */
-/** Force only **/
-//#include "nbnxn_cuda_kernels.cuh"
-//#include "nbnxn_ocl_kernels.clh"
-
-/** Force & energy **/
-#define CALC_ENERGIES
-//#include "nbnxn_cuda_kernels.cuh"
-//#include "nbnxn_ocl_kernels.clh"
-#undef CALC_ENERGIES
-
-/*** Pair-list pruning kernels ***/
-/** Force only **/
-#define PRUNE_NBL
-//#include "nbnxn_cuda_kernels.cuh"
-//#include "nbnxn_ocl_kernels.clh"
-/** Force & energy **/
-#define CALC_ENERGIES
-//#include "nbnxn_cuda_kernels.cuh"
-//#include "nbnxn_ocl_kernels.clh"
-#undef CALC_ENERGIES
-#undef PRUNE_NBL
-
-/////*! Nonbonded kernel function pointer type */
-////typedef void (*nbnxn_cu_kfunc_ptr_t)(const cu_atomdata_t,
-////                                     const cu_nbparam_t,
-////                                     const cu_plist_t,
-////                                     bool);
-
-/*********************************/
 
 /* XXX always/never run the energy/pruning kernels -- only for benchmarking purposes */
 static bool always_ener  = (getenv("GMX_GPU_ALWAYS_ENER") != NULL);
@@ -145,31 +93,31 @@ static bool always_prune = (getenv("GMX_GPU_ALWAYS_PRUNE") != NULL);
  */
 static unsigned int poll_wait_pattern = (0x7FU << 23);
 
-/////*! Returns the number of blocks to be used for the nonbonded GPU kernel. */
-////static inline int calc_nb_kernel_nblock(int nwork_units, cuda_dev_info_t *dinfo)
-////{
-////    int max_grid_x_size;
-////
-////    assert(dinfo);
-////
-////    max_grid_x_size = dinfo->prop.maxGridSize[0];
-////
-////    /* do we exceed the grid x dimension limit? */
-////    if (nwork_units > max_grid_x_size)
-////    {
-////        gmx_fatal(FARGS, "Watch out, the input system is too large to simulate!\n"
-////                  "The number of nonbonded work units (=number of super-clusters) exceeds the"
-////                  "maximum grid size in x dimension (%d > %d)!", nwork_units, max_grid_x_size);
-////    }
-////
-////    return nwork_units;
-////}
+/*! Returns the number of blocks to be used for the nonbonded GPU kernel.
+    OpenCL equivalent of calc_nb_kernel_nblock from nbnxn_cuda.cu
+*/
+static inline int calc_nb_kernel_nblock(int nwork_units, ocl_gpu_info_t *dinfo)
+{
+    int max_grid_x_size;
 
+    assert(dinfo);
 
-/* Constant arrays listing all kernel function names. */
+    // TODO: fix for OpenCL implementation
+    //max_grid_x_size = dinfo->prop.maxGridSize[0];
 
-/*! Pointers to the non-bonded kernel names organized in 2-dim arrays by:
- *  electrostatics and VDW type.
+    ///* do we exceed the grid x dimension limit? */
+    //if (nwork_units > max_grid_x_size)
+    //{
+    //    gmx_fatal(FARGS, "Watch out, the input system is too large to simulate!\n"
+    //              "The number of nonbonded work units (=number of super-clusters) exceeds the"
+    //              "maximum grid size in x dimension (%d > %d)!", nwork_units, max_grid_x_size);
+    //}
+
+    return nwork_units;
+}
+
+/* Constant arrays listing non-bonded kernel function names. The arrays are 
+ * organized in 2-dim arrays by: electrostatics and VDW type.
  *
  *  Note that the row- and column-order of function pointers has to match the
  *  order of corresponding enumerated electrostatics and vdw types, resp.,
@@ -220,72 +168,17 @@ static const char* nb_kfunc_ener_prune_ptr[eelOclNR][evdwOclNR] =
     { "nbnxn_kernel_ElecEwTwinCut_VdwLJ_VF_prune_opencl",      "nbnxn_kernel_ElecEwTwinCut_VdwLJFsw_VF_prune_opencl",      "nbnxn_kernel_ElecEwTwinCut_VdwLJPsw_VF_prune_opencl",      "nbnxn_kernel_ElecEwTwinCut_VdwLJEwCombGeom_VF_prune_opencl",      "nbnxn_kernel_ElecEwTwinCut_VdwLJEwCombLB_VF_prune_opencl"      }
 };
 
-/////*! Return a pointer to the kernel version to be executed at the current step. */
-////static inline nbnxn_cu_kfunc_ptr_t select_nbnxn_kernel(int  eeltype,
-////                                                       int  evdwtype,
-////                                                       bool bDoEne,
-////                                                       bool bDoPrune)
-////{
-////    nbnxn_cu_kfunc_ptr_t res;
-////
-////    assert(eeltype < eelCuNR);
-////    assert(evdwtype < eelCuNR);
-////
-////    if (bDoEne)
-////    {
-////        if (bDoPrune)
-////        {
-////            res = nb_kfunc_ener_prune_ptr[eeltype][evdwtype];
-////        }
-////        else
-////        {
-////            res = nb_kfunc_ener_noprune_ptr[eeltype][evdwtype];
-////        }
-////    }
-////    else
-////    {
-////        if (bDoPrune)
-////        {
-////            res = nb_kfunc_noener_prune_ptr[eeltype][evdwtype];
-////        }
-////        else
-////        {
-////            res = nb_kfunc_noener_noprune_ptr[eeltype][evdwtype];
-////        }
-////    }
-////
-////    return res;
-////}
-////
-/////*! Calculates the amount of shared memory required by the CUDA kernel in use. */
-////static inline int calc_shmem_required()
-////{
-////    int shmem;
-////
-////    /* size of shmem (force-buffers/xq/atom type preloading) */
-////    /* NOTE: with the default kernel on sm3.0 we need shmem only for pre-loading */
-////    /* i-atom x+q in shared memory */
-////    shmem  = NCL_PER_SUPERCL * CL_SIZE * sizeof(float4);
-////    /* cj in shared memory, for both warps separately */
-////    shmem += 2 * NBNXN_GPU_JGROUP_SIZE * sizeof(int);
-////#ifdef IATYPE_SHMEM
-////    /* i-atom types in shared memory */
-////    shmem += NCL_PER_SUPERCL * CL_SIZE * sizeof(int);
-////#endif
-////#if __CUDA_ARCH__ < 300
-////    /* force reduction buffers in shared memory */
-////    shmem += CL_SIZE * CL_SIZE * 3 * sizeof(float);
-////#endif
-////
-////    return shmem;
-////}
-
-/*! Return a pointer to the kernel version to be executed at the current step. */
+/*! Return a pointer to the kernel version to be executed at the current step.
+ *  OpenCL kernel objects are cached in ocl_nb. If the requested kernel is not
+ *  found in the cache, it will be created and the cache will be updated.
+ *
+ *  OpenCL equivalent of nbnxn_cu_kfunc_ptr_t.
+ */
 static inline cl_kernel select_nbnxn_kernel(nbnxn_opencl_ptr_t ocl_nb,
                                             int  eeltype,
-                                                       int  evdwtype,
-                                                       bool bDoEne,
-                                                       bool bDoPrune)
+                                            int  evdwtype,
+                                            bool bDoEne,
+                                            bool bDoPrune)
 {
     const char* kernel_name_to_run;
     cl_kernel *kernel_ptr;
@@ -334,28 +227,9 @@ static inline cl_kernel select_nbnxn_kernel(nbnxn_opencl_ptr_t ocl_nb,
     return *kernel_ptr;
 }
 
-/*! Returns the number of blocks to be used for the nonbonded GPU kernel. */
-static inline int calc_nb_kernel_nblock(int nwork_units, ocl_gpu_info_t *dinfo)
-{
-    int max_grid_x_size;
-
-    assert(dinfo);
-
-    // TODO: fix for OpenCL implementation
-    //max_grid_x_size = dinfo->prop.maxGridSize[0];
-
-    ///* do we exceed the grid x dimension limit? */
-    //if (nwork_units > max_grid_x_size)
-    //{
-    //    gmx_fatal(FARGS, "Watch out, the input system is too large to simulate!\n"
-    //              "The number of nonbonded work units (=number of super-clusters) exceeds the"
-    //              "maximum grid size in x dimension (%d > %d)!", nwork_units, max_grid_x_size);
-    //}
-
-    return nwork_units;
-}
-
-/*! Calculates the amount of shared memory required by the CUDA kernel in use. */
+/*! Calculates the amount of shared memory required by the OpenCL kernel in use.
+ *  OpenCL equivalent of calc_shmem_required from nbnxn_cuda.cu
+ */
 static inline int calc_shmem_required()
 {
     int shmem;
@@ -372,16 +246,18 @@ static inline int calc_shmem_required()
     #pragma error "Should not be defined"
     shmem += NCL_PER_SUPERCL * CL_SIZE * sizeof(int);       /* atib */
 #endif
-/* #if __CUDA_ARCH__ < 300 */
     /* force reduction buffers in shared memory */
     shmem += CL_SIZE * CL_SIZE * 3 * sizeof(float);         /* f_buf */
-/* #endif */
     /* Warp vote. In fact it must be * number of warps in block.. */
     shmem += sizeof(cl_uint) * 2; /* warp_any */
     return shmem;
 }
 
-
+/*! Initializes data structures that are going to be sent to the OpenCL device.
+ *  The device can't use the same data structures as the host for two main reasons:
+ *  - OpenCL restrictions (pointers are not accepted inside data structures)
+ *  - some host side fields are not needed for the OpenCL kernels.
+ */
 static void fillin_ocl_structures(cl_nbparam_t *nbp,
                                   cl_nbparam_params_t *nbparams_params)
 {
@@ -403,7 +279,6 @@ static void fillin_ocl_structures(cl_nbparam_t *nbp,
     nbparams_params->two_k_rf = nbp->two_k_rf;
     nbparams_params->vdwtype = nbp->vdwtype;
     nbparams_params->vdw_switch = nbp->vdw_switch;
-
 }
 
 /* Waits for the commands associated with the input event to finish.
@@ -478,14 +353,14 @@ double ocl_event_elapsed_ms(cl_event *ocl_event)
     return elapsed_ms;
 }
 
-/*! As we execute nonbonded workload in separate streams, before launching
+/*! As we execute nonbonded workload in separate queues, before launching
    the kernel we need to make sure that he following operations have completed:
    - atomdata allocation and related H2D transfers (every nstlist step);
    - pair list H2D transfer (every nstlist step);
    - shift vector H2D transfer (every nstlist step);
    - force (+shift force and energy) output clearing (every step).
 
-   These operations are issued in the local stream at the beginning of the step
+   These operations are issued in the local queue at the beginning of the step
    and therefore always complete before the local kernel launch. The non-local
    kernel is launched after the local on the same device/context, so this is
    inherently scheduled after the operations in the local stream (including the
@@ -493,20 +368,19 @@ double ocl_event_elapsed_ms(cl_event *ocl_event)
    However, for the sake of having a future-proof implementation, we use the
    misc_ops_done event to record the point in time when the above  operations
    are finished and synchronize with this event in the non-local stream.
+
+   OpenCL equivalent of nbnxn_cuda_launch_kernel
  */
-void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
-                              const nbnxn_atomdata_t *nbatom,
-                              int                     flags,
-                              int                     iloc)
+void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t      ocl_nb,
+                             const nbnxn_atomdata_t *nbatom,
+                             int                     flags,
+                             int                     iloc)
 {
-    cl_int cl_error;
-    //cudaError_t          stat;
+    cl_int               cl_error;
     int                  adat_begin, adat_len; /* local/nonlocal offset and length used for xq and f */
-    /* CUDA kernel launch-related stuff */
-    int                  shmem, nblock;
-    //dim3                 dim_block, dim_grid;
-    size_t                 dim_block[3], dim_grid[3];
-    //nbnxn_cu_kfunc_ptr_t nb_kernel = NULL; /* fn pointer to the nonbonded kernel */
+    /* OpenCL kernel launch-related stuff */
+    int                  shmem, nblock;    
+    size_t               dim_block[3], dim_grid[3];    
     cl_kernel nb_kernel = NULL; /* fn pointer to the nonbonded kernel */
 
     cl_atomdata_t       *adat    = ocl_nb->atdat;
@@ -518,7 +392,7 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
     bool                 bCalcEner   = flags & GMX_FORCE_VIRIAL;
     bool                 bCalcFshift = flags & GMX_FORCE_VIRIAL;
     bool                 bDoTime     = ocl_nb->bDoTime;
-    cl_uint                  arg_no;
+    cl_uint              arg_no;
 
     cl_nbparam_params_t nbparams_params;    
 #ifdef DEBUG_OCL
@@ -578,13 +452,11 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t        ocl_nb,
                                     plist->bDoPrune || always_prune);
 
     /* kernel launch config */
-    nblock    = calc_nb_kernel_nblock(plist->nsci, ocl_nb->dev_info);
-    //dim_block = dim3(CL_SIZE, CL_SIZE, 1);
+    nblock    = calc_nb_kernel_nblock(plist->nsci, ocl_nb->dev_info);    
     dim_block[0] = CL_SIZE;
     dim_block[1] = CL_SIZE;
     dim_block[2] = 1;
 
-    //dim_grid  = dim3(nblock, 1, 1);
     dim_grid[0] = nblock * dim_block[0];
     dim_grid[1] = 1 * dim_block[1];
     dim_grid[2]= 1 * dim_block[2];
@@ -830,10 +702,11 @@ void dump_compare_results_f(float* results, int cnt, char* out_file, char* ref_f
         printf("\n%s file not found. No comparison performed.", ref_file);
 }
 
-void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t        ocl_nb,
-                               const nbnxn_atomdata_t *nbatom,
-                               int                     flags,
-                               int                     aloc)
+/*! OpenCL equivalent of nbnxn_cuda_launch_cpyback */
+void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t      ocl_nb,
+                              const nbnxn_atomdata_t *nbatom,
+                              int                     flags,
+                              int                     aloc)
 {    
     cl_int      cl_error;
     int         adat_begin, adat_len, adat_end; /* local/nonlocal offset and length used for xq and f */
@@ -859,8 +732,7 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t        ocl_nb,
 
     cl_atomdata_t   *adat    = ocl_nb->atdat;
     cl_timers_t     *t       = ocl_nb->timers;
-    bool             bDoTime = ocl_nb->bDoTime;
-    //cudaStream_t     stream  = ocl_nb->stream[iloc];
+    bool             bDoTime = ocl_nb->bDoTime;    
     cl_command_queue stream  = ocl_nb->stream[iloc];
 
     bool             bCalcEner   = flags & GMX_FORCE_VIRIAL;
@@ -1047,6 +919,8 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t        ocl_nb,
 
 /* Atomic compare-exchange operation on unsigned values. It is used in
  * polling wait for the GPU.
+ *
+ * Copy of atomic_cas from nbnxn_cuda.cu
  */
 static inline bool atomic_cas(volatile unsigned int *ptr,
                               unsigned int           oldval,
@@ -1062,10 +936,11 @@ static inline bool atomic_cas(volatile unsigned int *ptr,
 #endif
 }
 
-void nbnxn_ocl_wait_gpu(nbnxn_opencl_ptr_t cu_nb,
-                         const nbnxn_atomdata_t *nbatom,
-                         int flags, int aloc,
-                         real *e_lj, real *e_el, rvec *fshift)
+/*! OpenCL equivalent of nbnxn_cuda_wait_gpu */
+void nbnxn_ocl_wait_gpu(nbnxn_opencl_ptr_t ocl_nb,
+                        const nbnxn_atomdata_t *nbatom,
+                        int flags, int aloc,
+                        real *e_lj, real *e_el, rvec *fshift)
 {
     /* NOTE:  only implemented for single-precision at this time */
     cl_int                 cl_error;
@@ -1089,10 +964,10 @@ void nbnxn_ocl_wait_gpu(nbnxn_opencl_ptr_t cu_nb,
         gmx_incons(stmp);
     }
 
-    cl_plist_t      *plist    = cu_nb->plist[iloc];
-    cl_timers_t     *timers   = cu_nb->timers;
-    wallclock_gpu_t *timings  = cu_nb->timings;
-    cl_nb_staging    nbst     = cu_nb->nbst;
+    cl_plist_t      *plist    = ocl_nb->plist[iloc];
+    cl_timers_t     *timers   = ocl_nb->timers;
+    wallclock_gpu_t *timings  = ocl_nb->timings;
+    cl_nb_staging    nbst     = ocl_nb->nbst;
 
 	bool             bCalcEner   = flags & GMX_FORCE_VIRIAL;
 	bool             bCalcFshift = flags & GMX_FORCE_VIRIAL;
@@ -1105,7 +980,7 @@ void nbnxn_ocl_wait_gpu(nbnxn_opencl_ptr_t cu_nb,
        NOTE: if timing with multiple GPUs (streams) becomes possible, the
        counters could end up being inconsistent due to not being incremented
        on some of the nodes! */
-    if (cu_nb->plist[iloc]->nsci == 0)
+    if (ocl_nb->plist[iloc]->nsci == 0)
     {
         return;
     }
@@ -1113,18 +988,18 @@ void nbnxn_ocl_wait_gpu(nbnxn_opencl_ptr_t cu_nb,
     /* calculate the atom data index range based on locality */
     if (LOCAL_A(aloc))
     {
-        adat_end = cu_nb->atdat->natoms_local;
+        adat_end = ocl_nb->atdat->natoms_local;
     }
     else
     {
-        adat_end = cu_nb->atdat->natoms;
+        adat_end = ocl_nb->atdat->natoms;
     }
 
-    if (cu_nb->bUseStreamSync)
+    if (ocl_nb->bUseStreamSync)
     {
 
         /* Actual sync point. Waits for everything to be finished in the command queue. TODO: Find out if a more fine grained solution is needed */
-        cl_error = clFinish(cu_nb->stream[iloc]);
+        cl_error = clFinish(ocl_nb->stream[iloc]);
         assert(CL_SUCCESS == cl_error);
     }
     else
@@ -1142,7 +1017,7 @@ void nbnxn_ocl_wait_gpu(nbnxn_opencl_ptr_t cu_nb,
     }
 
     /* timing data accumulation */
-    if (cu_nb->bDoTime)
+    if (ocl_nb->bDoTime)
     {
         /* only increase counter once (at local F wait) */
         if (LOCAL_I(iloc))
@@ -1205,189 +1080,4 @@ void nbnxn_ocl_wait_gpu(nbnxn_opencl_ptr_t cu_nb,
 	plist->bDoPrune = false;
 
 }
-////void nbnxn_cuda_wait_gpu(nbnxn_cuda_ptr_t cu_nb,
-////                         const nbnxn_atomdata_t *nbatom,
-////                         int flags, int aloc,
-////                         real *e_lj, real *e_el, rvec *fshift)
-////{
-////    /* NOTE:  only implemented for single-precision at this time */
-////    cudaError_t            stat;
-////    int                    i, adat_end, iloc = -1;
-////    volatile unsigned int *poll_word;
-////
-////    /* determine interaction locality from atom locality */
-////    if (LOCAL_A(aloc))
-////    {
-////        iloc = eintLocal;
-////    }
-////    else if (NONLOCAL_A(aloc))
-////    {
-////        iloc = eintNonlocal;
-////    }
-////    else
-////    {
-////        char stmp[STRLEN];
-////        sprintf(stmp, "Invalid atom locality passed (%d); valid here is only "
-////                "local (%d) or nonlocal (%d)", aloc, eatLocal, eatNonlocal);
-////        gmx_incons(stmp);
-////    }
-////
-////    cu_plist_t      *plist    = cu_nb->plist[iloc];
-////    cu_timers_t     *timers   = cu_nb->timers;
-////    wallclock_gpu_t *timings  = cu_nb->timings;
-////    nb_staging       nbst     = cu_nb->nbst;
-////
-////    bool             bCalcEner   = flags & GMX_FORCE_VIRIAL;
-////    bool             bCalcFshift = flags & GMX_FORCE_VIRIAL;
-////
-////    /* turn energy calculation always on/off (for debugging/testing only) */
-////    bCalcEner = (bCalcEner || always_ener) && !never_ener;
-////
-////    /* don't launch wait/update timers & counters if there was no work to do
-////
-////       NOTE: if timing with multiple GPUs (streams) becomes possible, the
-////       counters could end up being inconsistent due to not being incremented
-////       on some of the nodes! */
-////    if (cu_nb->plist[iloc]->nsci == 0)
-////    {
-////        return;
-////    }
-////
-////    /* calculate the atom data index range based on locality */
-////    if (LOCAL_A(aloc))
-////    {
-////        adat_end = cu_nb->atdat->natoms_local;
-////    }
-////    else
-////    {
-////        adat_end = cu_nb->atdat->natoms;
-////    }
-////
-////    if (cu_nb->bUseStreamSync)
-////    {
-////        stat = cudaStreamSynchronize(cu_nb->stream[iloc]);
-////        CU_RET_ERR(stat, "cudaStreamSynchronize failed in cu_blockwait_nb");
-////    }
-////    else
-////    {
-////        /* Busy-wait until we get the signal pattern set in last byte
-////         * of the l/nl float vector. This pattern corresponds to a floating
-////         * point number which can't be the result of the force calculation
-////         * (maximum, 127 exponent and 0 mantissa).
-////         * The polling uses atomic compare-exchange.
-////         */
-////        poll_word = (volatile unsigned int*)&nbatom->out[0].f[adat_end*3 - 1];
-////        while (atomic_cas(poll_word, poll_wait_pattern, poll_wait_pattern))
-////        {
-////        }
-////    }
-////
-////    /* timing data accumulation */
-////    if (cu_nb->bDoTime)
-////    {
-////        /* only increase counter once (at local F wait) */
-////        if (LOCAL_I(iloc))
-////        {
-////            timings->nb_c++;
-////            timings->ktime[plist->bDoPrune ? 1 : 0][bCalcEner ? 1 : 0].c += 1;
-////        }
-////
-////        /* kernel timings */
-////        timings->ktime[plist->bDoPrune ? 1 : 0][bCalcEner ? 1 : 0].t +=
-////            cu_event_elapsed(timers->start_nb_k[iloc], timers->stop_nb_k[iloc]);
-////
-////        /* X/q H2D and F D2H timings */
-////        timings->nb_h2d_t += cu_event_elapsed(timers->start_nb_h2d[iloc],
-////                                              timers->stop_nb_h2d[iloc]);
-////        timings->nb_d2h_t += cu_event_elapsed(timers->start_nb_d2h[iloc],
-////                                              timers->stop_nb_d2h[iloc]);
-////
-////        /* only count atdat and pair-list H2D at pair-search step */
-////        if (plist->bDoPrune)
-////        {
-////            /* atdat transfer timing (add only once, at local F wait) */
-////            if (LOCAL_A(aloc))
-////            {
-////                timings->pl_h2d_c++;
-////                timings->pl_h2d_t += cu_event_elapsed(timers->start_atdat,
-////                                                      timers->stop_atdat);
-////            }
-////
-////            timings->pl_h2d_t += cu_event_elapsed(timers->start_pl_h2d[iloc],
-////                                                  timers->stop_pl_h2d[iloc]);
-////        }
-////    }
-////
-////    /* add up energies and shift forces (only once at local F wait) */
-////    if (LOCAL_I(iloc))
-////    {
-////        if (bCalcEner)
-////        {
-////            *e_lj += *nbst.e_lj;
-////            *e_el += *nbst.e_el;
-////        }
-////
-////        if (bCalcFshift)
-////        {
-////            for (i = 0; i < SHIFTS; i++)
-////            {
-////                fshift[i][0] += nbst.fshift[i].x;
-////                fshift[i][1] += nbst.fshift[i].y;
-////                fshift[i][2] += nbst.fshift[i].z;
-////            }
-////        }
-////    }
-////
-////    /* turn off pruning (doesn't matter if this is pair-search step or not) */
-////    plist->bDoPrune = false;
-////}
 
-/////*! Return the reference to the nbfp texture. */
-////const struct texture<float, 1, cudaReadModeElementType> &nbnxn_cuda_get_nbfp_texref()
-////{
-////    return nbfp_texref;
-////}
-////
-/////*! Return the reference to the nbfp_comb texture. */
-////const struct texture<float, 1, cudaReadModeElementType> &nbnxn_cuda_get_nbfp_comb_texref()
-////{
-////    return nbfp_comb_texref;
-////}
-////
-/////*! Return the reference to the coulomb_tab. */
-////const struct texture<float, 1, cudaReadModeElementType> &nbnxn_cuda_get_coulomb_tab_texref()
-////{
-////    return coulomb_tab_texref;
-////}
-
-/////*! Set up the cache configuration for the non-bonded kernels,
-//// */
-////void nbnxn_cuda_set_cacheconfig(cuda_dev_info_t *devinfo)
-////{
-////    cudaError_t stat;
-////
-////    for (int i = 0; i < eelCuNR; i++)
-////    {
-////        for (int j = 0; j < evdwCuNR; j++)
-////        {
-////            if (devinfo->prop.major >= 3)
-////            {
-////                /* Default kernel on sm 3.x 48/16 kB Shared/L1 */
-////                cudaFuncSetCacheConfig(nb_kfunc_ener_prune_ptr[i][j], cudaFuncCachePreferShared);
-////                cudaFuncSetCacheConfig(nb_kfunc_ener_noprune_ptr[i][j], cudaFuncCachePreferShared);
-////                cudaFuncSetCacheConfig(nb_kfunc_noener_prune_ptr[i][j], cudaFuncCachePreferShared);
-////                stat = cudaFuncSetCacheConfig(nb_kfunc_noener_noprune_ptr[i][j], cudaFuncCachePreferShared);
-////            }
-////            else
-////            {
-////                /* On Fermi prefer L1 gives 2% higher performance */
-////                /* Default kernel on sm_2.x 16/48 kB Shared/L1 */
-////                cudaFuncSetCacheConfig(nb_kfunc_ener_prune_ptr[i][j], cudaFuncCachePreferL1);
-////                cudaFuncSetCacheConfig(nb_kfunc_ener_noprune_ptr[i][j], cudaFuncCachePreferL1);
-////                cudaFuncSetCacheConfig(nb_kfunc_noener_prune_ptr[i][j], cudaFuncCachePreferL1);
-////                stat = cudaFuncSetCacheConfig(nb_kfunc_noener_noprune_ptr[i][j], cudaFuncCachePreferL1);
-////            }
-////            CU_RET_ERR(stat, "cudaFuncSetCacheConfig failed");
-////        }
-////    }
-////}
