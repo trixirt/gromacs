@@ -33,6 +33,10 @@
  * the research papers on the package. Check out http://www.gromacs.org.
  */
  
+/** \file nbnxn_ocl_types.h
+ *  \brief OpenCL equivalent of nbnxn_cuda_types.h
+ */
+
 #ifndef NBNXN_OPENCL_TYPES_H
 #define NBNXN_OPENCL_TYPES_H
 
@@ -42,14 +46,6 @@
 #include "gromacs/utility/real.h"
 
 #include "types/interaction_const.h"
-
-/* Fixing headers: Mixed host/device structure.. Typedef things to avoid other includes that can cause
- problems to device code */
-#ifdef __IN_OPENCL_KERNEL__
-typedef float3  rvec;
-typedef bool    gmx_bool;
-#endif
-
 
 /* Fixing headers: Mixed host/device structure.. Header had to be modified to avoid irrelevant types in
  * device code, as tMPI_atomic_t.*/
@@ -67,9 +63,9 @@ typedef bool    gmx_bool;
 #ifdef __cplusplus
 extern "C" {
 #endif
-/*! \brief Electrostatic CUDA kernel flavors.
+/*! \brief Electrostatic OpenCL kernel flavors.
  *
- *  Types of electrostatics implementations available in the CUDA non-bonded
+ *  Types of electrostatics implementations available in the OpenCL non-bonded
  *  force kernels. These represent both the electrostatics types implemented
  *  by the kernels (cut-off, RF, and Ewald - a subset of what's defined in
  *  enums.h) as well as encode implementation details analytical/tabulated
@@ -85,9 +81,9 @@ enum eelOcl {
     eelOclCUT, eelOclRF, eelOclEWALD_TAB, eelOclEWALD_TAB_TWIN, eelOclEWALD_ANA, eelOclEWALD_ANA_TWIN, eelOclNR
 };
 
-/*! \brief VdW CUDA kernel flavors.
+/*! \brief VdW OpenCL kernel flavors.
  *
- * The enumerates values correspond to the LJ implementations in the CUDA non-bonded
+ * The enumerates values correspond to the LJ implementations in the OpenCL non-bonded
  * kernels.
  *
  * The column-order of pointers to different electrostatic kernels defined in
@@ -98,17 +94,6 @@ enum evdwOcl {
     evdwOclCUT, evdwOclFSWITCH, evdwOclPSWITCH, evdwOclEWALDGEOM, evdwOclEWALDLB, evdwOclNR
 };
 
-/* All structs prefixed with "cu_" hold data used in GPU calculations and
- * are passed to the kernels, except cu_timers_t. */
-/*! \cond */
-//typedef struct cl_plist     cl_plist_t;
-//typedef struct cl_atomdata  cl_atomdata_t;
-//typedef struct cl_nbparam   cl_nbparam_t;
-//typedef struct cl_timers    cl_timers_t;
-//typedef struct cl_nb_staging   cl_nb_staging_t;
-/*! \endcond */
-
-
 /** \internal
  * \brief Staging area for temporary data downloaded from the GPU.
  *
@@ -117,12 +102,10 @@ enum evdwOcl {
  */
 typedef struct cl_nb_staging
 {
-    float   *e_lj;      /**< LJ energy            */
-    float   *e_el;      /**< electrostatic energy */
-    // TODO: see how this field is used and fix its data type
-    //float3  *fshift;    /**< shift forces         */
+    float   *e_lj;      /**< LJ energy                       */
+    float   *e_el;      /**< electrostatic energy            */    
+    float *fshift;      /**< float3 buffer with shift forces */
     // TODO: review fshift data type and how its size is computed
-    float *fshift;
 }cl_nb_staging_t;
 
 /** \internal
@@ -134,31 +117,23 @@ typedef struct cl_atomdata
     int      natoms_local;      /**< number of local atoms                        */
     int      nalloc;            /**< allocation size for the atom data (xq, f)    */
 
-    //float4  *xq;                /**< atom coordinates + charges, size natoms      */
-    cl_mem xq;                /**< atom coordinates + charges, size natoms      */
-    //float3  *f;                 /**< force output array, size natoms              */
-    cl_mem f;                 /**< force output array, size natoms              */
+    cl_mem xq;                  /**< float4 buffer with atom coordinates + charges, size natoms */
+    cl_mem f;                   /**< float3 buffer with force output array, size natoms         */
 
-    //float   *e_lj;              /**< LJ energy output, size 1                     */
-    cl_mem e_lj;
-    //float   *e_el;              /**< Electrostatics energy input, size 1          */
-    cl_mem e_el;
+    cl_mem e_lj;                /**< LJ energy output, size 1                       */
+    cl_mem e_el;                /**< Electrostatics energy input, size 1            */
 
+    cl_mem fshift;              /**< float3 buffer with shift forces                */
 
-    //float3  *fshift;            /**< shift forces                                 */
-    cl_mem fshift;
+    int      ntypes;            /**< number of atom types                           */   
+    cl_mem atom_types;          /**< int buffer with atom type indices, size natoms */
 
-    int      ntypes;            /**< number of atom types                         */
-    //int     *atom_types;        /**< atom type indices, size natoms               */
-    cl_mem atom_types;        /**< atom type indices, size natoms               */
-
-    //float3  *shift_vec;         /**< shifts                                       */
-    cl_mem shift_vec;
-    cl_bool     bShiftVecUploaded; /**< true if the shift vector has been uploaded   */
+    cl_mem shift_vec;           /**< float3 buffer with shifts values               */
+    cl_bool     bShiftVecUploaded; /**< true if the shift vector has been uploaded  */
 } cl_atomdata_t;
 
 /** \internal
- * \brief Parameters required for the CUDA nonbonded calculations.
+ * \brief Parameters required for the OpenCL nonbonded calculations.
  */
 typedef struct cl_nbparam
 {
@@ -185,21 +160,13 @@ typedef struct cl_nbparam
     switch_consts_t vdw_switch;       /**< VdW switch constants                     */
 
     /* LJ non-bonded parameters - accessed through texture memory */
-    //float                 *nbfp;             /**< nonbonded parameter table with C6/C12 pairs per atom type-pair, 2*ntype^2 elements */
-    //cl_mem                  nbfp;
-    //openclTextureObject_t  nbfp_climg2d;      /**< texture object bound to nbfp                                                       */
-    cl_mem                  nbfp_climg2d;      /**< texture object bound to nbfp                                                       */
-    //float                 *nbfp_comb;        /**< nonbonded parameter table per atom type, 2*ntype elements                          */
-    //cl_mem                 nbfp_comb;        /**< nonbonded parameter table per atom type, 2*ntype elements                          */
-    //openclTextureObject_t  nbfp_comb_climg2d; /**< texture object bound to nbfp_texobj                                                */
-    cl_mem                  nbfp_comb_climg2d; /**< texture object bound to nbfp_texobj                                                */
+    cl_mem                  nbfp_climg2d;      /**< nonbonded parameter table with C6/C12 pairs per atom type-pair, 2*ntype^2 elements */
+    cl_mem                  nbfp_comb_climg2d; /**< nonbonded parameter table per atom type, 2*ntype elements                          */
 
     /* Ewald Coulomb force table data - accessed through texture memory */
     int                    coulomb_tab_size;   /**< table size (s.t. it fits in texture cache) */
     float                  coulomb_tab_scale;  /**< table scale/spacing                        */
-    //float                 *coulomb_tab;        /**< pointer to the table in the device memory  */
-    cl_mem                  coulomb_tab_climg2d;
-    //openclTextureObject_t  coulomb_tab_climg2d; /**< texture object bound to coulomb_tab        */
+    cl_mem                 coulomb_tab_climg2d;/**< pointer to the table in the device memory  */    
 }cl_nbparam_t;
 
 // Data structure shared between the OpenCL device code and OpenCL host code
@@ -243,17 +210,17 @@ typedef struct cl_plist
     int              na_c;        /**< number of atoms per cluster                  */
 
     int              nsci;        /**< size of sci, # of i clusters in the list     */
-    int              sci_nalloc;  /**< allocation size of sci                       */
-    //nbnxn_sci_t     *sci;         /**< list of i-cluster ("super-clusters")         */
-    cl_mem sci;         /**< list of i-cluster ("super-clusters")         */
+    int              sci_nalloc;  /**< allocation size of sci                       */    
+    cl_mem           sci;         /**< list of i-cluster ("super-clusters").
+                                       It contains elements of type nbnxn_sci_t     */
 
     int              ncj4;        /**< total # of 4*j clusters                      */
-    int              cj4_nalloc;  /**< allocation size of cj4                       */
-    //nbnxn_cj4_t     *cj4;         /**< 4*j cluster list, contains j cluster number
-    cl_mem     cj4;         /**< 4*j cluster list, contains j cluster number
-                                       and index into the i cluster list            */
-    //nbnxn_excl_t    *excl;        /**< atom interaction bits                        */
-    cl_mem excl;        /**< atom interaction bits                        */
+    int              cj4_nalloc;  /**< allocation size of cj4                       */    
+    cl_mem           cj4;         /**< 4*j cluster list, contains j cluster number and
+                                       index into the i cluster list.
+                                       It contains elements of type nbnxn_cj4_t     */    
+    cl_mem           excl;        /**< atom interaction bits                        
+                                       It contains elements of type nbnxn_excl_t    */
     int              nexcl;       /**< count for excl                               */
     int              excl_nalloc; /**< allocation size of excl                      */
 
@@ -261,8 +228,6 @@ typedef struct cl_plist
                                        done during the  current step                */
 }cl_plist_t;
 
-
-#ifndef __IN_OPENCL_KERNEL__
 
 /** \internal
  * \brief OpenCL events used for timing GPU kernels and H2D/D2H transfers.
@@ -289,52 +254,51 @@ typedef struct cl_timers
 }cl_timers_t;
 
 /** \internal
- * \brief Main data structure for CUDA nonbonded force calculations.
+ * \brief Main data structure for OpenCL nonbonded force calculations.
  */
 struct nbnxn_opencl
 {
-    ocl_gpu_info_t *dev_info;        /**< CUDA device information                              */    
+    ocl_gpu_info_t *dev_info;        /**< OpenCL device information                                  */    
 
-                                    /** non-bonded kernels */
-                                    /** organized similar with nb_kfunc_xxx arrays in nbnxn_ocl.cpp */
+                                     /** non-bonded kernels */
+                                     /** organized similar with nb_kfunc_xxx arrays in nbnxn_ocl.cpp */
     cl_kernel           kernel_noener_noprune_ptr[eelOclNR][evdwOclNR];
     cl_kernel           kernel_ener_noprune_ptr[eelOclNR][evdwOclNR] ;
     cl_kernel           kernel_noener_prune_ptr[eelOclNR][evdwOclNR];
     cl_kernel           kernel_ener_prune_ptr[eelOclNR][evdwOclNR];
 
-                                    /** auxiliary kernels implementing memset like functions */
+                                    /** auxiliary kernels implementing memset like functions         */
     cl_kernel           kernel_memset_f;
     cl_kernel           kernel_memset_f2;
     cl_kernel           kernel_memset_f3;
     cl_kernel           kernel_zero_e_fshift;
 
-    cl_bool          bUseTwoStreams; /**< true if doing both local/non-local NB work on GPU    */
-    cl_bool          bUseStreamSync; /**< true if the standard cudaStreamSynchronize is used
-                                          and not memory polling-based waiting                 */
-    cl_atomdata_t   *atdat;          /**< atom data                                            */
-    cl_nbparam_t    *nbparam;        /**< parameters required for the non-bonded calc.         */
-    cl_plist_t      *plist[2];       /**< pair-list data structures (local and non-local)      */
-    cl_nb_staging_t     nbst;           /**< staging area where fshift/energies get downloaded    */
+    cl_bool          bUseTwoStreams; /**< true if doing both local/non-local NB work on GPU          */
+    cl_bool          bUseStreamSync; /**< true if the standard synchronization is used
+                                          and not memory polling-based waiting                       */
+    cl_atomdata_t   *atdat;          /**< atom data                                                  */
+    cl_nbparam_t    *nbparam;        /**< parameters required for the non-bonded calc.               */
+    cl_plist_t      *plist[2];       /**< pair-list data structures (local and non-local)            */
+    cl_nb_staging_t  nbst;           /**< staging area where fshift/energies get downloaded          */
 
-    cl_mem              debug_buffer;
+    cl_mem           debug_buffer;
 
-    cl_command_queue     stream[2];      /**< local and non-local GPU streams                      */
+    cl_command_queue stream[2];      /**< local and non-local GPU queues                             */
 
     /** events used for synchronization */
     cl_event    nonlocal_done;    /**< event triggered when the non-local non-bonded kernel
-                                        is done (and the local transfer can proceed)           */
+                                        is done (and the local transfer can proceed)                 */
     cl_event    misc_ops_done;    /**< event triggered when the operations that precede the
-                                          main force calculations are done (e.g. buffer 0-ing) */
+                                          main force calculations are done (e.g. buffer 0-ing)       */
 
     /* NOTE: With current CUDA versions (<=5.0) timing doesn't work with multiple
      * concurrent streams, so we won't time if both l/nl work is done on GPUs.
      * Timer init/uninit is still done even with timing off so only the condition
      * setting bDoTime needs to be change if this CUDA "feature" gets fixed. */
-    cl_bool          bDoTime;       /**< True if event-based timing is enabled.               */
-    cl_timers_t     *timers;        /**< CUDA event-based timers.                             */
-    wallclock_gpu_t *timings;       /**< Timing data.                                         */
+    cl_bool          bDoTime;       /**< True if event-based timing is enabled.                     */
+    cl_timers_t     *timers;        /**< OpenCL event-based timers.                                 */
+    wallclock_gpu_t *timings;       /**< Timing data.                                               */
 };
-#endif /* __IN_OPENCL_KERNEL__ */
 
 #ifdef __cplusplus
 }

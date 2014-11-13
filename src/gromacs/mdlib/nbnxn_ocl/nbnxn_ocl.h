@@ -33,6 +33,10 @@
  * the research papers on the package. Check out http://www.gromacs.org.
  */
 
+/** \file nbnxn_ocl.h
+ *  \brief OpenCL equivalent of nbnxn_cuda.h
+ */
+
 #ifndef NBNXN_OCL_H
 #define NBNXN_OCL_H
 
