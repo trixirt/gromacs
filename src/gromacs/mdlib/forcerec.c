@@ -1804,7 +1804,7 @@ static void pick_nbnxn_resources(const t_commrec     *cr,
 
     *bUseGPU = FALSE;
 
-    bOclDoFastGen        = (getenv("OCL_NOFASTGEN") == NULL);
+    bOclDoFastGen        = (getenv("GMX_OCL_NOFASTGEN") == NULL);
 #ifdef GMX_USE_OPENCL
 	if (bOclDoFastGen)
 	{

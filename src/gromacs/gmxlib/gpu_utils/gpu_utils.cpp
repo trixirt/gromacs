@@ -117,7 +117,7 @@ ocl_vendor_id_t get_vendor_id(char *vendor_name)
  *  Will detect all OpenCL GPUs supported by the device driver in use. Also
  *  check for the compatibility of each and fill the gpu_info->ocl_dev array
  *  with the required information on each the device.
- *  If OCL_FORCE_CPU environment variable is defined, OpenCL CPU devices will also be detected.
+ *  If GMX_OCL_FORCE_CPU environment variable is defined, OpenCL CPU devices will also be detected.
  *
  *  \param[in] gpu_info    Pointer to structure holding GPU information.
  *  \param[out] err_str    The error message of any CUDA API error that caused
@@ -135,7 +135,7 @@ int detect_ocl_gpus(gmx_gpu_info_t *gpu_info, char *err_str)
     retval = 0;
     ocl_platform_ids = NULL;
 
-    if(getenv("OCL_FORCE_CPU")!=NULL)
+    if(getenv("GMX_OCL_FORCE_CPU")!=NULL)
         req_dev_type = CL_DEVICE_TYPE_CPU;
 
     while (1)

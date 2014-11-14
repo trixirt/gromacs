@@ -98,10 +98,10 @@ static const char* build_options_list[] = {
     "-I../../src/gromacs/gmxlib/ocl_tools           -I../../src/gromacs/mdlib/nbnxn_ocl            -I../../src/gromacs/pbcutil            -I../../src/gromacs/mdlib"
     -I../../../gromacs/src/gromacs/gmxlib/ocl_tools -I../../../gromacs/src/gromacs/mdlib/nbnxn_ocl -I../../../gromacs/src/gromacs/pbcutil -I../../../gromacs/src/gromacs/mdlib" */
 };
-/* Include paths when using the OCL_FILE_PATH to point to the gromacs source tree */
+/* Include paths when using the GMX_OCL_FILE_PATH to point to the gromacs source tree */
 #define INCLUDE_PATH_COUNT 4
 /**
- * \brief List of include paths relative to the path defined by \ref{OCL_FILE_PATH}
+ * \brief List of include paths relative to the path defined by \ref{GMX_OCL_FILE_PATH}
  */ 
 static const char* include_path_list[] =
 {
@@ -210,17 +210,17 @@ create_ocl_build_options_length(
         build_options_length +=
             strlen(custom_build_options_prepend)+whitespace;
 
-    if ( (build_device_vendor_id == _OCL_VENDOR_AMD_) && getenv("OCL_DEBUG") && getenv("OCL_FORCE_CPU") )
+    if ( (build_device_vendor_id == _OCL_VENDOR_AMD_) && getenv("GMX_OCL_DEBUG") && getenv("GMX_OCL_FORCE_CPU") )
     {
         build_options_length += get_ocl_build_option_length(_generic_debug_symbols_)+whitespace;
     }
 
-    if(getenv("OCL_NOOPT"))
+    if(getenv("GMX_OCL_NOOPT"))
     {
         build_options_length +=
             get_ocl_build_option_length(_generic_noopt_compilation_)+whitespace;
     }
-    if(getenv("OCL_FASTMATH"))
+    if(getenv("GMX_OCL_FASTMATH"))
     {
        build_options_length +=
             get_ocl_build_option_length(_generic_fast_relaxed_math_)+whitespace      ;
@@ -271,7 +271,7 @@ create_ocl_build_options(
         build_options_string[char_added++] =' ';
     }
 
-    if(getenv("OCL_NOOPT") )
+    if(getenv("GMX_OCL_NOOPT") )
     {
         strncpy( build_options_string+char_added,
                 get_ocl_build_option(_generic_noopt_compilation_),
@@ -282,7 +282,7 @@ create_ocl_build_options(
 
     }
 
-    if(getenv("OCL_FASTMATH") )
+    if(getenv("GMX_OCL_FASTMATH") )
     {
         strncpy( build_options_string+char_added,
                 get_ocl_build_option(_generic_fast_relaxed_math_),
@@ -292,7 +292,7 @@ create_ocl_build_options(
         build_options_string[char_added++]=' ';
     }
 
-    if ( ( build_device_vendor_id == _OCL_VENDOR_AMD_ ) && getenv("OCL_DEBUG") && getenv("OCL_FORCE_CPU"))
+    if ( ( build_device_vendor_id == _OCL_VENDOR_AMD_ ) && getenv("GMX_OCL_DEBUG") && getenv("GMX_OCL_FORCE_CPU"))
     {
         strncpy( build_options_string+char_added,
                 get_ocl_build_option(_generic_debug_symbols_),
@@ -336,8 +336,8 @@ create_ocl_build_options(
 /**
  * \brief Get the size of the full kernel source file path and name
  * 
- * If OCL_FILE_PATH is defined in the environment the following full path size is returned:
- *  strlen($OCL_FILE_PATH) + strlen(kernel_id.cl) + separator + null term
+ * If GMX_OCL_FILE_PATH is defined in the environment the following full path size is returned:
+ *  strlen($GMX_OCL_FILE_PATH) + strlen(kernel_id.cl) + separator + null term
  * Otherwise the following full path size is returned (OCL_INSTALL_DIR_NAME is provided by CMAKE
  *  installation prefix path) :
  *  strlen( OCL_INSTALL_DIR_NAME ) + strlen(kernel_id.cl) + separator + null term
@@ -350,7 +350,7 @@ static size_t
 get_ocl_kernel_source_file_info(kernel_source_index_t kernel_src_id)
 {
     char * gmx_pathname=NULL;
-	if ( (gmx_pathname = getenv("OCL_FILE_PATH")) != NULL)
+	if ( (gmx_pathname = getenv("GMX_OCL_FILE_PATH")) != NULL)
     {
         return (strlen(gmx_pathname)                        /* Path to gromacs source    */
                 + strlen(kernel_filenames[kernel_src_id])   /* Kernel source filename   */
@@ -370,8 +370,8 @@ get_ocl_kernel_source_file_info(kernel_source_index_t kernel_src_id)
 /**
  * \brief Compose and the full path and name of the kernel src to be used
  * 
- * If OCL_FILE_PATH is defined in the environment the following full path size is composed:
- *  $OCL_FILE_PATH/kernel_id.cl
+ * If GMX_OCL_FILE_PATH is defined in the environment the following full path size is composed:
+ *  $GMX_OCL_FILE_PATH/kernel_id.cl
  * Otherwise the following full path is composed (OCL_INSTALL_DIR_NAME is provided by CMAKE
  *  installation prefix path):
  *  OCL_INSTALL_DIR_NAME/kernel_id.cl
@@ -392,7 +392,7 @@ get_ocl_kernel_source_path(
     assert(kernel_filename_len != 0);
     assert(ocl_kernel_filename != NULL);
 
-    if( (filepath = getenv("OCL_FILE_PATH")) != NULL)
+    if( (filepath = getenv("GMX_OCL_FILE_PATH")) != NULL)
     {
         FILE *file_ok = NULL;
 
@@ -424,7 +424,7 @@ get_ocl_kernel_source_path(
 			fclose(file_ok); 
         }else
         {
-            printf("Warning, you seem to have misconfigured the OCL_FILE_PATH environent variable: %s\n",
+            printf("Warning, you seem to have misconfigured the GMX_OCL_FILE_PATH environent variable: %s\n",
                 filepath);
         }
     }else
@@ -797,7 +797,7 @@ ocl_compile_program(
 		strcat(binary_filename, ".bin");
 		FILE *f;
 
-		if (getenv("OCL_NOGENCACHE") == NULL && (f = fopen(binary_filename, "rb")) != NULL) 
+		if (getenv("GMX_OCL_NOGENCACHE") == NULL && (f = fopen(binary_filename, "rb")) != NULL) 
 		{
 			fseek(f, 0, SEEK_END);
 			binary_sizes[0] = ftell(f);
@@ -834,7 +834,7 @@ ocl_compile_program(
 		char *oclpath = NULL;
         
         /* Create include paths for non-standard location of the kernel sources */
-		if ((oclpath = getenv("OCL_FILE_PATH")) != NULL)
+		if ((oclpath = getenv("GMX_OCL_FILE_PATH")) != NULL)
 		{
 			size_t chars = 0;
 			custom_build_options_append = 
@@ -858,7 +858,7 @@ ocl_compile_program(
 				strncpy(&custom_build_options_append[chars], " ", 1);
 				chars += 1;
 			}
-			printf("OCL_FILE_PATH includes: %s\n", custom_build_options_append);
+			printf("GMX_OCL_FILE_PATH includes: %s\n", custom_build_options_append);
 		}
 
 		/* Get vendor specific define (amd,nvidia,nowarp) */
@@ -902,7 +902,7 @@ ocl_compile_program(
             clBuildProgram(*p_program, 0, NULL, build_options_string, NULL, NULL);
 
 		/* Store the binary only if the build has been successful */
-		if (build_status == CL_SUCCESS && isLoadedFromBinary == false && getenv("OCL_NOGENCACHE") == NULL)
+		if (build_status == CL_SUCCESS && isLoadedFromBinary == false && getenv("GMX_OCL_NOGENCACHE") == NULL)
 		{
 			size_t binaries[5] = { 0, 0, 0, 0, 0 };
 			unsigned char * binary[5] = { NULL, NULL, NULL, NULL, NULL };

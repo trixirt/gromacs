@@ -911,10 +911,10 @@ void nbnxn_ocl_init(FILE                 *fplog,
     /* OpenCL timing disabled as event timers don't work:
        - with multiple streams = domain-decomposition;
        - with the polling waiting hack (without cudaStreamSynchronize);
-       - when turned off by GMX_DISABLE_OPENCL_TIMING.
+       - when turned off by GMX_DISABLE_OCL_TIMING.
      */
     nb->bDoTime = (!nb->bUseTwoStreams && nb->bUseStreamSync &&
-                   (getenv("GMX_DISABLE_OPENCL_TIMING") == NULL));
+                   (getenv("GMX_DISABLE_OCL_TIMING") == NULL));
 
     /* Create queues only after bDoTime has been initialized */
     if (nb->bDoTime)
