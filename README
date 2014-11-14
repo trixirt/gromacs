@@ -46,8 +46,22 @@ automatically defined.
 If you do not wish to install Gromacs, but run the version built from sources,
 you need to provide the path to the source tree with the OpenCL kernels like
 below:
-	export OCL_FILE_PATH=/path-to-gromacs/src/
+	export GMX_OCL_FILE_PATH=/path-to-gromacs/src/
 
+Caching options for building the kernels
+----------------------------------------
+Building an OpenCL program can take a significant amount of time. NVIDIA
+implements a mechanism to cache the result of the build. As a consequence,
+only the first build of the OpenCL kernels will take longer, the following
+builds will be very fast. AMD drivers, on the other hand, implement no
+caching and building a program can be very slow. That's why we have started
+implementing our own caching. Caching for OpenCL kernel builds is by default
+enabled. To disable it, set GMX_OCL_NOGENCACHE environment variable.
+
+ If you plan to modify the OpenCL kernels, you should disable any caching:
+ * add GMX_OCL_NOGENCACHE environment variable and set it to 1
+ * for NVIDIA cards: add CUDA_CACHE_DISABLE environment variable and set it to 1
+ 
 OpenCL Device Selection
 -----------------------
 The same option used to select a CUDA device can be used to select an OpenCL
@@ -70,26 +84,39 @@ Currently, several environment variables exist that help customize some aspects
 of the OpenCL version of Gromacs. They are mostly related to the runtime
 compilation of OpenCL kernels, but they are also used on the device selection.
 
-	OCL_FORCE_CPU - Force the selection of a CPU device instead of a GPU. This
-	exists only for debugging purposes. Do not expect Gromacs to function
-	properly with this option on, it is solely for the simplicity of stepping
-	in a kernel and see what is happening.
-	
-	OCL_FILE_PATH - Is the full path to Gromacs src folder. Useful when gmx is
-	called from a folder other than the installation/bin folder.
-	
-	OCL_NOFASTGEN - Generates and compiles all algorithm flavors, otherwise
-	only the flavor required for the simulation is generated and compiled.
-	
-	OCL_DEBUG - Use in conjunction with OCL_FORCE_CPU or with an AMD device.
-	It adds the debug flag to the compiler options (-g).
-	
-	OCL_FASTMATH - Adds the option cl-fast-relaxed-math to the compiler options
-	(in the CUDA version this is enabled by default, it is likely that the same
-	will happen with the OpenCL version soon)
-	
-	OCL_NOOPT - Disable optimisations. Adds the option cl-opt-disable to the
-	compiler options.
+   GMX_OCL_FORCE_CPU - Force the selection of a CPU device instead of a GPU.
+   This exists only for debugging purposes. Do not expect Gromacs to function
+   properly with this option on, it is solely for the simplicity of stepping in
+   a kernel and see what is happening.
+   
+   GXM_OCL_FILE_PATH - Is the full path to Gromacs src folder. Useful when gmx
+   is called from a folder other than the installation/bin folder.
+   
+   GMX_OCL_NOFASTGEN - Generates and compiles all algorithm flavors, otherwise
+   only the flavor required for the simulation is generated and compiled.
+   
+   GMX_OCL_DEBUG - Use in conjunction with OCL_FORCE_CPU or with an AMD device.
+   It adds the debug flag to the compiler options (-g).
+   
+   GMX_OCL_FASTMATH - Adds the option cl-fast-relaxed-math to the compiler
+   options (in the CUDA version this is enabled by default, it is likely that
+   the same will happen with the OpenCL version soon)
+   
+   GMX_OCL_NOOPT - Disable optimisations. Adds the option cl-opt-disable to
+   the compiler options.
+   
+   GMX_OCL_NOGENCACHE - Disable caching for OpenCL kernel builds.
+   
+   GMX_OCL_NB_ANA_EWALD - Forces the use of analytical Ewald kernels.
+   Equivalent of CUDA env var GMX_CUDA_NB_ANA_EWALD
+   
+   GMX_OCL_NB_TAB_EWALD - Forces the use of tabulated Ewald kernel.
+   Equivalent of CUDA env var GMX_OCL_NB_TAB_EWALD
+   
+   GMX_OCL_NB_EWALD_TWINCUT - Forces the use of twin-range cutoff kernel.
+   Equivalent of CUDA env var GMX_CUDA_NB_EWALD_TWINCUT
+   
+   GMX_DISABLE_OCL_TIMING - Disables timing for OpenCL operations
 
 4. KNOWN LIMITATIONS
    =================
@@ -129,7 +156,7 @@ The GROMACS OpenCL team
 		Teemu Virolainen
 		Anca Hamuraru
 	Contributors
-		Dimitris Karkoulis
+		Dimitrios Karkoulis
                                * * * * *
 
 GROMACS is free software, distributed under the GNU Lesser General
