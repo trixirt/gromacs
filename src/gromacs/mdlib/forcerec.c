@@ -1804,12 +1804,15 @@ static void pick_nbnxn_resources(const t_commrec     *cr,
 
     *bUseGPU = FALSE;
 
-    // Temporary disabled - cut-off may be on and off during the same session,
-    // which means eeltype can change. The current implementation does not support
-    // that yet.
-    //bOclDoFastGen        = (getenv("OCL_NOFASTGEN") == NULL);
+    bOclDoFastGen        = (getenv("OCL_NOFASTGEN") == NULL);
 #ifdef GMX_USE_OPENCL
-    printf("\nWarning - all kernel flavours will be generated.\n\tFastGen temporary disabled. OCL_NOFASTGEN env var ignored.\n");
+	if (bOclDoFastGen)
+	{
+		bOclDoFastGen = 0;
+#ifndef NDEBUG
+		printf("\nFastGen temporary disabled. All kernel flavours will be generated.");
+#endif
+	}
 #endif
 
     bEmulateGPUEnvVarSet = (getenv("GMX_EMULATE_GPU") != NULL);
