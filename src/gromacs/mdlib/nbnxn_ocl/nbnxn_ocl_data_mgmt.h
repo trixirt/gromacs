@@ -33,12 +33,15 @@
  * the research papers on the package. Check out http://www.gromacs.org.
  */
 
+/** \file nbnxn_ocl_data_mgmt.h
+ *  \brief OpenCL equivalent of nbnxn_cuda_data_mgmt.h
+ */
+
 #if !defined(NBNXN_OCL_DATA_MGMT_H) && defined(GMX_USE_OPENCL)
 #define NBNXN_OCL_DATA_MGMT_H
 
 #include "types/simple.h"
 #include "types/interaction_const.h"
-//#include "types/nbnxn_cuda_types_ext.h"
 #include "types/nbnxn_ocl_types_ext.h"
 #include "types/hw_info.h"
 
@@ -70,10 +73,10 @@ void nbnxn_ocl_convert_gmx_to_gpu_flavors(
     int *gpu_eeltype,
     int *gpu_vdwtype) FUNC_TERM
 
-/** Initializes the data structures related to CUDA nonbonded calculations. */
+/** Initializes the data structures related to OpenCL nonbonded calculations. */
 FUNC_QUALIFIER
-void nbnxn_ocl_init(FILE gmx_unused                 *fplog,
-                     nbnxn_opencl_ptr_t gmx_unused     *p_cu_nb,
+void nbnxn_ocl_init(FILE gmx_unused                  *fplog,
+                     nbnxn_opencl_ptr_t gmx_unused   *p_ocl_nb,
                      const gmx_gpu_info_t gmx_unused *gpu_info,
                      const gmx_gpu_opt_t gmx_unused  *gpu_opt,
                      int gmx_unused                   my_gpu_index,
@@ -82,65 +85,50 @@ void nbnxn_ocl_init(FILE gmx_unused                 *fplog,
 
 /** Initializes simulation constant data. */
 FUNC_QUALIFIER
-void nbnxn_ocl_init_const(nbnxn_opencl_ptr_t               gmx_unused         cu_nb,
-                           const interaction_const_t      gmx_unused        *ic,
-                           const struct nonbonded_verlet_group_t gmx_unused *nbv_group) FUNC_TERM
+void nbnxn_ocl_init_const(nbnxn_opencl_ptr_t             gmx_unused         ocl_nb,
+                          const interaction_const_t      gmx_unused        *ic,
+                          const struct nonbonded_verlet_group_t gmx_unused *nbv_group) FUNC_TERM
                            
 /** Initializes pair-list data for GPU, called at every pair search step. */
 FUNC_QUALIFIER
-void nbnxn_ocl_init_pairlist(nbnxn_opencl_ptr_t       gmx_unused         cu_nb,
-                              const struct nbnxn_pairlist_t gmx_unused *h_nblist,
-                              int                    gmx_unused         iloc) FUNC_TERM
+void nbnxn_ocl_init_pairlist(nbnxn_opencl_ptr_t       gmx_unused       ocl_nb,
+                             const struct nbnxn_pairlist_t gmx_unused *h_nblist,
+                             int                    gmx_unused         iloc) FUNC_TERM
 
 /** Initializes atom-data on the GPU, called at every pair search step. */
 FUNC_QUALIFIER
-void nbnxn_ocl_init_atomdata(const nbnxn_opencl_ptr_t       gmx_unused   cu_nb,
-                              const struct nbnxn_atomdata_t gmx_unused *atomdata) FUNC_TERM
+void nbnxn_ocl_init_atomdata(const nbnxn_opencl_ptr_t      gmx_unused  ocl_nb,
+                             const struct nbnxn_atomdata_t gmx_unused *atomdata) FUNC_TERM
 
-///////*! \brief Update parameters during PP-PME load balancing. */
-//////FUNC_QUALIFIER
-//////void nbnxn_cuda_pme_loadbal_update_param(const struct nonbonded_verlet_t gmx_unused *nbv,
-//////                                         const interaction_const_t gmx_unused       *ic) FUNC_TERM
-//////
+/*! \brief Update parameters during PP-PME load balancing. */
+FUNC_QUALIFIER
+void nbnxn_ocl_pme_loadbal_update_param(const struct nonbonded_verlet_t gmx_unused *nbv,
+                                        const interaction_const_t gmx_unused       *ic) FUNC_TERM
+
 /** Uploads shift vector to the GPU if the box is dynamic (otherwise just returns). */
 FUNC_QUALIFIER
-void nbnxn_ocl_upload_shiftvec(nbnxn_opencl_ptr_t       gmx_unused         cu_nb,
-                                const struct nbnxn_atomdata_t gmx_unused *nbatom) FUNC_TERM
+void nbnxn_ocl_upload_shiftvec(nbnxn_opencl_ptr_t       gmx_unused       ocl_nb,
+                               const struct nbnxn_atomdata_t gmx_unused *nbatom) FUNC_TERM
 
 /** Clears GPU outputs: nonbonded force, shift force and energy. */
 FUNC_QUALIFIER
-void nbnxn_ocl_clear_outputs(
-	nbnxn_opencl_ptr_t ocl_nb,
-    int gmx_unused      flags) FUNC_TERM
+void nbnxn_ocl_clear_outputs(nbnxn_opencl_ptr_t  ocl_nb,
+                             int gmx_unused      flags) FUNC_TERM
 
 /** Frees all GPU resources used for the nonbonded calculations. */
 FUNC_QUALIFIER
-void nbnxn_ocl_free(nbnxn_opencl_ptr_t gmx_unused  cu_nb) FUNC_TERM
+void nbnxn_ocl_free(nbnxn_opencl_ptr_t gmx_unused ocl_nb) FUNC_TERM
 
 /** Returns the GPU timings structure or NULL if GPU is not used or timing is off. */
 FUNC_QUALIFIER
-wallclock_gpu_t * nbnxn_ocl_get_timings(nbnxn_opencl_ptr_t gmx_unused cu_nb) FUNC_TERM_P
+wallclock_gpu_t * nbnxn_ocl_get_timings(nbnxn_opencl_ptr_t gmx_unused ocl_nb) FUNC_TERM_P
 
 /** Resets nonbonded GPU timings. */
 FUNC_QUALIFIER
 void nbnxn_ocl_reset_timings(struct nonbonded_verlet_t gmx_unused *nbv) FUNC_TERM
 
-///////** Calculates the minimum size of proximity lists to improve SM load balance
-////// *  with CUDA non-bonded kernels. */
-//////FUNC_QUALIFIER
-//////int nbnxn_cuda_min_ci_balanced(nbnxn_cuda_ptr_t gmx_unused cu_nb)
-//////#ifdef GMX_GPU
-//////;
-//////#else
-//////{
-//////    return -1;
-//////}
-//////#endif
-//////
-
-
 /** Calculates the minimum size of proximity lists to improve SM load balance
- *  with CUDA non-bonded kernels. */
+ *  with OpenCL non-bonded kernels. */
 FUNC_QUALIFIER
 int nbnxn_ocl_min_ci_balanced(nbnxn_opencl_ptr_t gmx_unused ocl_nb)
 #if defined(GMX_GPU) && defined(GMX_USE_OPENCL)
@@ -151,7 +139,7 @@ int nbnxn_ocl_min_ci_balanced(nbnxn_opencl_ptr_t gmx_unused ocl_nb)
 }
 #endif
 
-/** Returns if analytical Ewald CUDA kernels are used. */
+/** Returns if analytical Ewald OpenCL kernels are used. */
 FUNC_QUALIFIER
 gmx_bool nbnxn_ocl_is_kernel_ewald_analytical(const nbnxn_opencl_ptr_t gmx_unused ocl_nb)
 #if defined(GMX_GPU) && defined(GMX_USE_OPENCL)
@@ -162,11 +150,19 @@ gmx_bool nbnxn_ocl_is_kernel_ewald_analytical(const nbnxn_opencl_ptr_t gmx_unuse
 }
 #endif
 
+/*! Launches asynchronous host to device memory copy. */
 FUNC_QUALIFIER
-int ocl_copy_H2D_async(cl_mem d_dest, void * h_src, size_t offset, size_t bytes, cl_command_queue command_queue, cl_event *copy_event);
+int ocl_copy_H2D_async(cl_mem d_dest, void * h_src,
+                       size_t offset, size_t bytes,
+                       cl_command_queue command_queue,
+                       cl_event *copy_event);
 
+/*! Launches asynchronous device to host memory copy. */
 FUNC_QUALIFIER
-int ocl_copy_D2H_async(void * h_dest, cl_mem d_src, size_t offset, size_t bytes, cl_command_queue command_queue, cl_event *copy_event);
+int ocl_copy_D2H_async(void * h_dest, cl_mem d_src,
+                       size_t offset, size_t bytes,
+                       cl_command_queue command_queue,
+                       cl_event *copy_event);
 
 #ifdef __cplusplus
 }
@@ -175,4 +171,4 @@ int ocl_copy_D2H_async(void * h_dest, cl_mem d_src, size_t offset, size_t bytes,
 #undef FUNC_TERM
 #undef FUNC_QUALIFIER
 
-#endif /* NBNXN_CUDA_DATA_MGMT_H */
+#endif /* NBNXN_OCL_DATA_MGMT_H */

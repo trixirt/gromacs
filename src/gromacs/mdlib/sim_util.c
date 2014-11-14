@@ -1129,9 +1129,15 @@ void do_force_cutsVERLET(FILE *fplog, t_commrec *cr,
             if (nbv->grp[eintNonlocal].kernel_type == nbnxnk8x8x8_CUDA)
             {
                 /* initialize non-local pair-list on the GPU */
+#ifdef GMX_USE_OPENCL
+                nbnxn_ocl_init_pairlist(nbv->ocl_nbv,
+                                     nbv->grp[eintNonlocal].nbl_lists.nbl[0],
+                                     eintNonlocal);
+#else
                 nbnxn_cuda_init_pairlist(nbv->cu_nbv,
                                          nbv->grp[eintNonlocal].nbl_lists.nbl[0],
                                          eintNonlocal);
+#endif
             }
             wallcycle_stop(wcycle, ewcNS);
         }

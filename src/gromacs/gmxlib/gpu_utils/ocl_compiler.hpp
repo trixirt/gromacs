@@ -39,31 +39,31 @@
 #include <CL/opencl.h>
 #include "../legacyheaders/types/hw_info.h"
 
+/**
+ * \brief Vendor specific kernel sources
+ * 
+ * Only affects the bottom level kernel sources (nbnxn_ocl_kernel_[spec].cl)
+ */
 typedef enum{
-    _generic_vendor_kernels_ = 0, /* Standard (warp-less) source file with generated methods/energy/prune */
-    _nvidia_vendor_kernels_     , /* Nvidia source file with generated methods/energy/prune */
-    _amd_vendor_kernels_        , /* AMD source file with generated methods/energy/prune */
-    _auto_vendor_kernels_         /* Compiler will select source based on vendor id*/
+    _generic_vendor_kernels_ = 0, /**< Standard (warp-less) source file with generated methods/energy/prune */
+    _nvidia_vendor_kernels_     , /**< Nvidia source file with generated methods/energy/prune */
+    _amd_vendor_kernels_        , /**< AMD source file with generated methods/energy/prune */
+    _auto_vendor_kernels_         /**< Compiler will select source based on vendor id*/
 } kernel_vendor_spec_t;
 
+/**
+ * \brief Kernel sources index
+ * 
+ * For now there is only default source. One may add here future kernel versions etc.
+ * This affect the top level kernel sources (nbnxn_ocl_kernels.cl)
+ */
 typedef enum{
     _default_source_ = 0  /* The default top-level source  */
 } kernel_source_index_t;
 
-typedef enum{
-    _invalid_option_          =0,
-    _amd_cpp_                   ,
-    _nvdia_verbose_ptxas_       ,
-    _generic_cl11_        ,
-    _generic_cl12_        ,
-    _generic_fast_relaxed_math_ ,
-    _generic_noopt_compilation_ ,
-    _generic_debug_symbols_,
-    _include_install_opencl_dir_,
-    _include_source_opencl_dirs_,
-    _num_build_options_
-} build_options_index_t;
-
+/**
+ * \brief Full description of the requested Gromacs algorithm flavour
+ */
 typedef struct
 {
     int eeltype;

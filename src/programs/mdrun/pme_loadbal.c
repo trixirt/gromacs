@@ -448,11 +448,7 @@ gmx_bool pme_load_balance(pme_load_balancing_t        pme_lb,
     char         buf[STRLEN], sbuf[22];
     real         rtab;
     gmx_bool     bUsesSimpleTables = TRUE;
-
-#if defined(GMX_GPU) && defined(GMX_USE_OPENCL)
-    assert(!"Not implemented nbnxn_ocl_pme_loadbal_update_param !!");
-#endif    
-    
+   
     if (pme_lb->stage == pme_lb->nstage)
     {
         return FALSE;
@@ -696,7 +692,11 @@ gmx_bool pme_load_balance(pme_load_balancing_t        pme_lb,
     }
 
     bUsesSimpleTables = uses_simple_tables(ir->cutoff_scheme, nbv, 0);
+#ifdef GMX_USE_OPENCL
+    nbnxn_ocl_pme_loadbal_update_param(nbv, ic);
+#else
     nbnxn_cuda_pme_loadbal_update_param(nbv, ic);
+#endif
 
     /* With tMPI + GPUs some ranks may be sharing GPU(s) and therefore
      * also sharing texture references. To keep the code simple, we don't

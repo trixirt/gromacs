@@ -49,11 +49,6 @@ extern "C" {
 } /* fixes auto-indentation problems */
 #endif
 
-/* ?? Why force EWALD analytical ??
-#define HAS_CC_3_0_OR_LATER 1
-*/
-#define HAS_CC_3_0_OR_LATER 0
-
 #if defined(GMX_GPU) && defined(GMX_USE_OPENCL)
 #include <CL/opencl.h>
 #endif
@@ -76,6 +71,9 @@ static const char * const gpu_detect_res_str[] =
 
 #if defined(GMX_GPU) && defined(GMX_USE_OPENCL)
 
+/**
+ * \brief OpenCL vendor IDs
+ */
 typedef enum{
     _OCL_VENDOR_NVIDIA_    = 0,
     _OCL_VENDOR_AMD_          ,
@@ -83,12 +81,24 @@ typedef enum{
     _OCL_VENDOR_UNKNOWN_
 } ocl_vendor_id_t;
 
+/**
+ * \brief OpenCL GPU device identificator
+ * An OpenCL device is identified by its ID.
+ * The platform ID is also included for caching reasons.
+ */
 typedef struct
 {
     cl_platform_id      ocl_platform_id;
     cl_device_id        ocl_device_id;
 } ocl_gpu_id_t, *ocl_gpu_id_ptr_t;
 
+/**
+ * \brief OpenCL GPU information
+ * \todo Move context and program outside this data structure.
+ * They are specific to a certain usage of the device (e.g. with/without OpenGL
+ * interop) and do not provide general device information as the data structure
+ * name indicates.
+ */
 typedef struct
 {
     ocl_gpu_id_t        ocl_gpu_id;
@@ -105,19 +115,19 @@ typedef struct
 } ocl_gpu_info_t, *ocl_gpu_info_ptr_t;
 #endif
 
-/* GPU device information -- for now with only CUDA devices.
+/* GPU device information -- includes CUDA and OpenCL devices.
  * The gmx_hardware_detect module initializes it. */
 typedef struct
 {
 	gmx_bool             bDetectGPUs;          /* Did we try to detect GPUs? */
-    int                  ncuda_dev;            /* total number of devices detected */
-    cuda_dev_info_ptr_t  cuda_dev;             /* devices detected in the system (per node) */
-    int                  ncuda_dev_compatible; /* number of compatible GPUs */
+    int                  ncuda_dev;            /* total number of CUDA devices detected */
+    cuda_dev_info_ptr_t  cuda_dev;             /* CUDA devices detected in the system (per node) */
+    int                  ncuda_dev_compatible; /* number of compatible CUDA GPUs */
 
 #ifdef GMX_USE_OPENCL			
-	int                  nocl_dev;
-	ocl_gpu_info_ptr_t	 ocl_dev;	
-	int                  nocl_dev_compatible;
+	int                  nocl_dev;             /* total number of OpenCL devices detected */
+	ocl_gpu_info_ptr_t	 ocl_dev;	           /* OpenCL devices detected in the system (per node) */
+	int                  nocl_dev_compatible;  /* number of compatible OpenCL GPUs */
 #endif
 } gmx_gpu_info_t;
 
@@ -143,18 +153,18 @@ enum {
     threadaffSEL, threadaffAUTO, threadaffON, threadaffOFF, threadaffNR
 };
 
-/* GPU device selection information -- for now with only CUDA devices */
+/* GPU device selection information -- includes CUDA and OpenCL devices */
 typedef struct
 {
     char     *gpu_id;        /* GPU id's to use, each specified as chars */
     gmx_bool  bUserSet;      /* true if the GPUs in cuda_dev_use are manually provided by the user */
 
-    int       ncuda_dev_use; /* number of device (IDs) selected to be used */
+    int       ncuda_dev_use; /* number of CUDA device (IDs) selected to be used */
     int      *cuda_dev_use;  /* device index list providing GPU to PP rank mapping, GPUs can be listed multiple times when ranks share them */
 
 #ifdef GMX_USE_OPENCL
-    int                 nocl_dev_use;
-    int                 *ocl_dev_use;
+    int       nocl_dev_use;  /* number of OpenCL device (IDs) selected to be used */
+    int       *ocl_dev_use;  /* device index list providing GPU to PP rank mapping, GPUs can be listed multiple times when ranks share them */
 #endif
 } gmx_gpu_opt_t;
 
