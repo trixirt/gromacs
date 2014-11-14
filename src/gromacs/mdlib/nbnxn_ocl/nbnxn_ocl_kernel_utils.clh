@@ -500,26 +500,46 @@ void reduce_force_j_generic(__local float *f_buf, __global float *fout,//__globa
  */
 __INLINE__ __device__
 void reduce_force_i_generic(__local float *f_buf, __global float *fout,//__global float3 *fout,
-                            float3 *fshift_buf, bool bCalcFshift,
+                            /*float3*/float *fshift_buf, bool bCalcFshift,
                             int tidxi, int tidxj, int aidx)
 {
-    if (tidxj == 0)
-    {
-        float3 f = (float3)(0.0f);
-        for (int j = tidxi; j < CL_SIZE_SQ; j += CL_SIZE)
-        {
-            f.x += f_buf[                  j];
-            f.y += f_buf[    FBUF_STRIDE + j];
-            f.z += f_buf[2 * FBUF_STRIDE + j];
-        }
-                
-        atomicAdd_g_f3(&fout[3 * aidx], f);
+	//if (tidxj == 0)
+	//{
+	//	float3 f = (float3)(0.0f);
+	//	for (int j = tidxi; j < CL_SIZE_SQ; j += CL_SIZE)
+	//	{
+	//		f.x += f_buf[j];
+	//		f.y += f_buf[FBUF_STRIDE + j];
+	//		f.z += f_buf[2 * FBUF_STRIDE + j];
+	//	}
 
-        if (bCalcFshift)
-        {
-            *fshift_buf += f;
-        }
-    }
+	//	atomicAdd_g_f3(&fout[3 * aidx], f);
+
+	//	if (bCalcFshift)
+	//	{
+	//		*fshift_buf += f;
+	//	}
+	//}
+
+	/* Split the reduction between the first 3 line threads
+	Threads with line id 0 will do the reduction for (float3).x components
+	Threads with line id 1 will do the reduction for (float3).y components
+	Threads with line id 2 will do the reduction for (float3).z components. */
+	if (tidxj < 3)
+	{
+		float f = 0.0f;
+		for (int j = tidxi; j < CL_SIZE_SQ; j += CL_SIZE)
+		{
+			f += f_buf[tidxj * FBUF_STRIDE + j];
+		}
+
+		atomicAdd_g_f(&fout[3 * aidx + tidxj], f);
+
+		if (bCalcFshift)
+		{
+			(*fshift_buf) += f;			
+		}
+	}
 }
 
 /*! Final i-force reduction; this implementation works only with power of two
@@ -527,7 +547,7 @@ void reduce_force_i_generic(__local float *f_buf, __global float *fout,//__globa
  */
 __INLINE__ __device__
 void reduce_force_i_pow2(volatile __local float *f_buf, __global float *fout,//__global float3 *fout,
-                         float3 *fshift_buf, bool bCalcFshift,                         
+                         /*float3*/float *fshift_buf, bool bCalcFshift,                         
                          int tidxi, int tidxj, int aidx)
 {
     int     i, j;    
@@ -549,22 +569,38 @@ void reduce_force_i_pow2(volatile __local float *f_buf, __global float *fout,//_
         i >>= 1;
     }
 
-    /* i == 1, last reduction step, writing to global mem */
-    if (tidxj == 0)
-    {
-        float3 f;
+	///* i == 1, last reduction step, writing to global mem */
+	//if (tidxj == 0)
+	//{
+	//	float3 f;
+	//	f.x = f_buf[tidxj * CL_SIZE + tidxi] + f_buf[(tidxj + i) * CL_SIZE + tidxi];
+	//	f.y = f_buf[FBUF_STRIDE + tidxj * CL_SIZE + tidxi] + f_buf[FBUF_STRIDE + (tidxj + i) * CL_SIZE + tidxi];
+	//	f.z = f_buf[2 * FBUF_STRIDE + tidxj * CL_SIZE + tidxi] + f_buf[2 * FBUF_STRIDE + (tidxj + i) * CL_SIZE + tidxi];
 
-        f.x = f_buf[                  tidxj * CL_SIZE + tidxi] + f_buf[                  (tidxj + i) * CL_SIZE + tidxi];
-        f.y = f_buf[    FBUF_STRIDE + tidxj * CL_SIZE + tidxi] + f_buf[    FBUF_STRIDE + (tidxj + i) * CL_SIZE + tidxi];
-        f.z = f_buf[2 * FBUF_STRIDE + tidxj * CL_SIZE + tidxi] + f_buf[2 * FBUF_STRIDE + (tidxj + i) * CL_SIZE + tidxi];
-        
-        atomicAdd_g_f3(&fout[3 * aidx], f);
+	//	atomicAdd_g_f3(&fout[3 * aidx], f);	
 
-        if (bCalcFshift)
-        {
-            *fshift_buf += f;
-        }
-    }
+	//	if (bCalcFshift)
+	//	{
+	//		*fshift_buf += f;
+	//	}
+	//}
+
+	/* i == 1, last reduction step, writing to global mem */
+	/* Split the reduction between the first 3 line threads
+	Threads with line id 0 will do the reduction for (float3).x components
+	Threads with line id 1 will do the reduction for (float3).y components
+	Threads with line id 2 will do the reduction for (float3).z components. */
+	if (tidxj < 3)
+	{
+		float f = f_buf[tidxj * FBUF_STRIDE + tidxi] + f_buf[tidxj * FBUF_STRIDE + i * CL_SIZE + tidxi];
+
+		atomicAdd_g_f(&fout[3 * aidx + tidxj], f);
+
+		if (bCalcFshift)
+		{
+			(*fshift_buf) += f;			
+		}
+	}
 }
 
 /*! Final i-force reduction wrapper; calls the generic or pow2 reduction depending
@@ -572,7 +608,7 @@ void reduce_force_i_pow2(volatile __local float *f_buf, __global float *fout,//_
  */
 __INLINE__ __device__
 void reduce_force_i(__local float *f_buf, __global float *f,//__global float3 *f,
-                    float3 *fshift_buf, bool bCalcFshift,                    
+                    /*float3*/float *fshift_buf, bool bCalcFshift,                    
                     int tidxi, int tidxj, int ai)
 {
     if ((CL_SIZE & (CL_SIZE - 1)))
