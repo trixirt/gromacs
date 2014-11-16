@@ -68,10 +68,10 @@ struct t_pbc;
  * \param[out] dr           The pull coordinate difference vector.
  * \param[out] dev          The deviation from the reference distance.
  */
-void get_pull_coord_distance(const t_pull *pull,
-                             int coord_ind,
-                             const struct t_pbc *pbc, double t,
-                             dvec dr, double *dev);
+gmx_bool get_pull_coord_distance(t_pull *pull,
+                                 int coord_ind,
+                                 const struct t_pbc *pbc, double t,
+                                 dvec dr, double *dev);
 
 
 /*! \brief Set the all the pull forces to zero.
@@ -193,6 +193,8 @@ void pull_calc_coms(t_commrec        *cr,
                     double            t,
                     rvec              x[],
                     rvec             *xp);
+
+void change_force_signs(t_pull *pull);
 
 #ifdef __cplusplus
 }
