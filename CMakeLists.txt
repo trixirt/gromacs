@@ -58,7 +58,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 # NOTE: when releasing the "-dev" suffix needs to be stripped off!
 # REGRESSIONTEST_VERSION and REGRESSIONTEST_BRANCH should always be
 # defined.
-set(PROJECT_VERSION "5.0-ocl_alpha.2")
+set(PROJECT_VERSION "5.0-ocl_alpha.3-dev")
 # If this is a released tarball, "-dev" will not be present in
 # PROJECT_VERSION, and REGRESSIONTEST_VERSION specifies the version
 # number of the regressiontest tarball against which the code tarball
