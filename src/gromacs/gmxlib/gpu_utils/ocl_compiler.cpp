@@ -70,14 +70,15 @@
 typedef enum{
     _invalid_option_          =0,
     _amd_cpp_                   ,
-    _nvidia_verbose_ptxas_       ,
+    _nvidia_verbose_       ,
     _generic_cl11_        ,
     _generic_cl12_        ,
     _generic_fast_relaxed_math_ ,
     _generic_noopt_compilation_ ,
     _generic_debug_symbols_,
+    _amd_dump_temp_files_,
     _include_install_opencl_dir_,
-    _include_source_opencl_dirs_,
+    _include_source_opencl_dirs_,    
     _num_build_options_
 } build_options_index_t;
 
@@ -87,12 +88,14 @@ typedef enum{
 static const char* build_options_list[] = {
     "",
     "-x clc++",                 /**< AMD C++ extension */
-    "-cl-nv-verbose",           /**< Nvidia verbose ptxas */
+    "-cl-nv-verbose",           /**< Nvidia verbose build log */
     "-cl-std=CL1.1",            /**< Force CL 1.1  */
     "-cl-std=CL1.2",            /**< Force CL 1.2  */
     "-cl-fast-relaxed-math",    /**< Fast math */
     "-cl-opt-disable",          /**< Disable optimisations */
     "-g",                       /**< Debug symbols */
+    "-save-temps",              /**< AMD option to dump intermediate temporary
+                                files such as IL or ISA code */
     "-I"OCL_INSTALL_DIR_NAME    /**< Include path to kernel sources */
     /*, 
     "-I../../src/gromacs/gmxlib/ocl_tools           -I../../src/gromacs/mdlib/nbnxn_ocl            -I../../src/gromacs/pbcutil            -I../../src/gromacs/mdlib"
@@ -220,11 +223,26 @@ create_ocl_build_options_length(
         build_options_length +=
             get_ocl_build_option_length(_generic_noopt_compilation_)+whitespace;
     }
+
     if(getenv("GMX_OCL_FASTMATH"))
     {
        build_options_length +=
-            get_ocl_build_option_length(_generic_fast_relaxed_math_)+whitespace      ;
+            get_ocl_build_option_length(_generic_fast_relaxed_math_)+whitespace;
     }
+
+    if ((build_device_vendor_id == _OCL_VENDOR_NVIDIA_) && getenv("GMX_OCL_VERBOSE"))
+    {
+        build_options_length +=
+            get_ocl_build_option_length(_nvidia_verbose_) + whitespace;
+    }
+
+    if ((build_device_vendor_id == _OCL_VENDOR_AMD_) && getenv("GMX_OCL_DUMP_INTERM_FILES"))
+        /* To dump OpenCL build intermediate files, caching must be off */
+        if (NULL != getenv("GMX_OCL_NOGENCACHE"))
+        {
+            build_options_length +=
+                get_ocl_build_option_length(_amd_dump_temp_files_) + whitespace;
+        }
 
     build_options_length +=
         get_ocl_build_option_length(_include_install_opencl_dir_)+whitespace;
@@ -291,6 +309,28 @@ create_ocl_build_options(
         char_added += get_ocl_build_option_length(_generic_fast_relaxed_math_);
         build_options_string[char_added++]=' ';
     }
+
+    if ((build_device_vendor_id == _OCL_VENDOR_NVIDIA_) && getenv("GMX_OCL_VERBOSE"))
+    {
+        strncpy(build_options_string + char_added,
+            get_ocl_build_option(_nvidia_verbose_),
+            get_ocl_build_option_length(_nvidia_verbose_));
+
+        char_added += get_ocl_build_option_length(_nvidia_verbose_);
+        build_options_string[char_added++] = ' ';
+    }
+
+    if ((build_device_vendor_id == _OCL_VENDOR_AMD_) && getenv("GMX_OCL_DUMP_INTERM_FILES"))
+        /* To dump OpenCL build intermediate files, caching must be off */
+        if (NULL != getenv("GMX_OCL_NOGENCACHE"))
+        {
+            strncpy(build_options_string + char_added,
+                get_ocl_build_option(_amd_dump_temp_files_),
+                get_ocl_build_option_length(_amd_dump_temp_files_));
+
+            char_added += get_ocl_build_option_length(_amd_dump_temp_files_);
+            build_options_string[char_added++] = ' ';
+        }
 
     if ( ( build_device_vendor_id == _OCL_VENDOR_AMD_ ) && getenv("GMX_OCL_DEBUG") && getenv("GMX_OCL_FORCE_CPU"))
     {
@@ -505,7 +545,7 @@ load_ocl_source(const char* filename, size_t* p_source_length)
  * In a release build:
  *  -Success: Nothing is logged.
  *  -Fail   : Save to a file kernel_id.FAILED in the run folder.
- * If OCL_JIT_DUMP_FILE is set, log is always dumped to file
+ * If GMX_OCL_DUMP_LOG is set, log is always dumped to file
  * If OCL_JIT_DUMP_STDERR is set, log is always dumped to stderr
  * 
  * \param build_log String containing the OpenCL JIT compilation log
@@ -530,7 +570,7 @@ handle_ocl_build_log(
 #endif
 
     /* Override default handling */
-    if(getenv("OCL_JIT_DUMP_FILE") != NULL )
+    if(getenv("GMX_OCL_DUMP_LOG") != NULL )
         dumpFile = true;
     if(getenv("OCL_JIT_DUMP_STDERR") != NULL )
         dumpStdErr = true;
@@ -720,6 +760,142 @@ ocl_get_fastgen_define(
     printf(" %s \n",p_algo_defines);
 }
 
+bool
+check_ocl_cache(char           *ocl_binary_filename,
+                char           *build_options_string,
+                char           *ocl_source,
+                size_t         *ocl_binary_size,
+                unsigned char **ocl_binary)
+{
+    FILE *f;
+
+    f = fopen(ocl_binary_filename, "rb");
+    if (!f)
+        return false;
+    
+    fseek(f, 0, SEEK_END);
+    *ocl_binary_size = ftell(f);
+    *ocl_binary = (unsigned char*)malloc(*ocl_binary_size);
+    fseek(f, 0, SEEK_SET);
+    fread(*ocl_binary, 1, *ocl_binary_size, f);
+    fclose(f);
+
+    // TODO: Compare current build options and code against the builds options
+    // and the code corresponding to the cache. If any change is detected this
+    // function must return false.    
+    return true;
+}
+
+char*
+ocl_get_build_options_string(cl_context context,
+                             cl_device_id device_id,
+                             kernel_vendor_spec_t kernel_vendor_spec,
+                             ocl_vendor_id_t ocl_device_vendor,
+                             gmx_algo_family_t * p_gmx_algo_family,
+                             int DoFastGen)
+{
+    char* build_options_string = NULL;
+    char custom_build_options_prepend[512] = { 0 };
+    char *custom_build_options_append = NULL;
+    char *oclpath = NULL;
+    cl_int warp_size = 0;
+
+    /* Get the reported warp size. Compile a small dummy kernel to do so */
+    warp_size = ocl_get_warp_size(context, device_id);
+
+    /* Select vendor specific kernels automatically */
+    if (kernel_vendor_spec == _auto_vendor_kernels_)
+        kernel_vendor_spec = ocl_autoselect_kernel_from_vendor(ocl_device_vendor);
+
+    /* Create include paths for non-standard location of the kernel sources */
+    if ((oclpath = getenv("GMX_OCL_FILE_PATH")) != NULL)
+    {
+        size_t chars = 0;
+        custom_build_options_append =
+            (char*)calloc((strlen(oclpath) + 32)*INCLUDE_PATH_COUNT, 1);
+
+        for (int i = 0; i < INCLUDE_PATH_COUNT; i++)
+        {
+            strncpy(&custom_build_options_append[chars], "-I", strlen("-I"));
+            chars += strlen("-I");
+
+            strncpy(&custom_build_options_append[chars], oclpath, strlen(oclpath));
+            chars += strlen(oclpath);
+
+            strncpy(
+                &custom_build_options_append[chars],
+                include_path_list[i],
+                strlen(include_path_list[i])
+                );
+            chars += strlen(include_path_list[i]);
+
+            strncpy(&custom_build_options_append[chars], " ", 1);
+            chars += 1;
+        }
+        printf("GMX_OCL_FILE_PATH includes: %s\n", custom_build_options_append);
+    }
+
+    /* Get vendor specific define (amd,nvidia,nowarp) */
+    const char * kernel_vendor_spec_define =
+        ocl_get_vendor_specific_define(kernel_vendor_spec);
+
+    /* Use the fastgen flavour-level kernel generator instead of the original */
+    char kernel_fastgen_define[128] = { 0 };
+    if (DoFastGen)
+        ocl_get_fastgen_define(p_gmx_algo_family, kernel_fastgen_define);
+
+    /* Compose the build options to be prepended */
+    sprintf(custom_build_options_prepend,
+        "-DWARP_SIZE_TEST=%d %s %s",
+        warp_size,
+        kernel_vendor_spec_define,
+        kernel_fastgen_define
+        );
+
+    /* Get the size of the complete build options string */
+    size_t build_options_length =
+        create_ocl_build_options_length(
+        ocl_device_vendor,
+        custom_build_options_prepend,
+        custom_build_options_append
+        );
+
+    build_options_string = (char *)malloc(build_options_length);
+
+    /* Compose the complete build options */
+    create_ocl_build_options(
+        build_options_string,
+        build_options_length,
+        ocl_device_vendor,
+        custom_build_options_prepend,
+        custom_build_options_append
+        );
+
+    if (custom_build_options_append)
+        free(custom_build_options_append);
+
+    return build_options_string;
+}
+
+void
+print_ocl_binaries_to_file(cl_program program, char* file_name)
+{
+    size_t ocl_binary_size = 0;
+    unsigned char *ocl_binary = NULL;
+
+    clGetProgramInfo(program, CL_PROGRAM_BINARY_SIZES, sizeof(size_t), &ocl_binary_size, NULL);
+
+    ocl_binary = (unsigned char*)malloc(ocl_binary_size);
+
+    clGetProgramInfo(program, CL_PROGRAM_BINARIES, sizeof(unsigned char *), &ocl_binary, NULL);    
+
+    FILE *f = fopen(file_name, "wb");
+    fwrite(ocl_binary, 1, ocl_binary_size, f);
+    fclose(f);
+
+    free(ocl_binary);
+}
+
 /**
  * \brief Compile the kernels as described by kernel src id and vendor spec
  * 
@@ -749,174 +925,118 @@ ocl_compile_program(
     cl_program *                p_program
 )
 {
-    cl_int cl_error     = CL_SUCCESS;
-    cl_int warp_size    = 0;
+    char * build_options_string   = NULL;
+    cl_int cl_error               = CL_SUCCESS;    
 
-    /* Get the reported warp size. Compile a small dummy kernel to do so */
-    warp_size = ocl_get_warp_size(context,device_id);
+    char* ocl_source              = NULL;    
+    size_t ocl_source_length      = 0;
+    size_t kernel_filename_len    = 0;
 
-    char* ocl_source        = NULL;
-    char* kernel_filename   = NULL;
-	char binary_filename[256];
-    size_t ocl_source_length    = 0;
-    size_t kernel_filename_len  = 0;
+    bool bCacheOclBuild           = false;
+    bool bOclCacheValid           = false;
 
-	bool isLoadedFromBinary = false; /* If this kernel has been loaded from binary cache or not */
+    char ocl_binary_filename[256] = { 0 };
+    size_t ocl_binary_size        = 0;
+    unsigned char *ocl_binary     = NULL;
 
-    /* Select vendor specific kernels automatically */
-    if ( kernel_vendor_spec == _auto_vendor_kernels_)
-        kernel_vendor_spec = ocl_autoselect_kernel_from_vendor(ocl_device_vendor);
-
-    /* Get the size of the kernel source filename */
-    kernel_filename_len = get_ocl_kernel_source_file_info(kernel_source_file);
-    if(kernel_filename_len) kernel_filename = (char*)malloc(kernel_filename_len);
-
-    /* Get the actual full path and name of the source file with the kernels */
-    get_ocl_kernel_source_path(kernel_filename, kernel_source_file, kernel_filename_len);
-
-    /* Load the above source file and store its contents in ocl_source */
-    ocl_source = load_ocl_source(kernel_filename, &kernel_filename_len);
-
-    if (!ocl_source)
+    /* Load OpenCL source files */
     {
-        sprintf(result_str, "Error loading OpenCL code %s",kernel_filename);
-        return CL_BUILD_PROGRAM_FAILURE;
+        char* kernel_filename = NULL;
+
+        /* Get the size of the kernel source filename */
+        kernel_filename_len = get_ocl_kernel_source_file_info(kernel_source_file);
+        if (kernel_filename_len) kernel_filename = (char*)malloc(kernel_filename_len);
+
+        /* Get the actual full path and name of the source file with the kernels */
+        get_ocl_kernel_source_path(kernel_filename, kernel_source_file, kernel_filename_len);
+
+        /* Load the above source file and store its contents in ocl_source */
+        ocl_source = load_ocl_source(kernel_filename, &ocl_source_length);
+
+        if (!ocl_source)
+        {
+            sprintf(result_str, "Error loading OpenCL code %s", kernel_filename);
+            return CL_BUILD_PROGRAM_FAILURE;
+        }
+
+        /* The sources are loaded so the filename is not needed anymore */
+        free(kernel_filename);
     }
 
-    /* The sources are loaded so the filename is not needed anymore */
-    free(kernel_filename);
+    /* Allocate and initialize the string with build options */
+    build_options_string =
+        ocl_get_build_options_string(context, device_id, kernel_vendor_spec,
+                                     ocl_device_vendor, p_gmx_algo_family,
+                                     DoFastGen);
 
-	/* See if the cached version of the kernel exists, if it does then create the program from binary. If not then use source. TODO: Save hash of the kernel source to see whether to update or not */
-	{
-		size_t binary_sizes[5] = { 0, 0, 0, 0, 0 };
+    /* Check if OpenCL caching is ON */
+    bCacheOclBuild = (NULL == getenv("GMX_OCL_NOGENCACHE"));
+    if (bCacheOclBuild)
+    {
+        clGetDeviceInfo(device_id, CL_DEVICE_NAME, sizeof(ocl_binary_filename), ocl_binary_filename, NULL);
+        strcat(ocl_binary_filename, ".bin");
 
+        /* Check if there's a valid cache available */
+        bOclCacheValid = check_ocl_cache(ocl_binary_filename,
+                                         build_options_string,
+                                         ocl_source,
+                                         &ocl_binary_size, &ocl_binary);
+    }
 
-		unsigned char * binary[5] = { NULL, NULL, NULL, NULL, NULL };
+    /* Create OpenCL program */
+    if (bCacheOclBuild && bOclCacheValid)
+    {
+        /* Create program from pre-built binaries */
+        *p_program =
+            clCreateProgramWithBinary(
+            context,
+            1,
+            &device_id,
+            &ocl_binary_size,
+            (const unsigned char**)&ocl_binary,
+            NULL,
+            &cl_error);
+    }
+    else
+    {
+        /* Create program from source code */
+        *p_program =
+            clCreateProgramWithSource(
+            context,
+            1,
+            (const char**)(&ocl_source),
+            &ocl_source_length,
+            &cl_error
+            );
+    }
 
-		clGetDeviceInfo(device_id, CL_DEVICE_NAME, 256, binary_filename, NULL);
-		strcat(binary_filename, ".bin");
-		FILE *f;
-
-		if (getenv("GMX_OCL_NOGENCACHE") == NULL && (f = fopen(binary_filename, "rb")) != NULL) 
-		{
-			fseek(f, 0, SEEK_END);
-			binary_sizes[0] = ftell(f);
-			binary[0] = (unsigned char*)malloc(binary_sizes[0]);
-			fseek(f, 0, SEEK_SET);
-			fread(binary[0], 1, binary_sizes[0], f);
-			fclose(f);
-
-			*p_program = clCreateProgramWithBinary(context, 1, &device_id, binary_sizes, (const unsigned char **)binary, NULL, &cl_error);
-			free(binary[0]);
-			isLoadedFromBinary = true;
-		}
-		else
-		{
-			/* Load the source in an OpenCL program */
-			*p_program =
-				clCreateProgramWithSource(
-				context,
-				1,
-				(const char**)(&ocl_source),
-				&ocl_source_length,
-				&cl_error
-				);
-		}
-	}
-
-
-
-    /* Prepare compilation and compile */
+    /* Build program */
     cl_int build_status         = CL_SUCCESS;
     {
-        char custom_build_options_prepend[512] = {0};
-		char *custom_build_options_append = NULL;
-		char *oclpath = NULL;
-        
-        /* Create include paths for non-standard location of the kernel sources */
-		if ((oclpath = getenv("GMX_OCL_FILE_PATH")) != NULL)
-		{
-			size_t chars = 0;
-			custom_build_options_append = 
-                (char*)calloc((strlen(oclpath) + 32)*INCLUDE_PATH_COUNT, 1);
-                
-			for (int i = 0; i < INCLUDE_PATH_COUNT; i++)
-			{
-				strncpy(&custom_build_options_append[chars], "-I", strlen("-I"));
-				chars += strlen("-I");
-                
-				strncpy(&custom_build_options_append[chars], oclpath, strlen(oclpath));
-				chars += strlen(oclpath);
-                
-				strncpy(
-                    &custom_build_options_append[chars], 
-                    include_path_list[i], 
-                    strlen(include_path_list[i])
-                );                
-				chars += strlen(include_path_list[i]);
-                
-				strncpy(&custom_build_options_append[chars], " ", 1);
-				chars += 1;
-			}
-			printf("GMX_OCL_FILE_PATH includes: %s\n", custom_build_options_append);
-		}
-
-		/* Get vendor specific define (amd,nvidia,nowarp) */
-        const char * kernel_vendor_spec_define =
-            ocl_get_vendor_specific_define(kernel_vendor_spec);
-
-        /* Use the fastgen flavour-level kernel generator instead of the original */
-        char kernel_fastgen_define[128] = {0};
-        if(DoFastGen)
-            ocl_get_fastgen_define(p_gmx_algo_family, kernel_fastgen_define);
-
-        /* Compose the build options to be prepended */
-        sprintf(custom_build_options_prepend, 
-                "-DWARP_SIZE_TEST=%d %s %s", 
-                warp_size, 
-                kernel_vendor_spec_define, 
-                kernel_fastgen_define
-        );
-
-        /* Get the size of the complete build options string */
-        size_t build_options_length =
-			create_ocl_build_options_length(
-                ocl_device_vendor, 
-                custom_build_options_prepend, 
-                custom_build_options_append
-            );
-
-        char * build_options_string = (char *)malloc(build_options_length);
-
-        /* Compose the complete build options */
-        create_ocl_build_options(
-            build_options_string,
-            build_options_length,
-            ocl_device_vendor,
-            custom_build_options_prepend, 
-            custom_build_options_append
-        );
-
         /* Now we are ready to launch the build */
         build_status = 
             clBuildProgram(*p_program, 0, NULL, build_options_string, NULL, NULL);
 
-		/* Store the binary only if the build has been successful */
-		if (build_status == CL_SUCCESS && isLoadedFromBinary == false && getenv("GMX_OCL_NOGENCACHE") == NULL)
-		{
-			size_t binaries[5] = { 0, 0, 0, 0, 0 };
-			unsigned char * binary[5] = { NULL, NULL, NULL, NULL, NULL };
-			clGetProgramInfo(*p_program, CL_PROGRAM_BINARY_SIZES, sizeof(size_t), binaries, NULL);
-
-			binary[0] = (unsigned char*)malloc(binaries[0] * 2);
-
-			clGetProgramInfo(*p_program, CL_PROGRAM_BINARIES, sizeof(unsigned char *)* 1, binary, NULL);
-			FILE *f = fopen(binary_filename, "wb");
-			fwrite(binary[0], 1, binaries[0], f);
-			fclose(f);
-			free(binary[0]);
-		}
-
+        if (build_status == CL_SUCCESS)
+            if (bCacheOclBuild)
+            {
+                /* If OpenCL caching is ON, but the current cache is not
+                   valid => update it */
+                if (!bOclCacheValid)
+                    print_ocl_binaries_to_file(*p_program, ocl_binary_filename);
+            }
+            else
+                if ((_OCL_VENDOR_NVIDIA_ == ocl_device_vendor) && getenv("GMX_OCL_DUMP_INTERM_FILES"))
+                {
+                    /* If dumping intermediate files has been requested and this is an NVIDIA card
+                       => write PTX to file */
+                    char ptx_filename[256];
+                    
+                    clGetDeviceInfo(device_id, CL_DEVICE_NAME, sizeof(ptx_filename), ptx_filename, NULL);
+                    strcat(ptx_filename, ".ptx");
+                    
+                    print_ocl_binaries_to_file(*p_program, ptx_filename);
+                }
 
         // Get log string size
         size_t build_log_size       = 0;        
@@ -967,14 +1087,18 @@ ocl_compile_program(
                 /* Build_log not needed anymore */
                 free(build_log);
             }
-        }
-        
-        /*  Final clean up */
-        free(build_options_string);
-        
-		if (custom_build_options_append != NULL) 
-            free(custom_build_options_append);
+        }        
     }
+
+    /*  Final clean up */
+    if (ocl_binary)
+        free(ocl_binary);
+    
+    if (build_options_string)
+        free(build_options_string);
+
+    if (ocl_source)
+        free(ocl_source);
 
     /* Append any other error to the build_status */
     return build_status | cl_error;
