@@ -33,7 +33,7 @@
  * the research papers on the package. Check out http://www.gromacs.org.
  */
 
-/** \file nbnxn_ocl_data_mgmt.cpp
+/** \file nbnxn_ocl.cpp
  *  \brief OpenCL equivalent of nbnxn_cuda.cu
  */
 
