@@ -452,6 +452,15 @@ gmx_bool init_ocl_gpu(int gmx_unused mygpu,
     retval = -1;
     result_str[0] = 0;
 
+    if (mygpu < 0 || mygpu >= gpu_opt->nocl_dev_use)
+    {
+        char        sbuf[STRLEN];
+        sprintf(sbuf, "Trying to initialize an inexistent GPU: "
+                "there are %d %s-selected GPU(s), but #%d was requested.",
+                gpu_opt->nocl_dev_use, gpu_opt->bUserSet ? "user" : "auto", mygpu);
+        gmx_incons(sbuf);
+    }
+
     while (1)
     {
         selected_ocl_gpu = gpu_info->ocl_dev + gpu_opt->ocl_dev_use[mygpu];
