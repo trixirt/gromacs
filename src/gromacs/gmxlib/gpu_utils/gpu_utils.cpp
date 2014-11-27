@@ -540,6 +540,14 @@ char* get_ocl_gpu_device_name(const gmx_gpu_info_t *gpu_info,
     return gpu_info->ocl_dev[gpu_opt->ocl_dev_use[idx]].device_name;
 }
 
+/*! \brief Returns the size of the ocl_gpu_info_t struct. 
+ * \returns                 size in bytes of ocl_gpu_info_t
+ */
+size_t sizeof_ocl_dev_info(void)
+{
+    return sizeof(ocl_gpu_info_t);
+}
+
 /*! \brief Allocates nbytes of host memory. Use ocl_free to free memory allocated with this function.
  *
  *  \todo

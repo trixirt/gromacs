@@ -52,6 +52,7 @@
 #if defined(GMX_GPU) && !defined(GMX_USE_OPENCL)
 #define FUNC_TERM_INT ;
 #define FUNC_TERM_SIZE_T ;
+#define FUNC_TERM_SIZE_T_OPENCL ;
 #define FUNC_TERM_VOID ;
 #define FUNC_QUALIFIER
 #define FUNC_TERM_INT_OPENCL {return -1;}
@@ -63,6 +64,7 @@ typedef int ocl_vendor_id_t;
 #elif defined(GMX_GPU) && defined(GMX_USE_OPENCL)
 #define FUNC_TERM_INT {return -1; }
 #define FUNC_TERM_SIZE_T {return 0; }
+#define FUNC_TERM_SIZE_T_OPENCL ;
 #define FUNC_TERM_VOID {}
 #define FUNC_QUALIFIER static
 #define FUNC_TERM_INT_OPENCL ;
@@ -72,6 +74,7 @@ typedef int ocl_vendor_id_t;
 #else
 #define FUNC_TERM_INT {return -1; }
 #define FUNC_TERM_SIZE_T {return 0; }
+#define FUNC_TERM_SIZE_T_OPENCL {return 0; }
 #define FUNC_TERM_VOID {}
 #define FUNC_QUALIFIER static
 #define FUNC_TERM_INT_OPENCL {return -1;}
@@ -164,6 +167,9 @@ ocl_vendor_id_t get_vendor_id(char *vendor_name) FUNC_TERM_INT_OPENCL
 
 FUNC_QUALIFIER
 size_t sizeof_cuda_dev_info(void) FUNC_TERM_SIZE_T
+
+FUNC_QUALIFIER_OPENCL
+size_t sizeof_ocl_dev_info(void) FUNC_TERM_SIZE_T_OPENCL
 
 FUNC_QUALIFIER_OPENCL
 void ocl_pmalloc(void **h_ptr, size_t nbytes) FUNC_TERM_VOID_OPENCL
