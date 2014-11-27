@@ -405,14 +405,29 @@ void gmx_check_hw_runconf_consistency(FILE                *fplog,
         sprintf(th_or_proc, "process");
     }
 
-    if (bUseGPU && hwinfo->gpu_info.ncuda_dev_compatible > 0 &&
+    if (bUseGPU &&
+#ifdef GMX_USE_OPENCL
+        hwinfo->gpu_info.nocl_dev_compatible > 0 &&
+#else
+        hwinfo->gpu_info.ncuda_dev_compatible > 0 &&
+#endif
         !bEmulateGPU)
     {
         int  ngpu_comp, ngpu_use;
         char gpu_comp_plural[2], gpu_use_plural[2];
 
-        ngpu_comp = hwinfo->gpu_info.ncuda_dev_compatible;
-        ngpu_use  = hw_opt->gpu_opt.ncuda_dev_use;
+        ngpu_comp = 
+#ifdef GMX_USE_OPENCL
+            hwinfo->gpu_info.nocl_dev_compatible;
+#else
+            hwinfo->gpu_info.ncuda_dev_compatible;
+#endif
+        ngpu_use  = 
+#ifdef GMX_USE_OPENCL
+            hw_opt->gpu_opt.nocl_dev_use;
+#else
+            hw_opt->gpu_opt.ncuda_dev_use;
+#endif
 
         sprintf(gpu_comp_plural, "%s", (ngpu_comp > 1) ? "s" : "");
         sprintf(gpu_use_plural,  "%s", (ngpu_use > 1) ? "s" : "");
@@ -528,7 +543,12 @@ void gmx_check_hw_runconf_consistency(FILE                *fplog,
 int gmx_count_gpu_dev_shared(const gmx_gpu_opt_t *gpu_opt)
 {
     int      same_count    = 0;
-    int      ngpu          = gpu_opt->ncuda_dev_use;
+    int      ngpu =
+#ifdef GMX_USE_OPENCL
+        gpu_opt->nocl_dev_use;
+#else
+        gpu_opt->ncuda_dev_use;
+#endif
 
     if (gpu_opt->bUserSet)
     {
@@ -538,8 +558,14 @@ int gmx_count_gpu_dev_shared(const gmx_gpu_opt_t *gpu_opt)
         {
             for (j = i + 1; j < ngpu; j++)
             {
-                same_count      += (gpu_opt->cuda_dev_use[i] ==
+                same_count      += 
+#ifdef GMX_USE_OPENCL
+                                    (gpu_opt->ocl_dev_use[i] ==
+                                    gpu_opt->ocl_dev_use[j]);
+#else
+                                    (gpu_opt->cuda_dev_use[i] ==
                                     gpu_opt->cuda_dev_use[j]);
+#endif
             }
         }
     }
@@ -715,6 +741,26 @@ static void gmx_detect_gpus(FILE *fplog, const t_commrec *cr)
 
 #ifdef GMX_LIB_MPI
     /* Broadcast the GPU info to the other ranks within this node */
+#ifdef GMX_USE_OPENCL
+    MPI_Bcast(&hwinfo_g->gpu_info.nocl_dev, 1, MPI_INT, 0, physicalnode_comm);
+
+    if (hwinfo_g->gpu_info.nocl_dev > 0)
+    {
+        int ocl_dev_size;
+
+        ocl_dev_size = hwinfo_g->gpu_info.nocl_dev*sizeof_ocl_dev_info();
+
+        if (rank_local > 0)
+        {
+            hwinfo_g->gpu_info.ocl_dev =
+                (ocl_gpu_info_ptr_t)malloc(ocl_dev_size);
+        }
+        MPI_Bcast(hwinfo_g->gpu_info.ocl_dev, ocl_dev_size, MPI_BYTE,
+                  0, physicalnode_comm);
+        MPI_Bcast(&hwinfo_g->gpu_info.nocl_dev_compatible, 1, MPI_INT,
+                  0, physicalnode_comm);
+    }
+#else
     MPI_Bcast(&hwinfo_g->gpu_info.ncuda_dev, 1, MPI_INT, 0, physicalnode_comm);
 
     if (hwinfo_g->gpu_info.ncuda_dev > 0)
@@ -733,6 +779,7 @@ static void gmx_detect_gpus(FILE *fplog, const t_commrec *cr)
         MPI_Bcast(&hwinfo_g->gpu_info.ncuda_dev_compatible, 1, MPI_INT,
                   0, physicalnode_comm);
     }
+#endif
 
     MPI_Comm_free(&physicalnode_comm);
 #endif
@@ -879,7 +926,11 @@ void gmx_select_gpu_ids(FILE *fplog, const t_commrec *cr,
             print_gpu_detection_stats(fplog, gpu_info, cr);
 
             sprintf(sbuf, "Some of the requested GPUs do not exist, behave strangely, or are not compatible:\n");
+#ifdef GMX_USE_OPENCL
+            for (i = 0; i < gpu_opt->nocl_dev_use; i++)
+#else
             for (i = 0; i < gpu_opt->ncuda_dev_use; i++)
+#endif
             {
                 if (checkres[i] != egpuCompatible)
                 {
