@@ -1196,6 +1196,21 @@ void free_kernels(cl_kernel *kernels, int count)
         free_kernel(kernels + i);
 }
 
+/*! Releases the input OpenCL buffer */
+void free_ocl_buffer(cl_mem *buffer)
+{
+	cl_int cl_error;
+
+	assert(NULL != buffer);
+
+	if (*buffer)
+	{
+		cl_error = clReleaseMemObject(*buffer);
+		assert(CL_SUCCESS == cl_error);
+		*buffer = NULL;
+	}
+}
+
 /*! OpenCL equivalent of nbnxn_cuda_free */
 void nbnxn_ocl_free(nbnxn_opencl_ptr_t ocl_nb)
 {
@@ -1221,13 +1236,82 @@ void nbnxn_ocl_free(nbnxn_opencl_ptr_t ocl_nb)
     free_kernel(&(ocl_nb->kernel_memset_f3));
     free_kernel(&(ocl_nb->kernel_zero_e_fshift));
 
-    /* Free debug buffer */
-    if (NULL != ocl_nb->debug_buffer)
-    {
-        cl_error = clReleaseMemObject(ocl_nb->debug_buffer);
-        assert(CL_SUCCESS == cl_error);
-        ocl_nb->debug_buffer = NULL;
-    }
+	/* Free atdat */
+	free_ocl_buffer(&(ocl_nb->atdat->xq));
+	free_ocl_buffer(&(ocl_nb->atdat->f));
+	free_ocl_buffer(&(ocl_nb->atdat->e_lj));
+	free_ocl_buffer(&(ocl_nb->atdat->e_el));
+	free_ocl_buffer(&(ocl_nb->atdat->fshift));
+	free_ocl_buffer(&(ocl_nb->atdat->atom_types));
+	free_ocl_buffer(&(ocl_nb->atdat->shift_vec));
+	sfree(ocl_nb->atdat);
+
+	/* Free nbparam */
+	free_ocl_buffer(&(ocl_nb->nbparam->nbfp_climg2d));
+	free_ocl_buffer(&(ocl_nb->nbparam->nbfp_comb_climg2d));
+	free_ocl_buffer(&(ocl_nb->nbparam->coulomb_tab_climg2d));
+	sfree(ocl_nb->nbparam);
+
+	/* Free plist */
+	free_ocl_buffer(&(ocl_nb->plist[eintLocal]->sci));
+	free_ocl_buffer(&(ocl_nb->plist[eintLocal]->cj4));
+	free_ocl_buffer(&(ocl_nb->plist[eintLocal]->excl));
+	sfree(ocl_nb->plist[eintLocal]);
+	if (ocl_nb->bUseTwoStreams)
+	{
+		free_ocl_buffer(&(ocl_nb->plist[eintNonlocal]->sci));
+		free_ocl_buffer(&(ocl_nb->plist[eintNonlocal]->cj4));
+		free_ocl_buffer(&(ocl_nb->plist[eintNonlocal]->excl));
+		sfree(ocl_nb->plist[eintNonlocal]);
+	}
+
+	/* Free nbst */
+	ocl_pfree(ocl_nb->nbst.e_lj);
+	ocl_nb->nbst.e_lj = NULL;
+
+	ocl_pfree(ocl_nb->nbst.e_el);
+	ocl_nb->nbst.e_el = NULL;
+
+	ocl_pfree(ocl_nb->nbst.fshift);
+	ocl_nb->nbst.fshift = NULL;
+
+	/* Free debug buffer */
+	if (NULL != ocl_nb->debug_buffer)
+	{
+		cl_error = clReleaseMemObject(ocl_nb->debug_buffer);
+		assert(CL_SUCCESS == cl_error);
+		ocl_nb->debug_buffer = NULL;
+	}
+
+	/* Free command queues */
+	clReleaseCommandQueue(ocl_nb->stream[eintLocal]);
+	ocl_nb->stream[eintLocal] = NULL;
+	if (ocl_nb->bUseTwoStreams)
+	{
+		clReleaseCommandQueue(ocl_nb->stream[eintNonlocal]);
+		ocl_nb->stream[eintNonlocal] = NULL;
+	}
+	/* Free other events */
+	if (ocl_nb->nonlocal_done)
+	{
+		clReleaseEvent(ocl_nb->nonlocal_done);
+		ocl_nb->nonlocal_done = NULL;
+	}
+	if (ocl_nb->misc_ops_done)
+	{
+		clReleaseEvent(ocl_nb->misc_ops_done);
+		ocl_nb->misc_ops_done = NULL;
+	}
+
+	/* Free timers and timings */
+	sfree(ocl_nb->timers);
+	sfree(ocl_nb->timings);
+	sfree(ocl_nb);
+
+	if (debug)
+	{
+		fprintf(debug, "Cleaned up OpenCL data structures.\n");
+	}
 }
 
 /*! OpenCL equivalent of nbnxn_cuda_get_timings */

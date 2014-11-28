@@ -265,8 +265,29 @@ int detect_ocl_gpus(gmx_gpu_info_t *gpu_info, char *err_str)
  */
 void free_ocl_gpu_info(const gmx_gpu_info_t gmx_unused *gpu_info)
 {
-    if (gpu_info)
-        sfree(gpu_info->ocl_dev);
+	if (gpu_info)
+	{
+		for (int i = 0; i < gpu_info->nocl_dev; i++)
+		{
+			cl_int cl_error;
+
+			if (gpu_info->ocl_dev[i].context)
+			{
+				cl_error = clReleaseContext(gpu_info->ocl_dev[i].context);
+				gpu_info->ocl_dev[i].context = NULL;
+				assert(CL_SUCCESS == cl_error);
+			}
+
+			if (gpu_info->ocl_dev[i].program)
+			{
+				cl_error = clReleaseProgram(gpu_info->ocl_dev[i].program);
+				gpu_info->ocl_dev[i].program = NULL;
+				assert(CL_SUCCESS == cl_error);
+			}			
+		}
+
+		sfree(gpu_info->ocl_dev);		
+	}
 }
 
 /*! \brief Select the OpenCL GPUs compatible with the native GROMACS acceleration.
