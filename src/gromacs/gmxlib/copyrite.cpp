@@ -636,16 +636,6 @@ const char *Program(void)
 
 extern void gmx_print_version_info_cuda_gpu(FILE *fp);
 
-void gmx_print_version_info_gpu(FILE *fp)
-{
-#ifdef GMX_USE_OPENCL
-    fprintf(fp, "OpenCL include dir: %s\n", OPENCL_INCLUDE_DIR);
-    fprintf(fp, "OpenCL library:     %s\n", OPENCL_LIBRARY);
-#else
-    gmx_print_version_info_cuda_gpu(fp);
-#endif
-}
-
 static void gmx_print_version_info(FILE *fp)
 {
     fprintf(fp, "Gromacs version:    %s\n", gmx_version());
@@ -753,7 +743,12 @@ static void gmx_print_version_info(FILE *fp)
             BOOST_VERSION / 100 % 1000, BOOST_VERSION % 100,
             bExternalBoost ? " (external)" : " (internal)");
 #if defined(GMX_GPU)
-    gmx_print_version_info_gpu(fp);
+#ifdef GMX_USE_OPENCL
+    fprintf(fp, "OpenCL include dir: %s\n", OPENCL_INCLUDE_DIR);
+    fprintf(fp, "OpenCL library:     %s\n", OPENCL_LIBRARY);
+#else
+    gmx_print_version_info_cuda_gpu(fp);
+#endif
 #endif
 }
 
