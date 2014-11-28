@@ -35,6 +35,7 @@
  * the research papers on the package. Check out http://www.gromacs.org.
  */
 #include "copyrite.h"
+#include "buildinfo.h"
 
 #include "config.h"
 
@@ -633,8 +634,17 @@ const char *Program(void)
     GMX_CATCH_ALL_AND_EXIT_WITH_FATAL_ERROR;
 }
 
+extern void gmx_print_version_info_cuda_gpu(FILE *fp);
 
-extern void gmx_print_version_info_gpu(FILE *fp);
+void gmx_print_version_info_gpu(FILE *fp)
+{
+#ifdef GMX_USE_OPENCL
+    fprintf(fp, "OpenCL include dir: %s\n", OPENCL_INCLUDE_DIR);
+    fprintf(fp, "OpenCL library:     %s\n", OPENCL_LIBRARY);
+#else
+    gmx_print_version_info_cuda_gpu(fp);
+#endif
+}
 
 static void gmx_print_version_info(FILE *fp)
 {
@@ -673,6 +683,11 @@ static void gmx_print_version_info(FILE *fp)
     fprintf(fp, "GPU support:        enabled\n");
 #else
     fprintf(fp, "GPU support:        disabled\n");
+#endif
+#if defined(GMX_GPU) && defined(GMX_USE_OPENCL)
+	fprintf(fp, "OpenCL support:     enabled\n");
+#else
+	fprintf(fp, "OpenCL support:     disabled\n");
 #endif
     /* A preprocessor trick to avoid duplicating logic from vec.h */
 #define gmx_stringify2(x) #x
@@ -737,7 +752,7 @@ static void gmx_print_version_info(FILE *fp)
     fprintf(fp, "Boost version:      %d.%d.%d%s\n", BOOST_VERSION / 100000,
             BOOST_VERSION / 100 % 1000, BOOST_VERSION % 100,
             bExternalBoost ? " (external)" : " (internal)");
-#if defined(GMX_GPU) && !defined(GMX_USE_OPENCL)
+#if defined(GMX_GPU)
     gmx_print_version_info_gpu(fp);
 #endif
 }
