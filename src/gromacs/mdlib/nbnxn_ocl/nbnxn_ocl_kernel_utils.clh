@@ -386,7 +386,7 @@ void calculate_lj_ewald_comb_LB_F_E(__constant float *nbfp_comb_climg2d,
     float sigma, sigma2, epsilon;
 
     /* sigma and epsilon are scaled to give 6*C6 */                                        
-    sigma      = nbfp_comb_climg2d[2*typei]*nbfp_comb_climg2d[2*typej];
+    sigma      = nbfp_comb_climg2d[2*typei] + nbfp_comb_climg2d[2*typej];
                 
     epsilon    = nbfp_comb_climg2d[2*typei+1]*nbfp_comb_climg2d[2*typej+1];
                
