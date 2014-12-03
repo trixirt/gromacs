@@ -78,15 +78,17 @@ static bool is_compatible_ocl_gpu(int stat)
 
 /*! \brief Returns true if the gpu characterized by the device properties is
  *  supported by the native gpu acceleration.
- * \todo
- * Add code for this function. 
  * \returns             true if the GPU properties passed indicate a compatible
  *                      GPU, otherwise false.
  */
-static int is_gmx_supported_ocl_gpu_id()
+static int is_gmx_supported_ocl_gpu_id(ocl_gpu_info_ptr_t ocl_gpu_device)
 {
-    // TODO: add code for this function
-    return egpuCompatible;
+	/* Only AMD and NVIDIA GPUs are supported for now */
+	if ((_OCL_VENDOR_NVIDIA_ == ocl_gpu_device->vendor_e) ||
+		(_OCL_VENDOR_AMD_ == ocl_gpu_device->vendor_e))
+		return egpuCompatible;
+
+	return egpuIncompatible;
 }
 
 /*! \brief Returns an ocl_vendor_id_t value corresponding to the input OpenCL vendor name.
@@ -205,12 +207,12 @@ int detect_ocl_gpus(gmx_gpu_info_t *gpu_info, char *err_str)
                     gpu_info->ocl_dev[device_index].compute_units = 0;
                     clGetDeviceInfo(ocl_device_ids[j], CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(gpu_info->ocl_dev[device_index].compute_units), &(gpu_info->ocl_dev[device_index].compute_units), NULL);
 
-                    gpu_info->ocl_dev[device_index].stat = is_gmx_supported_ocl_gpu_id();
+					gpu_info->ocl_dev[device_index].vendor_e = get_vendor_id(gpu_info->ocl_dev[device_index].device_vendor);
+
+					gpu_info->ocl_dev[device_index].stat = is_gmx_supported_ocl_gpu_id(gpu_info->ocl_dev + device_index);
 
                     if (egpuCompatible == gpu_info->ocl_dev[device_index].stat)
-                        gpu_info->nocl_dev_compatible++;
-
-                    gpu_info->ocl_dev[device_index].vendor_e = get_vendor_id(gpu_info->ocl_dev[device_index].device_vendor);
+                        gpu_info->nocl_dev_compatible++;                    
 
                     device_index++;
                 }
