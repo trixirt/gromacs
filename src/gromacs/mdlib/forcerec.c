@@ -1830,7 +1830,11 @@ static void pick_nbnxn_resources(const t_commrec     *cr,
      */
     *bEmulateGPU = (bEmulateGPUEnvVarSet ||
                     (!bDoNonbonded &&
+#ifdef GMX_USE_OPENCL
+					 gpu_opt->nocl_dev_use > 0));
+#else
                      gpu_opt->ncuda_dev_use > 0));
+#endif
 
     /* Enable GPU mode when GPUs are available or no GPU emulation is requested.
      */
