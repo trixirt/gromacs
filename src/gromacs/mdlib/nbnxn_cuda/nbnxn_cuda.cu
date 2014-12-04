@@ -307,8 +307,8 @@ void nbnxn_cuda_launch_kernel(nbnxn_cuda_ptr_t        cu_nb,
     bool                 bDoTime     = cu_nb->bDoTime;
 
 #ifdef DEBUG_CUDA
-        float* debug_buffer_h;
-        size_t debug_buffer_size;
+    float* debug_buffer_h;
+    size_t debug_buffer_size;
 #endif
     float* debug_buffer_d = NULL;
 
@@ -401,7 +401,7 @@ void nbnxn_cuda_launch_kernel(nbnxn_cuda_ptr_t        cu_nb,
         if (DEBUG_RUN_STEP == run_step)
         {
             debug_buffer_size = dim_grid.x * dim_block.x * dim_grid.y * dim_block.y * dim_grid.z * sizeof(float);
-            debug_buffer_h = (float*)calloc(1, debug_buffer_size);
+            debug_buffer_h    = (float*)calloc(1, debug_buffer_size);
             assert(NULL != debug_buffer_h);
 
             cudaMalloc(&debug_buffer_d, debug_buffer_size);
@@ -420,7 +420,7 @@ void nbnxn_cuda_launch_kernel(nbnxn_cuda_ptr_t        cu_nb,
         stat = cudaEventRecord(t->stop_nb_k[iloc], stream);
         CU_RET_ERR(stat, "cudaEventRecord failed");
     }
-    
+
 #if (defined(WIN32) || defined( _WIN32 ))
     /* Windows: force flushing WDDM queue */
     stat = cudaStreamQuery(stream);
@@ -433,21 +433,21 @@ void nbnxn_cuda_launch_kernel(nbnxn_cuda_ptr_t        cu_nb,
         if (DEBUG_RUN_STEP == run_step)
         {
             FILE *pf;
-            char file_name[256] = {0};
+            char  file_name[256] = {0};
 
             cu_copy_D2H_async(debug_buffer_h, debug_buffer_d,
-                    debug_buffer_size, stream);
+                              debug_buffer_size, stream);
 
             // Make sure all data has been transfered back from device
-            cudaStreamSynchronize(stream); 
+            cudaStreamSynchronize(stream);
 
             printf("\nWriting debug_buffer to debug_buffer_cuda.txt...");
-        
+
             sprintf(file_name, "debug_buffer_cuda_%d.txt", DEBUG_RUN_STEP);
             pf = fopen(file_name, "wt");
             assert(pf != NULL);
 
-            fprintf(pf,"%20s", "");
+            fprintf(pf, "%20s", "");
             for (int j = 0; j < dim_grid.x * dim_block.x; j++)
             {
                 char label[20];
@@ -462,7 +462,9 @@ void nbnxn_cuda_launch_kernel(nbnxn_cuda_ptr_t        cu_nb,
                 fprintf(pf, "\n%20s", label);
 
                 for (int j = 0; j < dim_grid.x * dim_block.x; j++)
+                {
                     fprintf(pf, "%20.5f", debug_buffer_h[i * dim_grid.x * dim_block.x + j]);
+                }
 
                 //fprintf(pf, "\n");
             }
@@ -484,23 +486,23 @@ void nbnxn_cuda_launch_kernel(nbnxn_cuda_ptr_t        cu_nb,
 }
 
 void dump_cj4(nbnxn_cj4_t *results, int cnt, char* out_file)
-{    
-    FILE *pf;        
+{
+    FILE *pf;
 
     pf = fopen(out_file, "wt");
     assert(pf != NULL);
-       
+
     fprintf(pf, "%20s%20s%20s%20s%20s%20s%20s%20s\n",
-        "cj[0]", "cj[1]", "cj[2]", "cj[3]",
-        "imei[0].imask", "imei[0].excl_ind",
-        "imei[1].imask", "imei[1].excl_ind");
+            "cj[0]", "cj[1]", "cj[2]", "cj[3]",
+            "imei[0].imask", "imei[0].excl_ind",
+            "imei[1].imask", "imei[1].excl_ind");
 
     for (int index = 0; index < cnt; index++)
     {
         fprintf(pf, "%20d%20d%20d%20d%20d%20u%20d%20u\n",
-            results[index].cj[0], results[index].cj[1], results[index].cj[2], results[index].cj[3],
-            results[index].imei[0].excl_ind, results[index].imei[0].imask,
-            results[index].imei[1].excl_ind, results[index].imei[1].imask);
+                results[index].cj[0], results[index].cj[1], results[index].cj[2], results[index].cj[3],
+                results[index].imei[0].excl_ind, results[index].imei[0].imask,
+                results[index].imei[1].excl_ind, results[index].imei[1].imask);
     }
 
     fclose(pf);
@@ -509,12 +511,12 @@ void dump_cj4(nbnxn_cj4_t *results, int cnt, char* out_file)
 }
 
 void dump_results_f(float* results, int cnt, char* out_file)
-{    
-    FILE *pf;        
+{
+    FILE *pf;
 
     pf = fopen(out_file, "wt");
     assert(pf != NULL);
-                
+
     for (int index = 0; index < cnt; index++)
     {
         fprintf(pf, "%15.5f\n", results[index]);
@@ -663,18 +665,18 @@ void nbnxn_cuda_launch_cpyback(nbnxn_cuda_ptr_t        cu_nb,
         static int run_step = 1;
 
         if (DEBUG_RUN_STEP == run_step)
-        {         
+        {
             nbnxn_cj4_t *temp_cj4;
-            int cnt;
-            size_t size;       
-            char file_name[256];
+            int          cnt;
+            size_t       size;
+            char         file_name[256];
 
-            cnt = cu_nb->plist[0]->ncj4;
-            size = cnt * sizeof(nbnxn_cj4_t);
+            cnt      = cu_nb->plist[0]->ncj4;
+            size     = cnt * sizeof(nbnxn_cj4_t);
             temp_cj4 = (nbnxn_cj4_t*)malloc(size);
 
             cu_copy_D2H_async(temp_cj4, cu_nb->plist[0]->cj4,
-                size, stream);
+                              size, stream);
 
             // Make sure all data has been transfered back from device
             cudaStreamSynchronize(stream);

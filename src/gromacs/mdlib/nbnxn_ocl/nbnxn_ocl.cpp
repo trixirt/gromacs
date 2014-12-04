@@ -95,7 +95,7 @@ static unsigned int poll_wait_pattern = (0x7FU << 23);
 
 /*! Returns the number of blocks to be used for the nonbonded GPU kernel.
     OpenCL equivalent of calc_nb_kernel_nblock from nbnxn_cuda.cu
-*/
+ */
 static inline int calc_nb_kernel_nblock(int nwork_units, ocl_gpu_info_t *dinfo)
 {
     int max_grid_x_size;
@@ -116,7 +116,7 @@ static inline int calc_nb_kernel_nblock(int nwork_units, ocl_gpu_info_t *dinfo)
     return nwork_units;
 }
 
-/* Constant arrays listing non-bonded kernel function names. The arrays are 
+/* Constant arrays listing non-bonded kernel function names. The arrays are
  * organized in 2-dim arrays by: electrostatics and VDW type.
  *
  *  Note that the row- and column-order of function pointers has to match the
@@ -175,14 +175,14 @@ static const char* nb_kfunc_ener_prune_ptr[eelOclNR][evdwOclNR] =
  *  OpenCL equivalent of nbnxn_cu_kfunc_ptr_t.
  */
 static inline cl_kernel select_nbnxn_kernel(nbnxn_opencl_ptr_t ocl_nb,
-                                            int  eeltype,
-                                            int  evdwtype,
-                                            bool bDoEne,
-                                            bool bDoPrune)
+                                            int                eeltype,
+                                            int                evdwtype,
+                                            bool               bDoEne,
+                                            bool               bDoPrune)
 {
     const char* kernel_name_to_run;
-    cl_kernel *kernel_ptr;
-    cl_int cl_error;
+    cl_kernel  *kernel_ptr;
+    cl_int      cl_error;
 
     assert(eeltype < eelOclNR);
     assert(evdwtype < eelOclNR);
@@ -192,12 +192,12 @@ static inline cl_kernel select_nbnxn_kernel(nbnxn_opencl_ptr_t ocl_nb,
         if (bDoPrune)
         {
             kernel_name_to_run = nb_kfunc_ener_prune_ptr[eeltype][evdwtype];
-            kernel_ptr = &(ocl_nb->kernel_ener_prune_ptr[eeltype][evdwtype]);
+            kernel_ptr         = &(ocl_nb->kernel_ener_prune_ptr[eeltype][evdwtype]);
         }
         else
         {
             kernel_name_to_run = nb_kfunc_ener_noprune_ptr[eeltype][evdwtype];
-            kernel_ptr = &(ocl_nb->kernel_ener_noprune_ptr[eeltype][evdwtype]);
+            kernel_ptr         = &(ocl_nb->kernel_ener_noprune_ptr[eeltype][evdwtype]);
         }
     }
     else
@@ -205,16 +205,16 @@ static inline cl_kernel select_nbnxn_kernel(nbnxn_opencl_ptr_t ocl_nb,
         if (bDoPrune)
         {
             kernel_name_to_run = nb_kfunc_noener_prune_ptr[eeltype][evdwtype];
-            kernel_ptr = &(ocl_nb->kernel_noener_prune_ptr[eeltype][evdwtype]);
+            kernel_ptr         = &(ocl_nb->kernel_noener_prune_ptr[eeltype][evdwtype]);
         }
         else
         {
             kernel_name_to_run = nb_kfunc_noener_noprune_ptr[eeltype][evdwtype];
-            kernel_ptr = &(ocl_nb->kernel_noener_noprune_ptr[eeltype][evdwtype]);
+            kernel_ptr         = &(ocl_nb->kernel_noener_noprune_ptr[eeltype][evdwtype]);
         }
     }
 #ifndef NDEBUG
-    printf("Selected kernel: %s\n",kernel_name_to_run);
+    printf("Selected kernel: %s\n", kernel_name_to_run);
 #endif
 
     if (NULL == kernel_ptr[0])
@@ -241,15 +241,15 @@ static inline int calc_shmem_required()
     shmem  = NCL_PER_SUPERCL * CL_SIZE * sizeof(float) * 4; /* xqib */
     /* cj in shared memory, for both warps separately */
     shmem += 2 * NBNXN_GPU_JGROUP_SIZE * sizeof(int);       /* cjs  */
-#ifdef IATYPE_SHMEM // CUDA ARCH >= 300
+#ifdef IATYPE_SHMEM                                         // CUDA ARCH >= 300
     /* i-atom types in shared memory */
     #pragma error "Should not be defined"
     shmem += NCL_PER_SUPERCL * CL_SIZE * sizeof(int);       /* atib */
 #endif
     /* force reduction buffers in shared memory */
-    shmem += CL_SIZE * CL_SIZE * 3 * sizeof(float);         /* f_buf */
+    shmem += CL_SIZE * CL_SIZE * 3 * sizeof(float); /* f_buf */
     /* Warp vote. In fact it must be * number of warps in block.. */
-    shmem += sizeof(cl_uint) * 2; /* warp_any */
+    shmem += sizeof(cl_uint) * 2;                   /* warp_any */
     return shmem;
 }
 
@@ -258,27 +258,27 @@ static inline int calc_shmem_required()
  *  - OpenCL restrictions (pointers are not accepted inside data structures)
  *  - some host side fields are not needed for the OpenCL kernels.
  */
-static void fillin_ocl_structures(cl_nbparam_t *nbp,
+static void fillin_ocl_structures(cl_nbparam_t        *nbp,
                                   cl_nbparam_params_t *nbparams_params)
 {
     nbparams_params->coulomb_tab_scale = nbp->coulomb_tab_scale;
-    nbparams_params->coulomb_tab_size = nbp->coulomb_tab_size;
-    nbparams_params->c_rf = nbp->c_rf;
-    nbparams_params->dispersion_shift = nbp->dispersion_shift;
-    nbparams_params->eeltype = nbp->eeltype;
-    nbparams_params->epsfac = nbp->epsfac;
-    nbparams_params->ewaldcoeff_lj = nbp->ewaldcoeff_lj;
-    nbparams_params->ewald_beta = nbp->ewald_beta;
-    nbparams_params->rcoulomb_sq = nbp->rcoulomb_sq;
-    nbparams_params->repulsion_shift = nbp->repulsion_shift;
-    nbparams_params->rlist_sq = nbp->rlist_sq;
-    nbparams_params->rvdw_sq = nbp->rvdw_sq;
-    nbparams_params->rvdw_switch = nbp->rvdw_switch;
-    nbparams_params->sh_ewald = nbp->sh_ewald;
-    nbparams_params->sh_lj_ewald = nbp->sh_lj_ewald;
-    nbparams_params->two_k_rf = nbp->two_k_rf;
-    nbparams_params->vdwtype = nbp->vdwtype;
-    nbparams_params->vdw_switch = nbp->vdw_switch;
+    nbparams_params->coulomb_tab_size  = nbp->coulomb_tab_size;
+    nbparams_params->c_rf              = nbp->c_rf;
+    nbparams_params->dispersion_shift  = nbp->dispersion_shift;
+    nbparams_params->eeltype           = nbp->eeltype;
+    nbparams_params->epsfac            = nbp->epsfac;
+    nbparams_params->ewaldcoeff_lj     = nbp->ewaldcoeff_lj;
+    nbparams_params->ewald_beta        = nbp->ewald_beta;
+    nbparams_params->rcoulomb_sq       = nbp->rcoulomb_sq;
+    nbparams_params->repulsion_shift   = nbp->repulsion_shift;
+    nbparams_params->rlist_sq          = nbp->rlist_sq;
+    nbparams_params->rvdw_sq           = nbp->rvdw_sq;
+    nbparams_params->rvdw_switch       = nbp->rvdw_switch;
+    nbparams_params->sh_ewald          = nbp->sh_ewald;
+    nbparams_params->sh_lj_ewald       = nbp->sh_lj_ewald;
+    nbparams_params->two_k_rf          = nbp->two_k_rf;
+    nbparams_params->vdwtype           = nbp->vdwtype;
+    nbparams_params->vdw_switch        = nbp->vdw_switch;
 }
 
 /* Waits for the commands associated with the input event to finish.
@@ -308,7 +308,7 @@ void sync_ocl_event(cl_command_queue stream, cl_event *ocl_event)
     cl_int cl_error;
 
     /* Enqueue wait */
-    cl_error = clEnqueueWaitForEvents(stream,1,ocl_event);
+    cl_error = clEnqueueWaitForEvents(stream, 1, ocl_event);
 
     assert(CL_SUCCESS == cl_error);
 
@@ -327,21 +327,21 @@ void sync_ocl_event(cl_command_queue stream, cl_event *ocl_event)
  */
 double ocl_event_elapsed_ms(cl_event *ocl_event)
 {
-    cl_int cl_error;
+    cl_int   cl_error;
     cl_ulong start_ns, end_ns;
-    double elapsed_ms;
+    double   elapsed_ms;
 
     elapsed_ms = 0.0;
-    assert(NULL != ocl_event);    
+    assert(NULL != ocl_event);
 
     if (*ocl_event)
     {
         cl_error = clGetEventProfilingInfo(*ocl_event, CL_PROFILING_COMMAND_START,
-            sizeof(cl_ulong), &start_ns, NULL);
+                                           sizeof(cl_ulong), &start_ns, NULL);
         assert(CL_SUCCESS == cl_error);
 
         cl_error = clGetEventProfilingInfo(*ocl_event, CL_PROFILING_COMMAND_END,
-            sizeof(cl_ulong), &end_ns, NULL);
+                                           sizeof(cl_ulong), &end_ns, NULL);
         assert(CL_SUCCESS == cl_error);
 
         clReleaseEvent(*ocl_event);
@@ -379,9 +379,9 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t      ocl_nb,
     cl_int               cl_error;
     int                  adat_begin, adat_len; /* local/nonlocal offset and length used for xq and f */
     /* OpenCL kernel launch-related stuff */
-    int                  shmem, nblock;    
-    size_t               dim_block[3], dim_grid[3];    
-    cl_kernel nb_kernel = NULL; /* fn pointer to the nonbonded kernel */
+    int                  shmem, nblock;
+    size_t               dim_block[3], dim_grid[3];
+    cl_kernel            nb_kernel = NULL; /* fn pointer to the nonbonded kernel */
 
     cl_atomdata_t       *adat    = ocl_nb->atdat;
     cl_nbparam_t        *nbp     = ocl_nb->nbparam;
@@ -394,10 +394,10 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t      ocl_nb,
     bool                 bDoTime     = ocl_nb->bDoTime;
     cl_uint              arg_no;
 
-    cl_nbparam_params_t nbparams_params;    
+    cl_nbparam_params_t  nbparams_params;
 #ifdef DEBUG_OCL
-        float* debug_buffer_h;
-        size_t debug_buffer_size;
+    float              * debug_buffer_h;
+    size_t               debug_buffer_size;
 #endif
 
     /* turn energy calculation always on/off (for debugging/testing only) */
@@ -440,7 +440,7 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t      ocl_nb,
 
     /* HtoD x, q */
     ocl_copy_H2D_async(adat->xq, nbatom->x + adat_begin * 4, adat_begin*sizeof(float)*4,
-        adat_len * sizeof(float) * 4, stream, bDoTime ? (&(t->nb_h2d[iloc])) : NULL);
+                       adat_len * sizeof(float) * 4, stream, bDoTime ? (&(t->nb_h2d[iloc])) : NULL);
 
     /* beginning of timed nonbonded calculation section */
 
@@ -452,14 +452,14 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t      ocl_nb,
                                     plist->bDoPrune || always_prune);
 
     /* kernel launch config */
-    nblock    = calc_nb_kernel_nblock(plist->nsci, ocl_nb->dev_info);    
+    nblock       = calc_nb_kernel_nblock(plist->nsci, ocl_nb->dev_info);
     dim_block[0] = CL_SIZE;
     dim_block[1] = CL_SIZE;
     dim_block[2] = 1;
 
     dim_grid[0] = nblock * dim_block[0];
     dim_grid[1] = 1 * dim_block[1];
-    dim_grid[2]= 1 * dim_block[2];
+    dim_grid[2] = 1 * dim_block[2];
 
     shmem     = calc_shmem_required();
 
@@ -470,17 +470,17 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t      ocl_nb,
         if (DEBUG_RUN_STEP == run_step)
         {
             debug_buffer_size = dim_grid[0] * dim_grid[1] * dim_grid[2] * sizeof(float);
-            debug_buffer_h = (float*)calloc(1, debug_buffer_size);
+            debug_buffer_h    = (float*)calloc(1, debug_buffer_size);
             assert(NULL != debug_buffer_h);
 
             if (NULL == ocl_nb->debug_buffer)
             {
                 ocl_nb->debug_buffer = clCreateBuffer(ocl_nb->dev_info->context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                    debug_buffer_size, debug_buffer_h, &cl_error);
+                                                      debug_buffer_size, debug_buffer_h, &cl_error);
 
                 assert(CL_SUCCESS == cl_error);
             }
-         }
+        }
 
         run_step++;
     }
@@ -496,8 +496,8 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t      ocl_nb,
 
     fillin_ocl_structures(nbp, &nbparams_params);
 
-    arg_no = 0;    
-    cl_error = clSetKernelArg(nb_kernel, arg_no++, sizeof(int), &(adat->ntypes));        
+    arg_no    = 0;
+    cl_error  = clSetKernelArg(nb_kernel, arg_no++, sizeof(int), &(adat->ntypes));
     cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(nbparams_params), &(nbparams_params));
     cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->xq));
     cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(adat->f));
@@ -518,8 +518,10 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t      ocl_nb,
 
     assert(cl_error == CL_SUCCESS);
 
-    if(cl_error)
-        printf("ClERROR! %d\n",cl_error);
+    if (cl_error)
+    {
+        printf("ClERROR! %d\n", cl_error);
+    }
     cl_error = clEnqueueNDRangeKernel(stream, nb_kernel, 3, NULL, dim_grid, dim_block, 0, NULL, bDoTime ? &(t->nb_k[iloc]) : NULL);
     assert(cl_error == CL_SUCCESS);
 
@@ -530,10 +532,10 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t      ocl_nb,
         if (DEBUG_RUN_STEP == run_step)
         {
             FILE *pf;
-            char file_name[256] = {0};
+            char  file_name[256] = {0};
 
             ocl_copy_D2H_async(debug_buffer_h, ocl_nb->debug_buffer, 0,
-                debug_buffer_size, stream, NULL);
+                               debug_buffer_size, stream, NULL);
 
             // Make sure all data has been transfered back from device
             clFinish(stream);
@@ -544,7 +546,7 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t      ocl_nb,
             pf = fopen(file_name, "wt");
             assert(pf != NULL);
 
-            fprintf(pf,"%20s", "");
+            fprintf(pf, "%20s", "");
             for (int j = 0; j < dim_grid[0]; j++)
             {
                 char label[20];
@@ -559,7 +561,9 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t      ocl_nb,
                 fprintf(pf, "\n%20s", label);
 
                 for (int j = 0; j < dim_grid[0]; j++)
+                {
                     fprintf(pf, "%20.5f", debug_buffer_h[i * dim_grid[0] + j]);
+                }
 
                 //fprintf(pf, "\n");
             }
@@ -586,16 +590,16 @@ void dump_compare_results_cj4(nbnxn_cj4_t* results, int cnt, char* out_file, cha
     assert(pf != NULL);
 
     fprintf(pf, "%20s%20s%20s%20s%20s%20s%20s%20s\n",
-        "cj[0]", "cj[1]", "cj[2]", "cj[3]",
-        "imei[0].excl_ind", "imei[0].imask",
-        "imei[1].excl_ind", "imei[1].imask");
+            "cj[0]", "cj[1]", "cj[2]", "cj[3]",
+            "imei[0].excl_ind", "imei[0].imask",
+            "imei[1].excl_ind", "imei[1].imask");
 
     for (int index = 0; index < cnt; index++)
     {
         fprintf(pf, "%20d%20d%20d%20d%20d%20u%20d%20u\n",
-            results[index].cj[0], results[index].cj[1], results[index].cj[2], results[index].cj[3],
-            results[index].imei[0].excl_ind, results[index].imei[0].imask,
-            results[index].imei[1].excl_ind, results[index].imei[1].imask);
+                results[index].cj[0], results[index].cj[1], results[index].cj[2], results[index].cj[3],
+                results[index].imei[0].excl_ind, results[index].imei[0].imask,
+                results[index].imei[1].excl_ind, results[index].imei[1].imask);
     }
 
     fclose(pf);
@@ -606,12 +610,15 @@ void dump_compare_results_cj4(nbnxn_cj4_t* results, int cnt, char* out_file, cha
     if (pf)
     {
         char c;
-        int diff = 0;
+        int  diff = 0;
         printf("\n%s file found. Comparing results...", ref_file);
 
         /* Skip the first line */
         c = 0;
-        while (c != '\n') fscanf(pf, "%c", &c);
+        while (c != '\n')
+        {
+            fscanf(pf, "%c", &c);
+        }
 
         for (int index = 0; index < cnt; index++)
         {
@@ -623,7 +630,7 @@ void dump_compare_results_cj4(nbnxn_cj4_t* results, int cnt, char* out_file, cha
                 if (ref_val != results[index].cj[j])
                 {
                     printf("\nDifference for cj[%d] at index %d computed value = %d reference value = %d",
-                        j, index, results[index].cj[j], ref_val);
+                           j, index, results[index].cj[j], ref_val);
 
                     diff++;
                 }
@@ -635,7 +642,7 @@ void dump_compare_results_cj4(nbnxn_cj4_t* results, int cnt, char* out_file, cha
                 if (ref_val != results[index].imei[j].excl_ind)
                 {
                     printf("\nDifference for imei[%d].excl_ind at index %d computed value = %d reference value = %d",
-                        j, index, results[index].imei[j].excl_ind, ref_val);
+                           j, index, results[index].imei[j].excl_ind, ref_val);
 
                     diff++;
                 }
@@ -644,7 +651,7 @@ void dump_compare_results_cj4(nbnxn_cj4_t* results, int cnt, char* out_file, cha
                 if (ref_val != results[index].imei[j].imask)
                 {
                     printf("\nDifference for imei[%d].imask at index %d computed value = %u reference value = %u",
-                        j, index, results[index].imei[j].imask, ref_val);
+                           j, index, results[index].imei[j].imask, ref_val);
 
                     diff++;
                 }
@@ -656,7 +663,9 @@ void dump_compare_results_cj4(nbnxn_cj4_t* results, int cnt, char* out_file, cha
         fclose(pf);
     }
     else
+    {
         printf("\n%s file not found. No comparison performed.", ref_file);
+    }
 }
 
 void dump_compare_results_f(float* results, int cnt, char* out_file, char* ref_file)
@@ -689,7 +698,7 @@ void dump_compare_results_f(float* results, int cnt, char* out_file, char* ref_f
                 ((ref_val - results[index]) < -cmp_eps))
             {
                 printf("\nDifference at index %d computed value = %15.5f reference value = %15.5f",
-                    index, results[index], ref_val);
+                       index, results[index], ref_val);
 
                 diff++;
             }
@@ -699,7 +708,9 @@ void dump_compare_results_f(float* results, int cnt, char* out_file, char* ref_f
         fclose(pf);
     }
     else
+    {
         printf("\n%s file not found. No comparison performed.", ref_file);
+    }
 }
 
 /*! OpenCL equivalent of nbnxn_cuda_launch_cpyback */
@@ -707,7 +718,7 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t      ocl_nb,
                               const nbnxn_atomdata_t *nbatom,
                               int                     flags,
                               int                     aloc)
-{    
+{
     cl_int      cl_error;
     int         adat_begin, adat_len, adat_end; /* local/nonlocal offset and length used for xq and f */
     int         iloc = -1;
@@ -726,13 +737,13 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t      ocl_nb,
         char stmp[STRLEN];
         sprintf(stmp, "Invalid atom locality passed (%d); valid here is only "
                 "local (%d) or nonlocal (%d)", aloc, eatLocal, eatNonlocal);
-                
+
         gmx_incons(stmp);
     }
 
     cl_atomdata_t   *adat    = ocl_nb->atdat;
     cl_timers_t     *t       = ocl_nb->timers;
-    bool             bDoTime = ocl_nb->bDoTime;    
+    bool             bDoTime = ocl_nb->bDoTime;
     cl_command_queue stream  = ocl_nb->stream[iloc];
 
     bool             bCalcEner   = flags & GMX_FORCE_VIRIAL;
@@ -795,16 +806,16 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t      ocl_nb,
         sync_ocl_event(stream, &(ocl_nb->nonlocal_done));
     }
 
-    /* DtoH f */    
+    /* DtoH f */
     ocl_copy_D2H_async(nbatom->out[0].f + adat_begin * 3, adat->f, adat_begin*3*sizeof(float),
-                      (adat_len)*sizeof(float) * 3, stream, bDoTime ? &(t->nb_d2h_f[iloc]) : NULL);
+                       (adat_len)*sizeof(float) * 3, stream, bDoTime ? &(t->nb_d2h_f[iloc]) : NULL);
 
     /* After the non-local D2H is launched the nonlocal_done event can be
        recorded which signals that the local D2H can proceed. This event is not
        placed after the non-local kernel because we first need the non-local
        data back first. */
     if (iloc == eintNonlocal)
-    {        
+    {
         cl_error = clEnqueueMarker(stream, &(ocl_nb->nonlocal_done));
         assert(CL_SUCCESS == cl_error);
     }
@@ -814,20 +825,20 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t      ocl_nb,
     {
         /* DtoH fshift */
         if (bCalcFshift)
-        {            
-             // TODO: review fshift data type and how its size is computed
+        {
+            // TODO: review fshift data type and how its size is computed
             ocl_copy_D2H_async(ocl_nb->nbst.fshift, adat->fshift, 0,
-                              3 * SHIFTS * sizeof(float), stream, bDoTime ? &(t->nb_d2h_fshift[iloc]) : NULL);
+                               3 * SHIFTS * sizeof(float), stream, bDoTime ? &(t->nb_d2h_fshift[iloc]) : NULL);
         }
 
         /* DtoH energies */
         if (bCalcEner)
-        {            
+        {
             ocl_copy_D2H_async(ocl_nb->nbst.e_lj, adat->e_lj, 0,
-                              sizeof(float), stream, bDoTime ? &(t->nb_d2h_e_lj[iloc]) : NULL);
-            
+                               sizeof(float), stream, bDoTime ? &(t->nb_d2h_e_lj[iloc]) : NULL);
+
             ocl_copy_D2H_async(ocl_nb->nbst.e_el, adat->e_el, 0,
-                              sizeof(float), stream, bDoTime ? &(t->nb_d2h_e_el[iloc]) : NULL);
+                               sizeof(float), stream, bDoTime ? &(t->nb_d2h_e_el[iloc]) : NULL);
         }
     }
 
@@ -840,17 +851,17 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t      ocl_nb,
         if (DEBUG_RUN_STEP == run_step)
         {
             nbnxn_cj4_t *temp_cj4;
-            int cnt;
-            size_t size;
-            char ocl_file_name[256] = {0};
-            char cuda_file_name[256] = {0};
+            int          cnt;
+            size_t       size;
+            char         ocl_file_name[256]  = {0};
+            char         cuda_file_name[256] = {0};
 
-            cnt = ocl_nb->plist[0]->ncj4;
-            size = cnt * sizeof(nbnxn_cj4_t);
+            cnt      = ocl_nb->plist[0]->ncj4;
+            size     = cnt * sizeof(nbnxn_cj4_t);
             temp_cj4 = (nbnxn_cj4_t*)malloc(size);
 
             ocl_copy_D2H_async(temp_cj4, ocl_nb->plist[0]->cj4, 0,
-                size, stream, NULL);
+                               size, stream, NULL);
 
             // Make sure all data has been transfered back from device
             clFinish(stream);
@@ -874,7 +885,7 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t      ocl_nb,
 
         if (DEBUG_RUN_STEP == run_step)
         {
-            char ocl_file_name[256] = {0};
+            char ocl_file_name[256]  = {0};
             char cuda_file_name[256] = {0};
 
             // Make sure all data has been transfered back from device
@@ -884,7 +895,7 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t      ocl_nb,
             sprintf(cuda_file_name, "cuda_f_%d.txt", DEBUG_RUN_STEP);
 
             dump_compare_results_f(nbatom->out[0].f + adat_begin * 3, (adat_len) * 3,
-                ocl_file_name, cuda_file_name);
+                                   ocl_file_name, cuda_file_name);
         }
 
         run_step++;
@@ -899,17 +910,17 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t      ocl_nb,
 
         if (DEBUG_RUN_STEP == run_step)
         {
-            char ocl_file_name[256] = {0};
+            char ocl_file_name[256]  = {0};
             char cuda_file_name[256] = {0};
 
             // Make sure all data has been transfered back from device
             clFinish(stream);
-            
+
             sprintf(ocl_file_name, "ocl_fshift_%d.txt", DEBUG_RUN_STEP);
             sprintf(cuda_file_name, "cuda_fshift_%d.txt", DEBUG_RUN_STEP);
 
             dump_compare_results_f(ocl_nb->nbst.fshift, SHIFTS * 3,
-                ocl_file_name, cuda_file_name);
+                                   ocl_file_name, cuda_file_name);
         }
 
         run_step++;
@@ -944,7 +955,7 @@ void nbnxn_ocl_wait_gpu(nbnxn_opencl_ptr_t ocl_nb,
 {
     /* NOTE:  only implemented for single-precision at this time */
     cl_int                 cl_error;
-    int                    i, adat_end, iloc = -1;	
+    int                    i, adat_end, iloc = -1;
     volatile unsigned int *poll_word;
 
     /* determine interaction locality from atom locality */
@@ -969,8 +980,8 @@ void nbnxn_ocl_wait_gpu(nbnxn_opencl_ptr_t ocl_nb,
     wallclock_gpu_t *timings  = ocl_nb->timings;
     cl_nb_staging    nbst     = ocl_nb->nbst;
 
-	bool             bCalcEner   = flags & GMX_FORCE_VIRIAL;
-	bool             bCalcFshift = flags & GMX_FORCE_VIRIAL;
+    bool             bCalcEner   = flags & GMX_FORCE_VIRIAL;
+    bool             bCalcFshift = flags & GMX_FORCE_VIRIAL;
 
     /* turn energy calculation always on/off (for debugging/testing only) */
     bCalcEner = (bCalcEner || always_ener) && !never_ener;
@@ -1032,7 +1043,7 @@ void nbnxn_ocl_wait_gpu(nbnxn_opencl_ptr_t ocl_nb,
             ocl_event_elapsed_ms(timers->nb_k + iloc);
 
         /* X/q H2D and F D2H timings */
-        timings->nb_h2d_t += ocl_event_elapsed_ms(timers->nb_h2d        + iloc);            
+        timings->nb_h2d_t += ocl_event_elapsed_ms(timers->nb_h2d        + iloc);
         timings->nb_d2h_t += ocl_event_elapsed_ms(timers->nb_d2h_f      + iloc);
         timings->nb_d2h_t += ocl_event_elapsed_ms(timers->nb_d2h_fshift + iloc);
         timings->nb_d2h_t += ocl_event_elapsed_ms(timers->nb_d2h_e_el   + iloc);
@@ -1056,28 +1067,27 @@ void nbnxn_ocl_wait_gpu(nbnxn_opencl_ptr_t ocl_nb,
         }
     }
 
-	/* add up energies and shift forces (only once at local F wait) */
-	if (LOCAL_I(iloc))
-	{
-	    if (bCalcEner)
-	    {
-	        *e_lj += *nbst.e_lj;
-	        *e_el += *nbst.e_el;
-	    }
+    /* add up energies and shift forces (only once at local F wait) */
+    if (LOCAL_I(iloc))
+    {
+        if (bCalcEner)
+        {
+            *e_lj += *nbst.e_lj;
+            *e_el += *nbst.e_el;
+        }
 
-	    if (bCalcFshift)
-	    {
-	        for (i = 0; i < SHIFTS; i++)
-	        {
-	            fshift[i][0] += nbst.fshift[i*3];
-				fshift[i][1] += nbst.fshift[i*3+1];
-	            fshift[i][2] += nbst.fshift[i*3+2 ];
-	        }
-	    }
-	}
+        if (bCalcFshift)
+        {
+            for (i = 0; i < SHIFTS; i++)
+            {
+                fshift[i][0] += nbst.fshift[i*3];
+                fshift[i][1] += nbst.fshift[i*3+1];
+                fshift[i][2] += nbst.fshift[i*3+2 ];
+            }
+        }
+    }
 
-	/* turn off pruning (doesn't matter if this is pair-search step or not) */
-	plist->bDoPrune = false;
+    /* turn off pruning (doesn't matter if this is pair-search step or not) */
+    plist->bDoPrune = false;
 
 }
-

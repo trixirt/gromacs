@@ -66,29 +66,29 @@ struct nbnxn_atomdata_t;
 
 FUNC_QUALIFIER
 void nbnxn_ocl_convert_gmx_to_gpu_flavors(
-    const int gmx_eeltype,
-    const int gmx_vdwtype,
-    const int gmx_vdw_modifier,
-    const int gmx_ljpme_comb_rule,
-    int *gpu_eeltype,
-    int *gpu_vdwtype) FUNC_TERM
+        const int gmx_eeltype,
+        const int gmx_vdwtype,
+        const int gmx_vdw_modifier,
+        const int gmx_ljpme_comb_rule,
+        int      *gpu_eeltype,
+        int      *gpu_vdwtype) FUNC_TERM
 
 /** Initializes the data structures related to OpenCL nonbonded calculations. */
 FUNC_QUALIFIER
 void nbnxn_ocl_init(FILE gmx_unused                  *fplog,
-                     nbnxn_opencl_ptr_t gmx_unused   *p_ocl_nb,
-                     const gmx_gpu_info_t gmx_unused *gpu_info,
-                     const gmx_gpu_opt_t gmx_unused  *gpu_opt,
-                     int gmx_unused                   my_gpu_index,
-                     /* true of both local and non-local are don on GPU */
-                     gmx_bool gmx_unused              bLocalAndNonlocal) FUNC_TERM
+                    nbnxn_opencl_ptr_t gmx_unused    *p_ocl_nb,
+                    const gmx_gpu_info_t gmx_unused  *gpu_info,
+                    const gmx_gpu_opt_t gmx_unused   *gpu_opt,
+                    int gmx_unused                    my_gpu_index,
+                    /* true of both local and non-local are don on GPU */
+                    gmx_bool gmx_unused               bLocalAndNonlocal) FUNC_TERM
 
 /** Initializes simulation constant data. */
 FUNC_QUALIFIER
 void nbnxn_ocl_init_const(nbnxn_opencl_ptr_t             gmx_unused         ocl_nb,
                           const interaction_const_t      gmx_unused        *ic,
                           const struct nonbonded_verlet_group_t gmx_unused *nbv_group) FUNC_TERM
-                           
+
 /** Initializes pair-list data for GPU, called at every pair search step. */
 FUNC_QUALIFIER
 void nbnxn_ocl_init_pairlist(nbnxn_opencl_ptr_t       gmx_unused       ocl_nb,

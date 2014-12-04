@@ -55,9 +55,9 @@
 #define FUNC_TERM_SIZE_T_OPENCL ;
 #define FUNC_TERM_VOID ;
 #define FUNC_QUALIFIER
-#define FUNC_TERM_INT_OPENCL {return -1;}
+#define FUNC_TERM_INT_OPENCL {return -1; }
 #define FUNC_TERM_VOID_OPENCL {}
-#define FUNC_TERM_PTR_OPENCL { return NULL;}
+#define FUNC_TERM_PTR_OPENCL { return NULL; }
 #define FUNC_QUALIFIER_OPENCL static
 typedef int ocl_gpu_id_t;
 typedef int ocl_vendor_id_t;
@@ -70,16 +70,16 @@ typedef int ocl_vendor_id_t;
 #define FUNC_TERM_INT_OPENCL ;
 #define FUNC_TERM_VOID_OPENCL ;
 #define FUNC_TERM_PTR_OPENCL ;
-#define FUNC_QUALIFIER_OPENCL 
+#define FUNC_QUALIFIER_OPENCL
 #else
 #define FUNC_TERM_INT {return -1; }
 #define FUNC_TERM_SIZE_T {return 0; }
 #define FUNC_TERM_SIZE_T_OPENCL {return 0; }
 #define FUNC_TERM_VOID {}
 #define FUNC_QUALIFIER static
-#define FUNC_TERM_INT_OPENCL {return -1;}
+#define FUNC_TERM_INT_OPENCL {return -1; }
 #define FUNC_TERM_VOID_OPENCL {}
-#define FUNC_TERM_PTR_OPENCL { return NULL;}
+#define FUNC_TERM_PTR_OPENCL { return NULL; }
 #define FUNC_QUALIFIER_OPENCL static
 typedef int ocl_gpu_id_t;
 typedef int ocl_vendor_id_t;
@@ -97,11 +97,11 @@ int detect_ocl_gpus(gmx_gpu_info_t gmx_unused *gpu_info, char gmx_unused *err_st
 
 FUNC_QUALIFIER
 void pick_compatible_cuda_gpus(const gmx_gpu_info_t gmx_unused *gpu_info,
-                          gmx_gpu_opt_t gmx_unused        *gpu_opt) FUNC_TERM_VOID
+                               gmx_gpu_opt_t gmx_unused        *gpu_opt) FUNC_TERM_VOID
 
 FUNC_QUALIFIER_OPENCL
 void pick_compatible_ocl_gpus(const gmx_gpu_info_t gmx_unused *gpu_info,
-                          gmx_gpu_opt_t gmx_unused        *gpu_opt) FUNC_TERM_VOID_OPENCL
+                              gmx_gpu_opt_t gmx_unused        *gpu_opt) FUNC_TERM_VOID_OPENCL
 
 FUNC_QUALIFIER
 gmx_bool check_selected_cuda_gpus(int gmx_unused                  *checkres,
@@ -110,8 +110,8 @@ gmx_bool check_selected_cuda_gpus(int gmx_unused                  *checkres,
 
 FUNC_QUALIFIER_OPENCL
 gmx_bool check_selected_ocl_gpus(int gmx_unused                  *checkres,
-                                  const gmx_gpu_info_t gmx_unused *gpu_info,
-                                  gmx_gpu_opt_t gmx_unused        *gpu_opt) FUNC_TERM_INT_OPENCL
+                                 const gmx_gpu_info_t gmx_unused *gpu_info,
+                                 gmx_gpu_opt_t gmx_unused        *gpu_opt) FUNC_TERM_INT_OPENCL
 
 FUNC_QUALIFIER
 void free_cuda_gpu_info(const gmx_gpu_info_t gmx_unused *gpu_info) FUNC_TERM_VOID
@@ -121,19 +121,19 @@ void free_ocl_gpu_info(const gmx_gpu_info_t gmx_unused *gpu_info) FUNC_TERM_VOID
 
 FUNC_QUALIFIER
 gmx_bool init_cuda_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
-                  const gmx_gpu_info_t gmx_unused *gpu_info,
-                  const gmx_gpu_opt_t gmx_unused *gpu_opt) FUNC_TERM_INT
+                       const gmx_gpu_info_t gmx_unused *gpu_info,
+                       const gmx_gpu_opt_t gmx_unused *gpu_opt) FUNC_TERM_INT
 
 FUNC_QUALIFIER_OPENCL
 gmx_bool init_ocl_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
-                  const gmx_gpu_info_t gmx_unused *gpu_info,
-                  const gmx_gpu_opt_t gmx_unused *gpu_opt,
-                  const int gmx_unused eeltype,
-                  const int gmx_unused vdwtype,
-                  const int gmx_unused vdw_modifier,
-                  const int gmx_unused ljpme_comb_rule,
-                  const gmx_bool gmx_unused bOclDoFastGen
-                     ) FUNC_TERM_INT_OPENCL
+                      const gmx_gpu_info_t gmx_unused *gpu_info,
+                      const gmx_gpu_opt_t gmx_unused *gpu_opt,
+                      const int gmx_unused eeltype,
+                      const int gmx_unused vdwtype,
+                      const int gmx_unused vdw_modifier,
+                      const int gmx_unused ljpme_comb_rule,
+                      const gmx_bool gmx_unused bOclDoFastGen
+                      ) FUNC_TERM_INT_OPENCL
 
 FUNC_QUALIFIER
 gmx_bool free_gpu(char gmx_unused *result_str) FUNC_TERM_INT
@@ -144,17 +144,17 @@ int get_current_gpu_device_id(void) FUNC_TERM_INT
 
 FUNC_QUALIFIER
 int get_cuda_gpu_device_id(const gmx_gpu_info_t gmx_unused *gpu_info,
-                      const gmx_gpu_opt_t gmx_unused  *gpu_opt,
-                      int gmx_unused                   index) FUNC_TERM_INT
+                           const gmx_gpu_opt_t gmx_unused  *gpu_opt,
+                           int gmx_unused                   index) FUNC_TERM_INT
 
 FUNC_QUALIFIER_OPENCL
 ocl_gpu_id_t get_ocl_gpu_device_id(const gmx_gpu_info_t gmx_unused *gpu_info,
-                      const gmx_gpu_opt_t gmx_unused  *gpu_opt,
-                      int gmx_unused                   index) FUNC_TERM_INT_OPENCL
+                                   const gmx_gpu_opt_t gmx_unused  *gpu_opt,
+                                   int gmx_unused                   index) FUNC_TERM_INT_OPENCL
 FUNC_QUALIFIER_OPENCL
 char* get_ocl_gpu_device_name(const gmx_gpu_info_t *gpu_info,
-                      const gmx_gpu_opt_t  *gpu_opt,
-                      int                   idx) FUNC_TERM_PTR_OPENCL
+                              const gmx_gpu_opt_t  *gpu_opt,
+                              int                   idx) FUNC_TERM_PTR_OPENCL
 
 FUNC_QUALIFIER
 void get_cuda_gpu_device_info_string(char gmx_unused *s, const gmx_gpu_info_t gmx_unused *gpu_info, int gmx_unused index) FUNC_TERM_VOID

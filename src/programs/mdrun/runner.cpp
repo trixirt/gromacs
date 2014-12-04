@@ -381,11 +381,11 @@ static int get_nthreads_mpi(const gmx_hw_info_t *hwinfo,
 #else
                   hwinfo->gpu_info.ncuda_dev_compatible > 0
 #endif
-				  );
+                  );
     if (bCanUseGPU)
     {
 #ifdef GMX_USE_OPENCL
-		ngpu = hwinfo->gpu_info.nocl_dev_compatible;
+        ngpu = hwinfo->gpu_info.nocl_dev_compatible;
 #else
         ngpu = hwinfo->gpu_info.ncuda_dev_compatible;
 #endif
@@ -963,19 +963,19 @@ static void check_and_update_hw_opt_1(gmx_hw_opt_t *hw_opt,
 #ifdef GMX_THREAD_MPI
     if (
 #ifdef GMX_USE_OPENCL
-		hw_opt->gpu_opt.nocl_dev_use > 0
+        hw_opt->gpu_opt.nocl_dev_use > 0
 #else
-		hw_opt->gpu_opt.ncuda_dev_use > 0
+        hw_opt->gpu_opt.ncuda_dev_use > 0
 #endif
-		&&
-		hw_opt->nthreads_tmpi == 0)
+        &&
+        hw_opt->nthreads_tmpi == 0)
     {
         /* Set the number of MPI threads equal to the number of GPUs */
-        hw_opt->nthreads_tmpi = 
+        hw_opt->nthreads_tmpi =
 #ifdef GMX_USE_OPENCL
-			hw_opt->gpu_opt.nocl_dev_use;
+            hw_opt->gpu_opt.nocl_dev_use;
 #else
-			hw_opt->gpu_opt.ncuda_dev_use;
+            hw_opt->gpu_opt.ncuda_dev_use;
 #endif
 
         if (hw_opt->nthreads_tot > 0 &&
@@ -1139,7 +1139,7 @@ int mdrunner(gmx_hw_opt_t *hw_opt,
 #else
             bUseGPU = (hwinfo->gpu_info.ncuda_dev_compatible > 0 ||
                        getenv("GMX_EMULATE_GPU") != NULL);
-#endif           
+#endif
 
             /* TODO add GPU kernels for this and replace this check by:
              * (bUseGPU && (ir->vdwtype == evdwPME &&
@@ -1169,7 +1169,7 @@ int mdrunner(gmx_hw_opt_t *hw_opt,
             }
 
 #ifdef GMX_USE_OPENCL
-			if (hwinfo->gpu_info.nocl_dev_compatible > 0)
+            if (hwinfo->gpu_info.nocl_dev_compatible > 0)
 #else
             if (hwinfo->gpu_info.ncuda_dev_compatible > 0)
 #endif
@@ -1527,7 +1527,7 @@ int mdrunner(gmx_hw_opt_t *hw_opt,
     {
         /* Ignore (potentially) manually selected GPUs */
 #ifdef GMX_USE_OPENCL
-		hw_opt->gpu_opt.nocl_dev_use = 0;
+        hw_opt->gpu_opt.nocl_dev_use = 0;
 #else
         hw_opt->gpu_opt.ncuda_dev_use = 0;
 #endif

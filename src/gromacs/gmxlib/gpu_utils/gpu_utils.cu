@@ -184,8 +184,8 @@ static int do_sanity_checks(int dev_id, cudaDeviceProp *dev_prop)
  * \returns                 true if no error occurs during initialization.
  */
 gmx_bool init_cuda_gpu(int mygpu, char *result_str,
-                  const gmx_gpu_info_t *gpu_info,
-                  const gmx_gpu_opt_t *gpu_opt)
+                       const gmx_gpu_info_t *gpu_info,
+                       const gmx_gpu_opt_t *gpu_opt)
 {
     cudaError_t stat;
     char        sbuf[STRLEN];
@@ -399,7 +399,7 @@ int detect_cuda_gpus(gmx_gpu_info_t *gpu_info, char *err_str)
  * \param[in,out] gpu_opt     pointer to structure holding GPU options
  */
 void pick_compatible_cuda_gpus(const gmx_gpu_info_t *gpu_info,
-                          gmx_gpu_opt_t        *gpu_opt)
+                               gmx_gpu_opt_t        *gpu_opt)
 {
     int  i, ncompat;
     int *compat;
@@ -543,8 +543,8 @@ void get_cuda_gpu_device_info_string(char *s, const gmx_gpu_info_t *gpu_info, in
  * \returns                 device ID of the requested GPU
  */
 int get_cuda_gpu_device_id(const gmx_gpu_info_t *gpu_info,
-                      const gmx_gpu_opt_t  *gpu_opt,
-                      int                   idx)
+                           const gmx_gpu_opt_t  *gpu_opt,
+                           int                   idx)
 {
     assert(gpu_info);
     assert(gpu_opt);

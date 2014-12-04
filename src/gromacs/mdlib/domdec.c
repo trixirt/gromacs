@@ -5657,7 +5657,7 @@ void dd_setup_dlb_resource_sharing(t_commrec           gmx_unused *cr,
 
     if (!(cr->duty & DUTY_PP) ||
 #ifdef GMX_USE_OPENCL
-		hw_opt->gpu_opt.nocl_dev_use == 0)
+        hw_opt->gpu_opt.nocl_dev_use == 0)
 #else
         hw_opt->gpu_opt.ncuda_dev_use == 0)
 #endif
