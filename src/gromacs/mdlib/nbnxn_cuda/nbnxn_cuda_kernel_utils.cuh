@@ -616,7 +616,9 @@ __device__
 void print_to_debug_buffer_f(float* debug_buffer, float value)
 {
     if (debug_buffer)
+    {
         debug_buffer[(blockIdx.y * blockDim.y + threadIdx.y) * gridDim.x * blockDim.x + blockIdx.x * blockDim.x + threadIdx.x] = value;
+    }
 }
 
 #endif /* NBNXN_CUDA_KERNEL_UTILS_CUH */

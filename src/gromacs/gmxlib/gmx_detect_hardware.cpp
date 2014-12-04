@@ -108,11 +108,11 @@ static void sprint_gpus(char *sbuf, const gmx_gpu_info_t *gpu_info)
     sbuf[0] = '\0';
     for (i = 0; i < ndev; i++)
     {
-#if defined(GMX_GPU) && defined(GMX_USE_OPENCL)        
-        get_ocl_gpu_device_info_string(stmp, gpu_info, i);  
+#if defined(GMX_GPU) && defined(GMX_USE_OPENCL)
+        get_ocl_gpu_device_info_string(stmp, gpu_info, i);
 #else
-        get_cuda_gpu_device_info_string(stmp, gpu_info, i);  
-#endif        
+        get_cuda_gpu_device_info_string(stmp, gpu_info, i);
+#endif
         strcat(sbuf, "  ");
         strcat(sbuf, stmp);
         if (i < ndev - 1)
@@ -219,7 +219,7 @@ makeGpuUsageReport(const gmx_gpu_info_t *gpu_info,
 #else
     int ngpu_use  = gpu_opt->ncuda_dev_use;
     int ngpu_comp = gpu_info->ncuda_dev_compatible;
-#endif    
+#endif
 
     /* Issue a note if GPUs are available but not used */
     if (ngpu_comp > 0 && ngpu_use < 1)
@@ -232,16 +232,16 @@ makeGpuUsageReport(const gmx_gpu_info_t *gpu_info,
     std::string output;
 
     {
-        
+
 #if defined(GMX_GPU) && defined(GMX_USE_OPENCL)
         std::vector<char*> gpuNamesInUse;
 #else
-        std::vector<int> gpuIdsInUse;
+        std::vector<int>   gpuIdsInUse;
 #endif
         for (int i = 0; i < ngpu_use; i++)
         {
 #if defined(GMX_GPU) && defined(GMX_USE_OPENCL)
-            gpuNamesInUse.push_back(get_ocl_gpu_device_name(gpu_info, gpu_opt, i));           
+            gpuNamesInUse.push_back(get_ocl_gpu_device_name(gpu_info, gpu_opt, i));
 #else
             gpuIdsInUse.push_back(get_cuda_gpu_device_id(gpu_info, gpu_opt, i));
 #endif
@@ -416,13 +416,13 @@ void gmx_check_hw_runconf_consistency(FILE                *fplog,
         int  ngpu_comp, ngpu_use;
         char gpu_comp_plural[2], gpu_use_plural[2];
 
-        ngpu_comp = 
+        ngpu_comp =
 #ifdef GMX_USE_OPENCL
             hwinfo->gpu_info.nocl_dev_compatible;
 #else
             hwinfo->gpu_info.ncuda_dev_compatible;
 #endif
-        ngpu_use  = 
+        ngpu_use  =
 #ifdef GMX_USE_OPENCL
             hw_opt->gpu_opt.nocl_dev_use;
 #else
@@ -543,7 +543,7 @@ void gmx_check_hw_runconf_consistency(FILE                *fplog,
 int gmx_count_gpu_dev_shared(const gmx_gpu_opt_t *gpu_opt)
 {
     int      same_count    = 0;
-    int      ngpu =
+    int      ngpu          =
 #ifdef GMX_USE_OPENCL
         gpu_opt->nocl_dev_use;
 #else
@@ -558,13 +558,13 @@ int gmx_count_gpu_dev_shared(const gmx_gpu_opt_t *gpu_opt)
         {
             for (j = i + 1; j < ngpu; j++)
             {
-                same_count      += 
+                same_count      +=
 #ifdef GMX_USE_OPENCL
-                                    (gpu_opt->ocl_dev_use[i] ==
-                                    gpu_opt->ocl_dev_use[j]);
+                    (gpu_opt->ocl_dev_use[i] ==
+                     gpu_opt->ocl_dev_use[j]);
 #else
-                                    (gpu_opt->cuda_dev_use[i] ==
-                                    gpu_opt->cuda_dev_use[j]);
+                    (gpu_opt->cuda_dev_use[i] ==
+                     gpu_opt->cuda_dev_use[j]);
 #endif
             }
         }
@@ -715,7 +715,7 @@ static void gmx_detect_gpus(FILE *fplog, const t_commrec *cr)
     {
         char detection_error[STRLEN] = "", sbuf[STRLEN];
 
-        int detect_gpu_ret;
+        int  detect_gpu_ret;
 
 #ifdef GMX_USE_OPENCL
         detect_gpu_ret = detect_ocl_gpus(&hwinfo_g->gpu_info, detection_error);
@@ -817,8 +817,8 @@ gmx_hw_info_t *gmx_detect_hardware(FILE *fplog, const t_commrec *cr,
         hwinfo_g->gpu_info.cuda_dev             = NULL;
         hwinfo_g->gpu_info.ncuda_dev_compatible = 0;
 #ifdef GMX_USE_OPENCL
-        hwinfo_g->gpu_info.nocl_dev         = 0;
-        hwinfo_g->gpu_info.ocl_dev          = NULL;
+        hwinfo_g->gpu_info.nocl_dev            = 0;
+        hwinfo_g->gpu_info.ocl_dev             = NULL;
         hwinfo_g->gpu_info.nocl_dev_compatible = 0;
 #endif
 
@@ -880,7 +880,7 @@ void gmx_parse_gpu_ids(gmx_gpu_opt_t *gpu_opt)
                                        &gpu_opt->ncuda_dev_use,
                                        &gpu_opt->cuda_dev_use);
         if (gpu_opt->ncuda_dev_use == 0)
-#endif        
+#endif
         {
             gmx_fatal(FARGS, "Empty GPU ID string encountered.\n%s\n",
                       invalid_gpuid_hint);

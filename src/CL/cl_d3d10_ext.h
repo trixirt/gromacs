@@ -70,53 +70,52 @@ typedef cl_uint cl_d3d10_device_set_nv;
 /******************************************************************************/
 
 typedef CL_API_ENTRY cl_int (CL_API_CALL *clGetDeviceIDsFromD3D10NV_fn)(
-    cl_platform_id            platform,
-    cl_d3d10_device_source_nv d3d_device_source,
-    void *                    d3d_object,
-    cl_d3d10_device_set_nv    d3d_device_set,
-    cl_uint                   num_entries, 
-    cl_device_id *            devices, 
-    cl_uint *                 num_devices) CL_API_SUFFIX__VERSION_1_0;
+        cl_platform_id            platform,
+        cl_d3d10_device_source_nv d3d_device_source,
+        void *                    d3d_object,
+        cl_d3d10_device_set_nv    d3d_device_set,
+        cl_uint                   num_entries,
+        cl_device_id *            devices,
+        cl_uint *                 num_devices) CL_API_SUFFIX__VERSION_1_0;
 
 typedef CL_API_ENTRY cl_mem (CL_API_CALL *clCreateFromD3D10BufferNV_fn)(
-    cl_context     context,
-    cl_mem_flags   flags,
-    ID3D10Buffer * resource,
-    cl_int *       errcode_ret) CL_API_SUFFIX__VERSION_1_0;
+        cl_context     context,
+        cl_mem_flags   flags,
+        ID3D10Buffer * resource,
+        cl_int *       errcode_ret) CL_API_SUFFIX__VERSION_1_0;
 
 typedef CL_API_ENTRY cl_mem (CL_API_CALL *clCreateFromD3D10Texture2DNV_fn)(
-    cl_context        context,
-    cl_mem_flags      flags,
-    ID3D10Texture2D * resource,
-    UINT              subresource,
-    cl_int *          errcode_ret) CL_API_SUFFIX__VERSION_1_0;
+        cl_context        context,
+        cl_mem_flags      flags,
+        ID3D10Texture2D * resource,
+        UINT              subresource,
+        cl_int *          errcode_ret) CL_API_SUFFIX__VERSION_1_0;
 
 typedef CL_API_ENTRY cl_mem (CL_API_CALL *clCreateFromD3D10Texture3DNV_fn)(
-    cl_context        context,
-    cl_mem_flags      flags,
-    ID3D10Texture3D * resource,
-    UINT              subresource,
-    cl_int *          errcode_ret) CL_API_SUFFIX__VERSION_1_0;
+        cl_context        context,
+        cl_mem_flags      flags,
+        ID3D10Texture3D * resource,
+        UINT              subresource,
+        cl_int *          errcode_ret) CL_API_SUFFIX__VERSION_1_0;
 
 typedef CL_API_ENTRY cl_int (CL_API_CALL *clEnqueueAcquireD3D10ObjectsNV_fn)(
-    cl_command_queue command_queue,
-    cl_uint          num_objects,
-    const cl_mem *   mem_objects,
-    cl_uint          num_events_in_wait_list,
-    const cl_event * event_wait_list,
-    cl_event *       event) CL_API_SUFFIX__VERSION_1_0;
+        cl_command_queue command_queue,
+        cl_uint          num_objects,
+        const cl_mem *   mem_objects,
+        cl_uint          num_events_in_wait_list,
+        const cl_event * event_wait_list,
+        cl_event *       event) CL_API_SUFFIX__VERSION_1_0;
 
 typedef CL_API_ENTRY cl_int (CL_API_CALL *clEnqueueReleaseD3D10ObjectsNV_fn)(
-    cl_command_queue command_queue,
-    cl_uint          num_objects,
-    cl_mem *         mem_objects,
-    cl_uint          num_events_in_wait_list,
-    const cl_event * event_wait_list,
-    cl_event *       event) CL_API_SUFFIX__VERSION_1_0;
+        cl_command_queue command_queue,
+        cl_uint          num_objects,
+        cl_mem *         mem_objects,
+        cl_uint          num_events_in_wait_list,
+        const cl_event * event_wait_list,
+        cl_event *       event) CL_API_SUFFIX__VERSION_1_0;
 
 #ifdef __cplusplus
 }
 #endif
 
 #endif  // __OPENCL_CL_D3D10_H
-

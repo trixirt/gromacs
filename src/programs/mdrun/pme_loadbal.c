@@ -448,7 +448,7 @@ gmx_bool pme_load_balance(pme_load_balancing_t        pme_lb,
     char         buf[STRLEN], sbuf[22];
     real         rtab;
     gmx_bool     bUsesSimpleTables = TRUE;
-   
+
     if (pme_lb->stage == pme_lb->nstage)
     {
         return FALSE;

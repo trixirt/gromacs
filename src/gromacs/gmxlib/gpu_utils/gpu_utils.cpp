@@ -54,16 +54,16 @@
 
 #include "ocl_compiler.hpp"
 
-#define CALLOCLFUNC_LOGERROR(func, err_str, retval) {\
-    cl_int opencl_ret = func;\
-    if (CL_SUCCESS != opencl_ret)\
-    {\
-        sprintf(err_str, "OpenCL error %d", opencl_ret);\
-        retval = -1;\
-    }\
-    else\
-        retval = 0;\
-    }
+#define CALLOCLFUNC_LOGERROR(func, err_str, retval) { \
+        cl_int opencl_ret = func; \
+        if (CL_SUCCESS != opencl_ret) \
+        { \
+            sprintf(err_str, "OpenCL error %d", opencl_ret); \
+            retval = -1; \
+        } \
+        else{ \
+            retval = 0; } \
+}
 
 
 /*! \brief Helper function that checks whether a given GPU status indicates compatible GPU.
@@ -83,17 +83,19 @@ static bool is_compatible_ocl_gpu(int stat)
  */
 static int is_gmx_supported_ocl_gpu_id(ocl_gpu_info_ptr_t ocl_gpu_device)
 {
-	/* Only AMD and NVIDIA GPUs are supported for now */
-	if ((_OCL_VENDOR_NVIDIA_ == ocl_gpu_device->vendor_e) ||
-		(_OCL_VENDOR_AMD_ == ocl_gpu_device->vendor_e))
-		return egpuCompatible;
+    /* Only AMD and NVIDIA GPUs are supported for now */
+    if ((_OCL_VENDOR_NVIDIA_ == ocl_gpu_device->vendor_e) ||
+        (_OCL_VENDOR_AMD_ == ocl_gpu_device->vendor_e))
+    {
+        return egpuCompatible;
+    }
 
-	return egpuIncompatible;
+    return egpuIncompatible;
 }
 
 /*! \brief Returns an ocl_vendor_id_t value corresponding to the input OpenCL vendor name.
  *
- *  \param[in] vendor_name String with OpenCL vendor name. 
+ *  \param[in] vendor_name String with OpenCL vendor name.
  *  \returns               ocl_vendor_id_t value for the input vendor_name
  */
 ocl_vendor_id_t get_vendor_id(char *vendor_name)
@@ -101,14 +103,20 @@ ocl_vendor_id_t get_vendor_id(char *vendor_name)
     if (vendor_name)
     {
         if (strstr(vendor_name, "NVIDIA"))
+        {
             return _OCL_VENDOR_NVIDIA_;
+        }
         else
-            if (strstr(vendor_name, "AMD") ||
-                strstr(vendor_name, "Advanced Micro Devices"))
-                return _OCL_VENDOR_AMD_;
-            else
-                if (strstr(vendor_name, "Intel"))
-                    return _OCL_VENDOR_INTEL_;
+        if (strstr(vendor_name, "AMD") ||
+            strstr(vendor_name, "Advanced Micro Devices"))
+        {
+            return _OCL_VENDOR_AMD_;
+        }
+        else
+        if (strstr(vendor_name, "Intel"))
+        {
+            return _OCL_VENDOR_INTEL_;
+        }
     }
     return _OCL_VENDOR_UNKNOWN_;
 }
@@ -129,31 +137,39 @@ ocl_vendor_id_t get_vendor_id(char *vendor_name)
  */
 int detect_ocl_gpus(gmx_gpu_info_t *gpu_info, char *err_str)
 {
-    int retval;
-    cl_uint ocl_platform_count;
+    int             retval;
+    cl_uint         ocl_platform_count;
     cl_platform_id *ocl_platform_ids;
-    cl_device_type req_dev_type = CL_DEVICE_TYPE_GPU;
+    cl_device_type  req_dev_type = CL_DEVICE_TYPE_GPU;
 
-    retval = 0;
+    retval           = 0;
     ocl_platform_ids = NULL;
 
-    if(getenv("GMX_OCL_FORCE_CPU")!=NULL)
+    if (getenv("GMX_OCL_FORCE_CPU") != NULL)
+    {
         req_dev_type = CL_DEVICE_TYPE_CPU;
+    }
 
     while (1)
     {
         CALLOCLFUNC_LOGERROR(clGetPlatformIDs(0, NULL, &ocl_platform_count), err_str, retval)
         if (0 != retval)
+        {
             break;
+        }
 
         if (1 > ocl_platform_count)
+        {
             break;
+        }
 
         snew(ocl_platform_ids, ocl_platform_count);
 
         CALLOCLFUNC_LOGERROR(clGetPlatformIDs(ocl_platform_count, ocl_platform_ids, NULL), err_str, retval)
         if (0 != retval)
+        {
             break;
+        }
 
         for (unsigned int i = 0; i < ocl_platform_count; i++)
         {
@@ -161,19 +177,25 @@ int detect_ocl_gpus(gmx_gpu_info_t *gpu_info, char *err_str)
 
             CALLOCLFUNC_LOGERROR(clGetDeviceIDs(ocl_platform_ids[i], req_dev_type, 0, NULL, &ocl_device_count), err_str, retval)
             if (0 != retval)
+            {
                 continue;
+            }
 
             if (1 <= ocl_device_count)
+            {
                 gpu_info->nocl_dev += ocl_device_count;
+            }
         }
 
         if (1 > gpu_info->nocl_dev)
+        {
             break;
+        }
 
         snew(gpu_info->ocl_dev, gpu_info->nocl_dev);
 
         {
-            int device_index;
+            int           device_index;
             cl_device_id *ocl_device_ids;
 
             snew(ocl_device_ids, gpu_info->nocl_dev);
@@ -185,15 +207,19 @@ int detect_ocl_gpus(gmx_gpu_info_t *gpu_info, char *err_str)
 
                 CALLOCLFUNC_LOGERROR(clGetDeviceIDs(ocl_platform_ids[i], req_dev_type, gpu_info->nocl_dev, ocl_device_ids, &ocl_device_count), err_str, retval)
                 if (0 != retval)
+                {
                     continue;
+                }
 
                 if (1 > ocl_device_count)
+                {
                     break;
+                }
 
                 for (unsigned int j = 0; j < ocl_device_count; j++)
                 {
                     gpu_info->ocl_dev[device_index].ocl_gpu_id.ocl_platform_id = ocl_platform_ids[i];
-                    gpu_info->ocl_dev[device_index].ocl_gpu_id.ocl_device_id = ocl_device_ids[j];
+                    gpu_info->ocl_dev[device_index].ocl_gpu_id.ocl_device_id   = ocl_device_ids[j];
 
                     gpu_info->ocl_dev[device_index].device_name[0] = 0;
                     clGetDeviceInfo(ocl_device_ids[j], CL_DEVICE_NAME, sizeof(gpu_info->ocl_dev[device_index].device_name), gpu_info->ocl_dev[device_index].device_name, NULL);
@@ -207,12 +233,14 @@ int detect_ocl_gpus(gmx_gpu_info_t *gpu_info, char *err_str)
                     gpu_info->ocl_dev[device_index].compute_units = 0;
                     clGetDeviceInfo(ocl_device_ids[j], CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(gpu_info->ocl_dev[device_index].compute_units), &(gpu_info->ocl_dev[device_index].compute_units), NULL);
 
-					gpu_info->ocl_dev[device_index].vendor_e = get_vendor_id(gpu_info->ocl_dev[device_index].device_vendor);
+                    gpu_info->ocl_dev[device_index].vendor_e = get_vendor_id(gpu_info->ocl_dev[device_index].device_vendor);
 
-					gpu_info->ocl_dev[device_index].stat = is_gmx_supported_ocl_gpu_id(gpu_info->ocl_dev + device_index);
+                    gpu_info->ocl_dev[device_index].stat = is_gmx_supported_ocl_gpu_id(gpu_info->ocl_dev + device_index);
 
                     if (egpuCompatible == gpu_info->ocl_dev[device_index].stat)
-                        gpu_info->nocl_dev_compatible++;                    
+                    {
+                        gpu_info->nocl_dev_compatible++;
+                    }
 
                     device_index++;
                 }
@@ -221,33 +249,43 @@ int detect_ocl_gpus(gmx_gpu_info_t *gpu_info, char *err_str)
             gpu_info->nocl_dev = device_index;
 
             /* Dummy sort of devices -  AMD first, then NVIDIA, then Intel */
-            // TODO: Sort devices based on performance.            
+            // TODO: Sort devices based on performance.
             if (0 < gpu_info->nocl_dev)
             {
                 int last = -1;
                 for (int i = 0; i < gpu_info->nocl_dev; i++)
+                {
                     if (_OCL_VENDOR_AMD_ == gpu_info->ocl_dev[i].vendor_e)
+                    {
                         if ((last + 1) < i)
                         {
                             ocl_gpu_info_t ocl_gpu_info;
                             ocl_gpu_info = gpu_info->ocl_dev[i];
                             last++;
-                            gpu_info->ocl_dev[i] = gpu_info->ocl_dev[last];
+                            gpu_info->ocl_dev[i]    = gpu_info->ocl_dev[last];
                             gpu_info->ocl_dev[last] = ocl_gpu_info;
                         }
+                    }
+                }
 
                 /* if more than 1 device left to be sorted */
                 if ((gpu_info->nocl_dev - 1 - last) > 1)
+                {
                     for (int i = 0; i < gpu_info->nocl_dev; i++)
+                    {
                         if (_OCL_VENDOR_NVIDIA_ == gpu_info->ocl_dev[i].vendor_e)
+                        {
                             if ((last + 1) < i)
                             {
                                 ocl_gpu_info_t ocl_gpu_info;
                                 ocl_gpu_info = gpu_info->ocl_dev[i];
                                 last++;
-                                gpu_info->ocl_dev[i] = gpu_info->ocl_dev[last];
+                                gpu_info->ocl_dev[i]    = gpu_info->ocl_dev[last];
                                 gpu_info->ocl_dev[last] = ocl_gpu_info;
                             }
+                        }
+                    }
+                }
             }
 
             sfree(ocl_device_ids);
@@ -267,29 +305,29 @@ int detect_ocl_gpus(gmx_gpu_info_t *gpu_info, char *err_str)
  */
 void free_ocl_gpu_info(const gmx_gpu_info_t gmx_unused *gpu_info)
 {
-	if (gpu_info)
-	{
-		for (int i = 0; i < gpu_info->nocl_dev; i++)
-		{
-			cl_int cl_error;
+    if (gpu_info)
+    {
+        for (int i = 0; i < gpu_info->nocl_dev; i++)
+        {
+            cl_int cl_error;
 
-			if (gpu_info->ocl_dev[i].context)
-			{
-				cl_error = clReleaseContext(gpu_info->ocl_dev[i].context);
-				gpu_info->ocl_dev[i].context = NULL;
-				assert(CL_SUCCESS == cl_error);
-			}
+            if (gpu_info->ocl_dev[i].context)
+            {
+                cl_error                     = clReleaseContext(gpu_info->ocl_dev[i].context);
+                gpu_info->ocl_dev[i].context = NULL;
+                assert(CL_SUCCESS == cl_error);
+            }
 
-			if (gpu_info->ocl_dev[i].program)
-			{
-				cl_error = clReleaseProgram(gpu_info->ocl_dev[i].program);
-				gpu_info->ocl_dev[i].program = NULL;
-				assert(CL_SUCCESS == cl_error);
-			}			
-		}
+            if (gpu_info->ocl_dev[i].program)
+            {
+                cl_error                     = clReleaseProgram(gpu_info->ocl_dev[i].program);
+                gpu_info->ocl_dev[i].program = NULL;
+                assert(CL_SUCCESS == cl_error);
+            }
+        }
 
-		sfree(gpu_info->ocl_dev);		
-	}
+        sfree(gpu_info->ocl_dev);
+    }
 }
 
 /*! \brief Select the OpenCL GPUs compatible with the native GROMACS acceleration.
@@ -402,7 +440,7 @@ void get_ocl_gpu_device_info_string(char gmx_unused *s, const gmx_gpu_info_t gmx
         return;
     }
 
-    ocl_gpu_info_t *dinfo = &gpu_info->ocl_dev[index];
+    ocl_gpu_info_t  *dinfo = &gpu_info->ocl_dev[index];
 
     bool             bGpuExists =
         dinfo->stat == egpuCompatible ||
@@ -441,30 +479,30 @@ void get_ocl_gpu_device_info_string(char gmx_unused *s, const gmx_gpu_info_t gmx
  * the total compilatin time. If false, all OpenCL kernels are compiled.
  * \returns                   true if no error occurs during initialization.
  */
-gmx_bool init_ocl_gpu(int gmx_unused mygpu,
-                      char gmx_unused *result_str,
+gmx_bool init_ocl_gpu(int gmx_unused                   mygpu,
+                      char gmx_unused                 *result_str,
                       const gmx_gpu_info_t gmx_unused *gpu_info,
-                      const gmx_gpu_opt_t gmx_unused *gpu_opt,
-                      const int gmx_unused eeltype,
-                      const int gmx_unused vdwtype,
-                      const int gmx_unused vdw_modifier,
-                      const int gmx_unused ljpme_comb_rule,
-                      const gmx_bool gmx_unused bOclDoFastGen
-                     )
+                      const gmx_gpu_opt_t gmx_unused  *gpu_opt,
+                      const int gmx_unused             eeltype,
+                      const int gmx_unused             vdwtype,
+                      const int gmx_unused             vdw_modifier,
+                      const int gmx_unused             ljpme_comb_rule,
+                      const gmx_bool gmx_unused        bOclDoFastGen
+                      )
 {
     cl_context_properties context_properties[3];
-    ocl_gpu_info_ptr_t selected_ocl_gpu;
-    cl_platform_id platform_id;
-    cl_device_id device_id;
-    cl_context context;
-    cl_program program;
-    cl_int cl_error;
+    ocl_gpu_info_ptr_t    selected_ocl_gpu;
+    cl_platform_id        platform_id;
+    cl_device_id          device_id;
+    cl_context            context;
+    cl_program            program;
+    cl_int                cl_error;
 
-    gmx_algo_family_t   gmx_algo_family;
+    gmx_algo_family_t     gmx_algo_family;
 
-    gmx_algo_family.eeltype = eeltype;
-    gmx_algo_family.vdwtype = vdwtype;
-    gmx_algo_family.vdw_modifier = vdw_modifier;
+    gmx_algo_family.eeltype         = eeltype;
+    gmx_algo_family.vdwtype         = vdwtype;
+    gmx_algo_family.vdw_modifier    = vdw_modifier;
     gmx_algo_family.ljpme_comb_rule = ljpme_comb_rule;
 
     int retval;
@@ -472,7 +510,7 @@ gmx_bool init_ocl_gpu(int gmx_unused mygpu,
     assert(gpu_info);
     assert(result_str);
 
-    retval = -1;
+    retval        = -1;
     result_str[0] = 0;
 
     if (mygpu < 0 || mygpu >= gpu_opt->nocl_dev_use)
@@ -487,8 +525,8 @@ gmx_bool init_ocl_gpu(int gmx_unused mygpu,
     while (1)
     {
         selected_ocl_gpu = gpu_info->ocl_dev + gpu_opt->ocl_dev_use[mygpu];
-        platform_id = selected_ocl_gpu->ocl_gpu_id.ocl_platform_id;
-        device_id = selected_ocl_gpu->ocl_gpu_id.ocl_device_id;
+        platform_id      = selected_ocl_gpu->ocl_gpu_id.ocl_platform_id;
+        device_id        = selected_ocl_gpu->ocl_gpu_id.ocl_device_id;
 
         context_properties[0] = CL_CONTEXT_PLATFORM;
         context_properties[1] = (cl_context_properties)platform_id;
@@ -497,7 +535,9 @@ gmx_bool init_ocl_gpu(int gmx_unused mygpu,
         context = clCreateContext(context_properties, 1, &device_id, NULL, NULL, &cl_error);
         CALLOCLFUNC_LOGERROR(cl_error, result_str, retval)
         if (0 != retval)
+        {
             break;
+        }
 
         cl_error =
             ocl_compile_program(_default_source_,
@@ -509,9 +549,10 @@ gmx_bool init_ocl_gpu(int gmx_unused mygpu,
                                 device_id,
                                 selected_ocl_gpu->vendor_e,
                                 &program
-                               );
-        if(cl_error != CL_SUCCESS) {
-            retval=-1;
+                                );
+        if (cl_error != CL_SUCCESS)
+        {
+            retval = -1;
             break;
         }
 
@@ -572,7 +613,7 @@ char* get_ocl_gpu_device_name(const gmx_gpu_info_t *gpu_info,
     return gpu_info->ocl_dev[gpu_opt->ocl_dev_use[idx]].device_name;
 }
 
-/*! \brief Returns the size of the ocl_gpu_info_t struct. 
+/*! \brief Returns the size of the ocl_gpu_info_t struct.
  * \returns                 size in bytes of ocl_gpu_info_t
  */
 size_t sizeof_ocl_dev_info(void)
@@ -605,10 +646,10 @@ void ocl_pmalloc(void **h_ptr, size_t nbytes)
 
     *h_ptr = calloc(1, nbytes);
 
-    if(! *h_ptr)
+    if (!*h_ptr)
     {
         sprintf(strbuf, "calloc of size %d bytes failed", (int)nbytes);
-        gmx_fatal(FARGS, "%s: %s\n", __FUNCTION__,strbuf);
+        gmx_fatal(FARGS, "%s: %s\n", __FUNCTION__, strbuf);
     }
 }
 
@@ -639,14 +680,16 @@ void ocl_pfree(void *h_ptr)
 cl_int dbg_ocl_kernel_name(const cl_kernel kernel)
 {
     cl_int cl_error = CL_SUCCESS;
-    char kernel_name[256];
+    char   kernel_name[256];
     cl_error = clGetKernelInfo(kernel, CL_KERNEL_FUNCTION_NAME,
-                            sizeof(kernel_name), &kernel_name, NULL);
-    if(cl_error)
+                               sizeof(kernel_name), &kernel_name, NULL);
+    if (cl_error)
     {
         printf("No kernel found!\n");
-    }else{
-        printf("%s\n",kernel_name);
+    }
+    else
+    {
+        printf("%s\n", kernel_name);
     }
     return cl_error;
 }
@@ -659,14 +702,16 @@ cl_int dbg_ocl_kernel_name(const cl_kernel kernel)
 cl_int dbg_ocl_kernel_name_address(void* kernel)
 {
     cl_int cl_error = CL_SUCCESS;
-    char kernel_name[256];
+    char   kernel_name[256];
     cl_error = clGetKernelInfo((cl_kernel)kernel, CL_KERNEL_FUNCTION_NAME,
-                            sizeof(kernel_name), &kernel_name, NULL);
-    if(cl_error)
+                               sizeof(kernel_name), &kernel_name, NULL);
+    if (cl_error)
     {
         printf("No kernel found!\n");
-    }else{
-        printf("%s\n",kernel_name);
+    }
+    else
+    {
+        printf("%s\n", kernel_name);
     }
     return cl_error;
 }

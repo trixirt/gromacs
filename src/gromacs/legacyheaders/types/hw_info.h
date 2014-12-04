@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2012,2013, by the GROMACS development team, led by
+ * Copyright (c) 2012,2013,2014, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -74,10 +74,10 @@ static const char * const gpu_detect_res_str[] =
 /**
  * \brief OpenCL vendor IDs
  */
-typedef enum{
+typedef enum {
     _OCL_VENDOR_NVIDIA_    = 0,
-    _OCL_VENDOR_AMD_          ,
-    _OCL_VENDOR_INTEL_        ,
+    _OCL_VENDOR_AMD_,
+    _OCL_VENDOR_INTEL_,
     _OCL_VENDOR_UNKNOWN_
 } ocl_vendor_id_t;
 
@@ -109,7 +109,7 @@ typedef struct
     int                 stat;
     ocl_vendor_id_t     vendor_e;
 
-    cl_context          context;    
+    cl_context          context;
     cl_program          program;
 
 } ocl_gpu_info_t, *ocl_gpu_info_ptr_t;
@@ -119,15 +119,15 @@ typedef struct
  * The gmx_hardware_detect module initializes it. */
 typedef struct
 {
-	gmx_bool             bDetectGPUs;          /* Did we try to detect GPUs? */
+    gmx_bool             bDetectGPUs;          /* Did we try to detect GPUs? */
     int                  ncuda_dev;            /* total number of CUDA devices detected */
     cuda_dev_info_ptr_t  cuda_dev;             /* CUDA devices detected in the system (per node) */
     int                  ncuda_dev_compatible; /* number of compatible CUDA GPUs */
 
-#ifdef GMX_USE_OPENCL			
-	int                  nocl_dev;             /* total number of OpenCL devices detected */
-	ocl_gpu_info_ptr_t	 ocl_dev;	           /* OpenCL devices detected in the system (per node) */
-	int                  nocl_dev_compatible;  /* number of compatible OpenCL GPUs */
+#ifdef GMX_USE_OPENCL
+    int                  nocl_dev;             /* total number of OpenCL devices detected */
+    ocl_gpu_info_ptr_t   ocl_dev;              /* OpenCL devices detected in the system (per node) */
+    int                  nocl_dev_compatible;  /* number of compatible OpenCL GPUs */
 #endif
 } gmx_gpu_info_t;
 
@@ -163,7 +163,7 @@ typedef struct
     int      *cuda_dev_use;  /* device index list providing GPU to PP rank mapping, GPUs can be listed multiple times when ranks share them */
 
 #ifdef GMX_USE_OPENCL
-    int       nocl_dev_use;  /* number of OpenCL device (IDs) selected to be used */
+    int        nocl_dev_use; /* number of OpenCL device (IDs) selected to be used */
     int       *ocl_dev_use;  /* device index list providing GPU to PP rank mapping, GPUs can be listed multiple times when ranks share them */
 #endif
 } gmx_gpu_opt_t;

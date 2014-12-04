@@ -675,9 +675,9 @@ static void gmx_print_version_info(FILE *fp)
     fprintf(fp, "GPU support:        disabled\n");
 #endif
 #if defined(GMX_GPU) && defined(GMX_USE_OPENCL)
-	fprintf(fp, "OpenCL support:     enabled\n");
+    fprintf(fp, "OpenCL support:     enabled\n");
 #else
-	fprintf(fp, "OpenCL support:     disabled\n");
+    fprintf(fp, "OpenCL support:     disabled\n");
 #endif
     /* A preprocessor trick to avoid duplicating logic from vec.h */
 #define gmx_stringify2(x) #x

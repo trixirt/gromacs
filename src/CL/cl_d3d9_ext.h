@@ -71,73 +71,72 @@ typedef cl_uint cl_d3d9_device_set_nv;
 /******************************************************************************/
 
 typedef CL_API_ENTRY cl_int (CL_API_CALL *clGetDeviceIDsFromD3D9NV_fn)(
-    cl_platform_id            platform,
-    cl_d3d9_device_source_nv  d3d_device_source,
-    void *                    d3d_object,
-    cl_d3d9_device_set_nv     d3d_device_set,
-    cl_uint                   num_entries, 
-    cl_device_id *            devices, 
-    cl_uint *                 num_devices) CL_API_SUFFIX__VERSION_1_0;
+        cl_platform_id            platform,
+        cl_d3d9_device_source_nv  d3d_device_source,
+        void *                    d3d_object,
+        cl_d3d9_device_set_nv     d3d_device_set,
+        cl_uint                   num_entries,
+        cl_device_id *            devices,
+        cl_uint *                 num_devices) CL_API_SUFFIX__VERSION_1_0;
 
 typedef CL_API_ENTRY cl_mem (CL_API_CALL *clCreateFromD3D9VertexBufferNV_fn)(
-    cl_context               context,
-    cl_mem_flags             flags,
-    IDirect3DVertexBuffer9 * resource,
-    cl_int *                 errcode_ret) CL_API_SUFFIX__VERSION_1_0;
+        cl_context               context,
+        cl_mem_flags             flags,
+        IDirect3DVertexBuffer9 * resource,
+        cl_int *                 errcode_ret) CL_API_SUFFIX__VERSION_1_0;
 
 typedef CL_API_ENTRY cl_mem (CL_API_CALL *clCreateFromD3D9IndexBufferNV_fn)(
-    cl_context              context,
-    cl_mem_flags            flags,
-    IDirect3DIndexBuffer9 * resource,
-    cl_int *                errcode_ret) CL_API_SUFFIX__VERSION_1_0;
+        cl_context              context,
+        cl_mem_flags            flags,
+        IDirect3DIndexBuffer9 * resource,
+        cl_int *                errcode_ret) CL_API_SUFFIX__VERSION_1_0;
 
 typedef CL_API_ENTRY cl_mem (CL_API_CALL *clCreateFromD3D9SurfaceNV_fn)(
-    cl_context          context,
-    cl_mem_flags        flags,
-    IDirect3DSurface9 * resource,
-    cl_int *            errcode_ret) CL_API_SUFFIX__VERSION_1_0;
+        cl_context          context,
+        cl_mem_flags        flags,
+        IDirect3DSurface9 * resource,
+        cl_int *            errcode_ret) CL_API_SUFFIX__VERSION_1_0;
 
 typedef CL_API_ENTRY cl_mem (CL_API_CALL *clCreateFromD3D9TextureNV_fn)(
-    cl_context         context,
-    cl_mem_flags       flags,
-    IDirect3DTexture9 *resource,
-    UINT               miplevel,
-    cl_int *           errcode_ret) CL_API_SUFFIX__VERSION_1_0;
+        cl_context         context,
+        cl_mem_flags       flags,
+        IDirect3DTexture9 *resource,
+        UINT               miplevel,
+        cl_int *           errcode_ret) CL_API_SUFFIX__VERSION_1_0;
 
 typedef CL_API_ENTRY cl_mem (CL_API_CALL *clCreateFromD3D9CubeTextureNV_fn)(
-    cl_context              context,
-    cl_mem_flags            flags,
-    IDirect3DCubeTexture9 * resource,
-    D3DCUBEMAP_FACES        facetype,
-    UINT                    miplevel,
-    cl_int *                errcode_ret) CL_API_SUFFIX__VERSION_1_0;
+        cl_context              context,
+        cl_mem_flags            flags,
+        IDirect3DCubeTexture9 * resource,
+        D3DCUBEMAP_FACES        facetype,
+        UINT                    miplevel,
+        cl_int *                errcode_ret) CL_API_SUFFIX__VERSION_1_0;
 
 typedef CL_API_ENTRY cl_mem (CL_API_CALL *clCreateFromD3D9VolumeTextureNV_fn)(
-    cl_context                context,
-    cl_mem_flags              flags,
-    IDirect3DVolumeTexture9 * resource,
-    UINT                      miplevel,
-    cl_int *                  errcode_ret) CL_API_SUFFIX__VERSION_1_0;
+        cl_context                context,
+        cl_mem_flags              flags,
+        IDirect3DVolumeTexture9 * resource,
+        UINT                      miplevel,
+        cl_int *                  errcode_ret) CL_API_SUFFIX__VERSION_1_0;
 
 typedef CL_API_ENTRY cl_int (CL_API_CALL *clEnqueueAcquireD3D9ObjectsNV_fn)(
-    cl_command_queue command_queue,
-    cl_uint num_objects,
-    const cl_mem *mem_objects,
-    cl_uint num_events_in_wait_list,
-    const cl_event *event_wait_list,
-    cl_event *event) CL_API_SUFFIX__VERSION_1_0;
+        cl_command_queue command_queue,
+        cl_uint num_objects,
+        const cl_mem *mem_objects,
+        cl_uint num_events_in_wait_list,
+        const cl_event *event_wait_list,
+        cl_event *event) CL_API_SUFFIX__VERSION_1_0;
 
 typedef CL_API_ENTRY cl_int (CL_API_CALL *clEnqueueReleaseD3D9ObjectsNV_fn)(
-    cl_command_queue command_queue,
-    cl_uint num_objects,
-    cl_mem *mem_objects,
-    cl_uint num_events_in_wait_list,
-    const cl_event *event_wait_list,
-    cl_event *event) CL_API_SUFFIX__VERSION_1_0;
+        cl_command_queue command_queue,
+        cl_uint num_objects,
+        cl_mem *mem_objects,
+        cl_uint num_events_in_wait_list,
+        const cl_event *event_wait_list,
+        cl_event *event) CL_API_SUFFIX__VERSION_1_0;
 
 #ifdef __cplusplus
 }
 #endif
 
 #endif  // __OPENCL_CL_D3D9_H
-

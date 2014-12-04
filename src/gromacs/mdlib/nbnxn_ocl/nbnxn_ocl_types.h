@@ -32,7 +32,7 @@
  * To help us fund GROMACS development, we humbly ask that you cite
  * the research papers on the package. Check out http://www.gromacs.org.
  */
- 
+
 /** \file nbnxn_ocl_types.h
  *  \brief OpenCL equivalent of nbnxn_cuda_types.h
  */
@@ -52,9 +52,9 @@
 //#include "nbnxn_pairlist.h"
 #include "../nbnxn_pairlist.h"
 
-/* Fixing headers: not needed anymore, host structure nbnxn_opencl not included anymore in device code... 
+/* Fixing headers: not needed anymore, host structure nbnxn_opencl not included anymore in device code...
  * Dependency was wallclock_gpu_t */
-/* #include "nbnxn_opencl_types_ext.h" */ 
+/* #include "nbnxn_opencl_types_ext.h" */
 
 /* Fixing headers: Only dependency is WARP_SIZE. The rest are host api code.. In OpenCL warp size can
     differ anyway!. For now it is define in upper-level (kernel-utils.h) */
@@ -103,8 +103,8 @@ enum evdwOcl {
 typedef struct cl_nb_staging
 {
     float   *e_lj;      /**< LJ energy                       */
-    float   *e_el;      /**< electrostatic energy            */    
-    float *fshift;      /**< float3 buffer with shift forces */
+    float   *e_el;      /**< electrostatic energy            */
+    float   *fshift;    /**< float3 buffer with shift forces */
     // TODO: review fshift data type and how its size is computed
 }cl_nb_staging_t;
 
@@ -113,22 +113,22 @@ typedef struct cl_nb_staging
  */
 typedef struct cl_atomdata
 {
-    int      natoms;            /**< number of atoms                              */
-    int      natoms_local;      /**< number of local atoms                        */
-    int      nalloc;            /**< allocation size for the atom data (xq, f)    */
+    int         natoms;            /**< number of atoms                              */
+    int         natoms_local;      /**< number of local atoms                        */
+    int         nalloc;            /**< allocation size for the atom data (xq, f)    */
 
-    cl_mem xq;                  /**< float4 buffer with atom coordinates + charges, size natoms */
-    cl_mem f;                   /**< float3 buffer with force output array, size natoms         */
+    cl_mem      xq;                /**< float4 buffer with atom coordinates + charges, size natoms */
+    cl_mem      f;                 /**< float3 buffer with force output array, size natoms         */
 
-    cl_mem e_lj;                /**< LJ energy output, size 1                       */
-    cl_mem e_el;                /**< Electrostatics energy input, size 1            */
+    cl_mem      e_lj;              /**< LJ energy output, size 1                       */
+    cl_mem      e_el;              /**< Electrostatics energy input, size 1            */
 
-    cl_mem fshift;              /**< float3 buffer with shift forces                */
+    cl_mem      fshift;            /**< float3 buffer with shift forces                */
 
-    int      ntypes;            /**< number of atom types                           */   
-    cl_mem atom_types;          /**< int buffer with atom type indices, size natoms */
+    int         ntypes;            /**< number of atom types                           */
+    cl_mem      atom_types;        /**< int buffer with atom type indices, size natoms */
 
-    cl_mem shift_vec;           /**< float3 buffer with shifts values               */
+    cl_mem      shift_vec;         /**< float3 buffer with shifts values               */
     cl_bool     bShiftVecUploaded; /**< true if the shift vector has been uploaded  */
 } cl_atomdata_t;
 
@@ -164,9 +164,9 @@ typedef struct cl_nbparam
     cl_mem                  nbfp_comb_climg2d; /**< nonbonded parameter table per atom type, 2*ntype elements                          */
 
     /* Ewald Coulomb force table data - accessed through texture memory */
-    int                    coulomb_tab_size;   /**< table size (s.t. it fits in texture cache) */
-    float                  coulomb_tab_scale;  /**< table scale/spacing                        */
-    cl_mem                 coulomb_tab_climg2d;/**< pointer to the table in the device memory  */    
+    int                    coulomb_tab_size;    /**< table size (s.t. it fits in texture cache) */
+    float                  coulomb_tab_scale;   /**< table scale/spacing                        */
+    cl_mem                 coulomb_tab_climg2d; /**< pointer to the table in the device memory  */
 }cl_nbparam_t;
 
 // Data structure shared between the OpenCL device code and OpenCL host code
@@ -194,11 +194,11 @@ typedef struct cl_nbparam_params
 
     shift_consts_t  dispersion_shift; /**< VdW shift dispersion constants           */
     shift_consts_t  repulsion_shift;  /**< VdW shift repulsion constants            */
-    switch_consts_t vdw_switch;       /**< VdW switch constants                     */   
+    switch_consts_t vdw_switch;       /**< VdW switch constants                     */
 
     /* Ewald Coulomb force table data - accessed through texture memory */
     int                    coulomb_tab_size;   /**< table size (s.t. it fits in texture cache) */
-    float                  coulomb_tab_scale;  /**< table scale/spacing                        */    
+    float                  coulomb_tab_scale;  /**< table scale/spacing                        */
 }cl_nbparam_params_t;
 
 
@@ -210,16 +210,16 @@ typedef struct cl_plist
     int              na_c;        /**< number of atoms per cluster                  */
 
     int              nsci;        /**< size of sci, # of i clusters in the list     */
-    int              sci_nalloc;  /**< allocation size of sci                       */    
+    int              sci_nalloc;  /**< allocation size of sci                       */
     cl_mem           sci;         /**< list of i-cluster ("super-clusters").
                                        It contains elements of type nbnxn_sci_t     */
 
     int              ncj4;        /**< total # of 4*j clusters                      */
-    int              cj4_nalloc;  /**< allocation size of cj4                       */    
+    int              cj4_nalloc;  /**< allocation size of cj4                       */
     cl_mem           cj4;         /**< 4*j cluster list, contains j cluster number and
                                        index into the i cluster list.
-                                       It contains elements of type nbnxn_cj4_t     */    
-    cl_mem           excl;        /**< atom interaction bits                        
+                                       It contains elements of type nbnxn_cj4_t     */
+    cl_mem           excl;        /**< atom interaction bits
                                        It contains elements of type nbnxn_excl_t    */
     int              nexcl;       /**< count for excl                               */
     int              excl_nalloc; /**< allocation size of excl                      */
@@ -237,20 +237,20 @@ typedef struct cl_plist
  */
 typedef struct cl_timers
 {
-    cl_event atdat;             /**< event for atom data transfer (every PS step)                 */    
+    cl_event atdat;             /**< event for atom data transfer (every PS step)                 */
 
     cl_event nb_h2d[2];         /**< events for x/q H2D transfers (l/nl, every step)              */
 
     cl_event nb_d2h_f[2];       /**< events for f D2H transfer (l/nl, every step)                 */
     cl_event nb_d2h_fshift[2];  /**< events for fshift D2H transfer (l/nl, every step)            */
     cl_event nb_d2h_e_el[2];    /**< events for e_el D2H transfer (l/nl, every step)              */
-    cl_event nb_d2h_e_lj[2];    /**< events for e_lj D2H transfer (l/nl, every step)              */    
-    
+    cl_event nb_d2h_e_lj[2];    /**< events for e_lj D2H transfer (l/nl, every step)              */
+
     cl_event pl_h2d_sci[2];     /**< events for pair-list sci H2D transfers (l/nl, every PS step) */
     cl_event pl_h2d_cj4[2];     /**< events for pair-list cj4 H2D transfers (l/nl, every PS step) */
-    cl_event pl_h2d_excl[2];    /**< events for pair-list excl H2D transfers (l/nl, every PS step)*/    
-    
-    cl_event nb_k[2];           /**< event for non-bonded kernels (l/nl, every step)              */    
+    cl_event pl_h2d_excl[2];    /**< events for pair-list excl H2D transfers (l/nl, every PS step)*/
+
+    cl_event nb_k[2];           /**< event for non-bonded kernels (l/nl, every step)              */
 }cl_timers_t;
 
 /** \internal
@@ -258,32 +258,32 @@ typedef struct cl_timers
  */
 struct nbnxn_opencl
 {
-    ocl_gpu_info_t *dev_info;        /**< OpenCL device information                                  */    
+    ocl_gpu_info_t *dev_info;        /**< OpenCL device information                                  */
 
-                                     /** non-bonded kernels */
-                                     /** organized similar with nb_kfunc_xxx arrays in nbnxn_ocl.cpp */
+    /** non-bonded kernels */
+    /** organized similar with nb_kfunc_xxx arrays in nbnxn_ocl.cpp */
     cl_kernel           kernel_noener_noprune_ptr[eelOclNR][evdwOclNR];
-    cl_kernel           kernel_ener_noprune_ptr[eelOclNR][evdwOclNR] ;
+    cl_kernel           kernel_ener_noprune_ptr[eelOclNR][evdwOclNR];
     cl_kernel           kernel_noener_prune_ptr[eelOclNR][evdwOclNR];
     cl_kernel           kernel_ener_prune_ptr[eelOclNR][evdwOclNR];
 
-                                    /** auxiliary kernels implementing memset like functions         */
+    /** auxiliary kernels implementing memset like functions         */
     cl_kernel           kernel_memset_f;
     cl_kernel           kernel_memset_f2;
     cl_kernel           kernel_memset_f3;
     cl_kernel           kernel_zero_e_fshift;
 
-    cl_bool          bUseTwoStreams; /**< true if doing both local/non-local NB work on GPU          */
-    cl_bool          bUseStreamSync; /**< true if the standard synchronization is used
-                                          and not memory polling-based waiting                       */
-    cl_atomdata_t   *atdat;          /**< atom data                                                  */
-    cl_nbparam_t    *nbparam;        /**< parameters required for the non-bonded calc.               */
-    cl_plist_t      *plist[2];       /**< pair-list data structures (local and non-local)            */
-    cl_nb_staging_t  nbst;           /**< staging area where fshift/energies get downloaded          */
+    cl_bool             bUseTwoStreams; /**< true if doing both local/non-local NB work on GPU          */
+    cl_bool             bUseStreamSync; /**< true if the standard synchronization is used
+                                             and not memory polling-based waiting                       */
+    cl_atomdata_t      *atdat;          /**< atom data                                                  */
+    cl_nbparam_t       *nbparam;        /**< parameters required for the non-bonded calc.               */
+    cl_plist_t         *plist[2];       /**< pair-list data structures (local and non-local)            */
+    cl_nb_staging_t     nbst;           /**< staging area where fshift/energies get downloaded          */
 
-    cl_mem           debug_buffer;
+    cl_mem              debug_buffer;
 
-    cl_command_queue stream[2];      /**< local and non-local GPU queues                             */
+    cl_command_queue    stream[2];   /**< local and non-local GPU queues                             */
 
     /** events used for synchronization */
     cl_event    nonlocal_done;    /**< event triggered when the non-local non-bonded kernel

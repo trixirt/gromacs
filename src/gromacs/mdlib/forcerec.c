@@ -1797,7 +1797,7 @@ static void pick_nbnxn_resources(const t_commrec     *cr,
                                  const int            vdwtype,
                                  const int            vdw_modifier,
                                  const int            ljpme_comb_rule
-                                )
+                                 )
 {
     gmx_bool bEmulateGPUEnvVarSet, bOclDoFastGen = FALSE;
     char     gpu_err_str[STRLEN];
@@ -1806,13 +1806,13 @@ static void pick_nbnxn_resources(const t_commrec     *cr,
 
     bOclDoFastGen        = (getenv("GMX_OCL_NOFASTGEN") == NULL);
 #ifdef GMX_USE_OPENCL
-	if (bOclDoFastGen)
-	{
-		bOclDoFastGen = 0;
+    if (bOclDoFastGen)
+    {
+        bOclDoFastGen = 0;
 #ifndef NDEBUG
-		printf("\nFastGen temporary disabled. All kernel flavours will be generated.");
+        printf("\nFastGen temporary disabled. All kernel flavours will be generated.");
 #endif
-	}
+    }
 #endif
 
     bEmulateGPUEnvVarSet = (getenv("GMX_EMULATE_GPU") != NULL);
@@ -1831,7 +1831,7 @@ static void pick_nbnxn_resources(const t_commrec     *cr,
     *bEmulateGPU = (bEmulateGPUEnvVarSet ||
                     (!bDoNonbonded &&
 #ifdef GMX_USE_OPENCL
-					 gpu_opt->nocl_dev_use > 0));
+                     gpu_opt->nocl_dev_use > 0));
 #else
                      gpu_opt->ncuda_dev_use > 0));
 #endif
@@ -1849,10 +1849,10 @@ static void pick_nbnxn_resources(const t_commrec     *cr,
 
 #ifdef GMX_USE_OPENCL
         if (!init_ocl_gpu(cr->rank_pp_intranode, gpu_err_str,
-                      &hwinfo->gpu_info, gpu_opt, eeltype, vdwtype, vdw_modifier, ljpme_comb_rule, bOclDoFastGen))
+                          &hwinfo->gpu_info, gpu_opt, eeltype, vdwtype, vdw_modifier, ljpme_comb_rule, bOclDoFastGen))
 #else
         if (!init_cuda_gpu(cr->rank_pp_intranode, gpu_err_str,
-                      &hwinfo->gpu_info, gpu_opt))
+                           &hwinfo->gpu_info, gpu_opt))
 #endif
         {
             /* At this point the init should never fail as we made sure that
@@ -1861,13 +1861,13 @@ static void pick_nbnxn_resources(const t_commrec     *cr,
             gmx_fatal(FARGS, "On rank %d failed to initialize GPU #%s: %s",
                       cr->nodeid,
                       get_ocl_gpu_device_name(&hwinfo->gpu_info, gpu_opt,
-                                        cr->rank_pp_intranode),
+                                              cr->rank_pp_intranode),
                       gpu_err_str);
 #else
             gmx_fatal(FARGS, "On rank %d failed to initialize GPU #%d: %s",
                       cr->nodeid,
                       get_cuda_gpu_device_id(&hwinfo->gpu_info, gpu_opt,
-                                        cr->rank_pp_intranode),
+                                             cr->rank_pp_intranode),
                       gpu_err_str);
 #endif
         }
@@ -2200,7 +2200,7 @@ static void init_nb_verlet(FILE                *fp,
                          fr->vdwtype,
                          fr->vdw_modifier,
                          fr->ljpme_combination_rule
-                        );
+                         );
 
     nbv->nbs = NULL;
 
@@ -2247,9 +2247,9 @@ static void init_nb_verlet(FILE                *fp,
          * both local and non-local NB calculation on GPU */
 #ifdef GMX_USE_OPENCL
         nbnxn_ocl_init(fp, &nbv->ocl_nbv,
-                        &fr->hwinfo->gpu_info, fr->gpu_opt,
-                        cr->rank_pp_intranode,
-                        (nbv->ngrp > 1) && !bHybridGPURun);
+                       &fr->hwinfo->gpu_info, fr->gpu_opt,
+                       cr->rank_pp_intranode,
+                       (nbv->ngrp > 1) && !bHybridGPURun);
 #else
         nbnxn_cuda_init(fp, &nbv->cu_nbv,
                         &fr->hwinfo->gpu_info, fr->gpu_opt,
@@ -2309,8 +2309,8 @@ static void init_nb_verlet(FILE                *fp,
             nb_free  = &ocl_pfree;
 #else
             nb_alloc = &pmalloc;
-            nb_free  = &pfree;            
-#endif            
+            nb_free  = &pfree;
+#endif
         }
         else
         {
