@@ -40,8 +40,8 @@
 
 #include "config.h"
 
-#include "types/simple.h"
-#include "types/hw_info.h"
+#include "gromacs/legacyheaders/types/hw_info.h"
+#include "gromacs/legacyheaders/types/simple.h"
 
 /* TODO This needs to be fixed
  *      Use universal generic interface functions for all OpenCL/CUDA ops here

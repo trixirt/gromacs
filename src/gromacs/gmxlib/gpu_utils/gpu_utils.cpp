@@ -43,12 +43,12 @@
 #include <memory.h>
 #include <string.h>
 
-#include "types/hw_info.h"
+#include "gromacs/legacyheaders/types/hw_info.h"
 
-#include "../ocl_tools/oclutils.h"
+#include "gromacs/gmxlib/ocl_tools/oclutils.h"
 
-#include "types/enums.h"
-#include "gpu_utils.h"
+#include "gromacs/legacyheaders/types/enums.h"
+#include "gromacs/legacyheaders/gpu_utils.h"
 #include "gromacs/utility/smalloc.h"
 #include "gromacs/utility/cstringutil.h"
 #include "gromacs/utility/fatalerror.h"

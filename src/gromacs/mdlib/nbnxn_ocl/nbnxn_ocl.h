@@ -42,8 +42,8 @@
 
 #include "config.h"
 
-#include "types/nbnxn_ocl_types_ext.h"
-#include "types/simple.h"
+#include "gromacs/legacyheaders/types/nbnxn_ocl_types_ext.h"
+#include "gromacs/legacyheaders/types/simple.h"
 
 #if defined(GMX_GPU) && defined(GMX_USE_OPENCL)
 #define FUNC_TERM ;

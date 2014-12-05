@@ -46,15 +46,15 @@
 #include <limits>
 #endif
 
-#include "types/simple.h"
+#include "gromacs/legacyheaders/types/simple.h"
 #include "gromacs/mdlib/nbnxn_pairlist.h"
 #include "gromacs/mdlib/nb_verlet.h"
-#include "types/force_flags.h"
-#include "../nbnxn_consts.h"
-#include "types/hw_info.h"
+#include "gromacs/legacyheaders/types/force_flags.h"
+#include "gromacs/mdlib/nbnxn_consts.h"
+#include "gromacs/legacyheaders/types/hw_info.h"
 
 
-#include "../../gmxlib/ocl_tools/oclutils.h"
+#include "gromacs/mdlib/../gmxlib/ocl_tools/oclutils.h"
 
 #ifdef TMPI_ATOMICS
 #include "thread_mpi/atomic.h"

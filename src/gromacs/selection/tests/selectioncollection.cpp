@@ -39,13 +39,16 @@
  * \author Teemu Murtola <teemu.murtola@gmail.com>
  * \ingroup module_selection
  */
+#include "gmxpre.h"
+
+#include "gromacs/selection/selectioncollection.h"
+
 #include <gtest/gtest.h>
 
 #include "gromacs/fileio/trx.h"
 #include "gromacs/options/basicoptions.h"
 #include "gromacs/options/options.h"
 #include "gromacs/selection/indexutil.h"
-#include "gromacs/selection/selectioncollection.h"
 #include "gromacs/selection/selection.h"
 #include "gromacs/topology/topology.h"
 #include "gromacs/utility/arrayref.h"
@@ -1108,6 +1111,27 @@ TEST_F(SelectionCollectionDataTest, HandlesEmptySelectionWithUnevaluatedExpressi
         "none and x > 2",
         "none and same resname as resnr 2"
     };
+    runTest("simple.gro", selections);
+}
+
+
+TEST_F(SelectionCollectionDataTest, HandlesPositionModifiersForKeywords)
+{
+    static const char * const selections[] = {
+        "res_cog x > 2",
+        "name CB and res_cog y > 2.5"
+    };
+    setFlags(TestFlags() | efTestEvaluation);
+    runTest("simple.gro", selections);
+}
+
+
+TEST_F(SelectionCollectionDataTest, HandlesPositionModifiersForMethods)
+{
+    static const char * const selections[] = {
+        "res_cog distance from cog of resnr 1 < 2"
+    };
+    setFlags(TestFlags() | efTestEvaluation);
     runTest("simple.gro", selections);
 }
 
