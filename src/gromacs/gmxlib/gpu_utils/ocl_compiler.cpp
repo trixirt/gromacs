@@ -44,8 +44,6 @@
 
 #include "config.h"
 
-#include <CL/opencl.h>
-
 #include "ocl_compiler.hpp"
 #include "../mdlib/nbnxn_ocl/nbnxn_ocl_types.h"
 #include "../mdlib/nbnxn_ocl/nbnxn_ocl_data_mgmt.h"

@@ -43,8 +43,10 @@ extern "C" {
 /* Abstract types */
 /* CUDA nonbonded structure */
 typedef struct nbnxn_cuda *nbnxn_cuda_ptr_t;
-/* CUDA GPU device info */
-typedef struct cuda_dev_info *cuda_dev_info_ptr_t;
+
+/* Abstract GPU device info structures */
+typedef struct gpu_info *gpu_info_ptr_t;
+typedef struct gpu_info gpu_info_t;
 
 /* Types defined for the structs below. */
 typedef struct wallclock_gpu wallclock_gpu_t;

@@ -36,8 +36,6 @@
 #ifndef HWINFO_H
 #define HWINFO_H
 
-#include "config.h"
-
 #include "simple.h"
 #include "nbnxn_cuda_types_ext.h"
 #include "../gmx_cpuid.h"
@@ -49,9 +47,6 @@ extern "C" {
 } /* fixes auto-indentation problems */
 #endif
 
-#if defined(GMX_GPU) && defined(GMX_USE_OPENCL)
-#include <CL/opencl.h>
-#endif
 
 /* Possible results of the GPU detection/check.
  *
@@ -69,64 +64,14 @@ static const char * const gpu_detect_res_str[] =
     "compatible", "inexistent", "incompatible", "insane"
 };
 
-#if defined(GMX_GPU) && defined(GMX_USE_OPENCL)
-
-/**
- * \brief OpenCL vendor IDs
- */
-typedef enum {
-    _OCL_VENDOR_NVIDIA_    = 0,
-    _OCL_VENDOR_AMD_,
-    _OCL_VENDOR_INTEL_,
-    _OCL_VENDOR_UNKNOWN_
-} ocl_vendor_id_t;
-
-/**
- * \brief OpenCL GPU device identificator
- * An OpenCL device is identified by its ID.
- * The platform ID is also included for caching reasons.
- */
-typedef struct
-{
-    cl_platform_id      ocl_platform_id;
-    cl_device_id        ocl_device_id;
-} ocl_gpu_id_t, *ocl_gpu_id_ptr_t;
-
-/**
- * \brief OpenCL GPU information
- * \todo Move context and program outside this data structure.
- * They are specific to a certain usage of the device (e.g. with/without OpenGL
- * interop) and do not provide general device information as the data structure
- * name indicates.
- */
-typedef struct
-{
-    ocl_gpu_id_t        ocl_gpu_id;
-    char                device_name[256];
-    char                device_version[256];
-    char                device_vendor[256];
-    int                 compute_units;
-    int                 stat;
-    ocl_vendor_id_t     vendor_e;
-
-    cl_context          context;
-    cl_program          program;
-
-} ocl_gpu_info_t, *ocl_gpu_info_ptr_t;
-#endif
-
 /* GPU device information -- includes either CUDA or OpenCL devices.
  * The gmx_hardware_detect module initializes it. */
 typedef struct
 {
     gmx_bool             bDetectGPUs;          /* Did we try to detect GPUs? */
     int                  n_dev;                /* total number of GPU devices detected */
-    cuda_dev_info_ptr_t  cuda_dev;             /* CUDA devices detected in the system (per node) */
+    gpu_info_ptr_t       gpu_dev;              /* GPU devices detected in the system (per node) */
     int                  n_dev_compatible;     /* number of compatible GPUs */
-
-#ifdef GMX_USE_OPENCL    
-    ocl_gpu_info_ptr_t   ocl_dev;              /* OpenCL devices detected in the system (per node) */
-#endif
 } gmx_gpu_info_t;
 
 /* Hardware information structure with CPU and GPU information.

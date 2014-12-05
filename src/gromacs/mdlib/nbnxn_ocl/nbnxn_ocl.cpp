@@ -53,11 +53,12 @@
 #include "../nbnxn_consts.h"
 #include "types/hw_info.h"
 
+
+#include "../../gmxlib/ocl_tools/oclutils.h"
+
 #ifdef TMPI_ATOMICS
 #include "thread_mpi/atomic.h"
 #endif
-
-#include <CL/opencl.h>
 
 #include "nbnxn_ocl_types.h"
 
@@ -96,7 +97,7 @@ static unsigned int poll_wait_pattern = (0x7FU << 23);
 /*! Returns the number of blocks to be used for the nonbonded GPU kernel.
     OpenCL equivalent of calc_nb_kernel_nblock from nbnxn_cuda.cu
  */
-static inline int calc_nb_kernel_nblock(int nwork_units, ocl_gpu_info_t *dinfo)
+static inline int calc_nb_kernel_nblock(int nwork_units, gpu_info_t *dinfo)
 {
     int max_grid_x_size;
 

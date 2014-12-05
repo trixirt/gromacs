@@ -55,6 +55,7 @@
 #include "../nbnxn_consts.h"
 #include "gmx_detect_hardware.h"
 
+#include "../../gmxlib/ocl_tools/oclutils.h"
 #include "../nbnxn_ocl/nbnxn_ocl_types.h"
 #include "gromacs/mdlib/nbnxn_ocl/nbnxn_ocl_data_mgmt.h"
 #include "gpu_utils.h"
@@ -97,123 +98,6 @@ static void md_print_warn(FILE       *fplog,
         fprintf(fplog, "\n");
         va_end(ap);
     }
-}
-
-/*! Launches synchronous or asynchronous host to device memory copy.
- *
- *  If copy_event is not NULL, on return it will contain an event object
- *  identifying this particular host to device operation. The event can further
- *  be used to queue a wait for this operation or to query profiling information.
- *
- *  OpenCL equivalent of cu_copy_H2D_generic.
- */
-static int ocl_copy_H2D_generic(cl_mem d_dest, void* h_src,
-                                size_t offset, size_t bytes,
-                                bool bAsync /* = false*/,
-                                cl_command_queue command_queue,
-                                cl_event *copy_event)
-{
-    cl_int cl_error;
-
-    if (d_dest == NULL || h_src == NULL || bytes == 0)
-    {
-        return -1;
-    }
-
-    if (bAsync)
-    {
-        cl_error = clEnqueueWriteBuffer(command_queue, d_dest, CL_FALSE, offset, bytes, h_src, 0, NULL, copy_event);
-        assert(cl_error == CL_SUCCESS);
-        // TODO: handle errors
-    }
-    else
-    {
-        cl_error = clEnqueueWriteBuffer(command_queue, d_dest, CL_TRUE, offset, bytes, h_src, 0, NULL, copy_event);
-        assert(cl_error == CL_SUCCESS);
-        // TODO: handle errors
-    }
-
-    return 0;
-}
-
-/*! Launches asynchronous host to device memory copy.
- *
- *  If copy_event is not NULL, on return it will contain an event object
- *  identifying this particular host to device operation. The event can further
- *  be used to queue a wait for this operation or to query profiling information.
- *
- *  OpenCL equivalent of cu_copy_H2D_async.
- */
-int ocl_copy_H2D_async(cl_mem d_dest, void * h_src,
-                       size_t offset, size_t bytes,
-                       cl_command_queue command_queue,
-                       cl_event *copy_event)
-{
-    return ocl_copy_H2D_generic(d_dest, h_src, offset, bytes, true, command_queue, copy_event);
-}
-
-/*! Launches synchronous host to device memory copy.
- *
- *  OpenCL equivalent of cu_copy_H2D.
- */
-int ocl_copy_H2D(cl_mem d_dest, void * h_src,
-                 size_t offset, size_t bytes,
-                 cl_command_queue command_queue)
-{
-    return ocl_copy_H2D_generic(d_dest, h_src, offset, bytes, false, command_queue, NULL);
-}
-
-/*! Launches synchronous or asynchronous device to host memory copy.
- *
- *  If copy_event is not NULL, on return it will contain an event object
- *  identifying this particular device to host operation. The event can further
- *  be used to queue a wait for this operation or to query profiling information.
- *
- *  OpenCL equivalent of cu_copy_D2H_generic.
- */
-int ocl_copy_D2H_generic(void * h_dest, cl_mem d_src,
-                         size_t offset, size_t bytes,
-                         bool bAsync,
-                         cl_command_queue command_queue,
-                         cl_event *copy_event)
-{
-    cl_int cl_error;
-
-    if (h_dest == NULL || d_src == NULL || bytes == 0)
-    {
-        return -1;
-    }
-
-    if (bAsync)
-    {
-        cl_error = clEnqueueReadBuffer(command_queue, d_src, CL_FALSE, offset, bytes, h_dest, 0, NULL, copy_event);
-        assert(cl_error == CL_SUCCESS);
-        // TODO: handle errors
-    }
-    else
-    {
-        cl_error = clEnqueueReadBuffer(command_queue, d_src, CL_TRUE, offset, bytes, h_dest, 0, NULL, copy_event);
-        assert(cl_error == CL_SUCCESS);
-        // TODO: handle errors
-    }
-
-    return 0;
-}
-
-/*! Launches asynchronous device to host memory copy.
- *
- *  If copy_event is not NULL, on return it will contain an event object
- *  identifying this particular host to device operation. The event can further
- *  be used to queue a wait for this operation or to query profiling information.
- *
- *  OpenCL equivalent of cu_copy_D2H_async.
- */
-int ocl_copy_D2H_async(void * h_dest, cl_mem d_src,
-                       size_t offset, size_t bytes,
-                       cl_command_queue command_queue,
-                       cl_event *copy_event)
-{
-    return ocl_copy_D2H_generic(h_dest, d_src, offset, bytes, true, command_queue, copy_event);
 }
 
 /*!
@@ -311,7 +195,7 @@ void ocl_realloc_buffered(cl_mem *d_dest, void *h_src,
     OpenCL equivalent of init_ewald_coulomb_force_table from nbnxn_cuda_data_mgmt.cu
  */
 static void init_ewald_coulomb_force_table(cl_nbparam_t             *nbp,
-                                           const ocl_gpu_info_t     *dev_info)
+                                           const gpu_info_t         *dev_info)
 {
     float       *ftmp;
     cl_mem       coul_tab;
@@ -361,7 +245,7 @@ static void init_ewald_coulomb_force_table(cl_nbparam_t             *nbp,
     pair-search.
     OpenCL equivalent of init_atomdata_first from nbnxn_cuda_data_mgmt.cu
  */
-static void init_atomdata_first(cl_atomdata_t *ad, int ntypes, ocl_gpu_info_t *dev_info)
+static void init_atomdata_first(cl_atomdata_t *ad, int ntypes, gpu_info_t *dev_info)
 {
     cl_int cl_error;
 
@@ -544,7 +428,7 @@ void nbnxn_ocl_convert_gmx_to_gpu_flavors(
 static void init_nbparam(cl_nbparam_t              *nbp,
                          const interaction_const_t *ic,
                          const nbnxn_atomdata_t    *nbat,
-                         const ocl_gpu_info_t      *dev_info)
+                         const gpu_info_t          *dev_info)
 {
     int         ntypes, nnbfp, nnbfp_comb;
     cl_int      cl_error;
@@ -782,7 +666,7 @@ void nbnxn_ocl_init(FILE                 *fplog,
     snew(nb->timings, 1);
 
     /* set device info, just point it to the right GPU among the detected ones */
-    nb->dev_info = gpu_info->ocl_dev + gpu_opt->dev_use[my_gpu_index];
+    nb->dev_info = gpu_info->gpu_dev + gpu_opt->dev_use[my_gpu_index];
 
     /* init the kernels */
     nbnxn_init_kernels(nb);
@@ -973,7 +857,7 @@ nbnxn_ocl_clear_e_fshift(nbnxn_opencl_ptr_t ocl_nb)
     cl_int               cl_error = CL_SUCCESS;
     cl_atomdata_t *      adat     = ocl_nb->atdat;
     cl_command_queue     ls       = ocl_nb->stream[eintLocal];
-    ocl_gpu_info_t *     dev_info = ocl_nb->dev_info;
+    gpu_info_t *         dev_info = ocl_nb->dev_info;
 
     size_t               dim_block[3] = {1, 1, 1};
     size_t               dim_grid[3]  = {1, 1, 1};
@@ -1007,7 +891,7 @@ static void nbnxn_ocl_clear_f(nbnxn_opencl_ptr_t ocl_nb, int natoms_clear)
     cl_int               cl_error = CL_SUCCESS;
     cl_atomdata_t *      adat     = ocl_nb->atdat;
     cl_command_queue     ls       = ocl_nb->stream[eintLocal];
-    ocl_gpu_info_t *     dev_info = ocl_nb->dev_info;
+    gpu_info_t *         dev_info = ocl_nb->dev_info;
     cl_float             value    = 0.0f;
 
     size_t               dim_block[3] = {1, 1, 1};

@@ -36,8 +36,8 @@
 #ifndef OCL_COMPILER_H
 #define OCL_COMPILER_H
 
-#include <CL/opencl.h>
 #include "../legacyheaders/types/hw_info.h"
+#include "../ocl_tools/oclutils.h"
 
 /**
  * \brief Vendor specific kernel sources

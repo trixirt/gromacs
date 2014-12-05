@@ -230,7 +230,7 @@ struct cu_timers
  */
 struct nbnxn_cuda
 {
-    cuda_dev_info_t *dev_info;       /**< CUDA device information                              */
+    gpu_info_t      *dev_info;       /**< CUDA device information                              */
     bool             bUseTwoStreams; /**< true if doing both local/non-local NB work on GPU    */
     bool             bUseStreamSync; /**< true if the standard cudaStreamSynchronize is used
                                           and not memory polling-based waiting                 */

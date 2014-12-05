@@ -150,20 +150,6 @@ gmx_bool nbnxn_ocl_is_kernel_ewald_analytical(const nbnxn_opencl_ptr_t gmx_unuse
 }
 #endif
 
-/*! Launches asynchronous host to device memory copy. */
-FUNC_QUALIFIER
-int ocl_copy_H2D_async(cl_mem d_dest, void * h_src,
-                       size_t offset, size_t bytes,
-                       cl_command_queue command_queue,
-                       cl_event *copy_event);
-
-/*! Launches asynchronous device to host memory copy. */
-FUNC_QUALIFIER
-int ocl_copy_D2H_async(void * h_dest, cl_mem d_src,
-                       size_t offset, size_t bytes,
-                       cl_command_queue command_queue,
-                       cl_event *copy_event);
-
 #ifdef __cplusplus
 }
 #endif

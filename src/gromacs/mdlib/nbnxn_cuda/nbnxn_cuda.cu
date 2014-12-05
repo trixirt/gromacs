@@ -133,7 +133,7 @@ static bool always_prune = (getenv("GMX_GPU_ALWAYS_PRUNE") != NULL);
 static unsigned int poll_wait_pattern = (0x7FU << 23);
 
 /*! Returns the number of blocks to be used for the nonbonded GPU kernel. */
-static inline int calc_nb_kernel_nblock(int nwork_units, cuda_dev_info_t *dinfo)
+static inline int calc_nb_kernel_nblock(int nwork_units, gpu_info_t *dinfo)
 {
     int max_grid_x_size;
 
@@ -914,7 +914,7 @@ const struct texture<float, 1, cudaReadModeElementType> &nbnxn_cuda_get_coulomb_
 
 /*! Set up the cache configuration for the non-bonded kernels,
  */
-void nbnxn_cuda_set_cacheconfig(cuda_dev_info_t *devinfo)
+void nbnxn_cuda_set_cacheconfig(gpu_info_t *devinfo)
 {
     cudaError_t stat;
 

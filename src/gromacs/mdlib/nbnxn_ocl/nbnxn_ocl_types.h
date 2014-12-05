@@ -258,7 +258,7 @@ typedef struct cl_timers
  */
 struct nbnxn_opencl
 {
-    ocl_gpu_info_t *dev_info;        /**< OpenCL device information                                  */
+    gpu_info_t *dev_info;        /**< OpenCL device information                                  */
 
     /** non-bonded kernels */
     /** organized similar with nb_kfunc_xxx arrays in nbnxn_ocl.cpp */

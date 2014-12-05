@@ -148,10 +148,6 @@ int get_cuda_gpu_device_id(const gmx_gpu_info_t gmx_unused *gpu_info,
                            int gmx_unused                   index) FUNC_TERM_INT
 
 FUNC_QUALIFIER_OPENCL
-ocl_gpu_id_t get_ocl_gpu_device_id(const gmx_gpu_info_t gmx_unused *gpu_info,
-                                   const gmx_gpu_opt_t gmx_unused  *gpu_opt,
-                                   int gmx_unused                   index) FUNC_TERM_INT_OPENCL
-FUNC_QUALIFIER_OPENCL
 char* get_ocl_gpu_device_name(const gmx_gpu_info_t *gpu_info,
                               const gmx_gpu_opt_t  *gpu_opt,
                               int                   idx) FUNC_TERM_PTR_OPENCL
@@ -161,9 +157,6 @@ void get_cuda_gpu_device_info_string(char gmx_unused *s, const gmx_gpu_info_t gm
 
 FUNC_QUALIFIER_OPENCL
 void get_ocl_gpu_device_info_string(char gmx_unused *s, const gmx_gpu_info_t gmx_unused *gpu_info, int gmx_unused index) FUNC_TERM_VOID_OPENCL
-
-FUNC_QUALIFIER_OPENCL
-ocl_vendor_id_t get_vendor_id(char *vendor_name) FUNC_TERM_INT_OPENCL
 
 FUNC_QUALIFIER
 size_t sizeof_cuda_dev_info(void) FUNC_TERM_SIZE_T
@@ -176,12 +169,6 @@ void ocl_pmalloc(void **h_ptr, size_t nbytes) FUNC_TERM_VOID_OPENCL
 
 FUNC_QUALIFIER_OPENCL
 void ocl_pfree(void *h_ptr) FUNC_TERM_VOID_OPENCL
-
-#if defined(GMX_GPU) && defined(GMX_USE_OPENCL) && !defined(NDEBUG)
-/* Debugger callable function that prints the name of a kernel function pointer */
-cl_int dbg_ocl_kernel_name(const cl_kernel kernel);
-cl_int dbg_ocl_kernel_name_address(void* kernel);
-#endif
 
 #ifdef __cplusplus
 }

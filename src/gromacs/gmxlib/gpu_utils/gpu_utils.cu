@@ -202,14 +202,14 @@ gmx_bool init_cuda_gpu(int mygpu, char *result_str,
         gmx_incons(sbuf);
     }
 
-    gpuid = gpu_info->cuda_dev[gpu_opt->dev_use[mygpu]].id;
+    gpuid = gpu_info->gpu_dev[gpu_opt->dev_use[mygpu]].id;
 
     stat = cudaSetDevice(gpuid);
     strncpy(result_str, cudaGetErrorString(stat), STRLEN);
 
     if (debug)
     {
-        fprintf(stderr, "Initialized GPU ID #%d: %s\n", gpuid, gpu_info->cuda_dev[gpuid].prop.name);
+        fprintf(stderr, "Initialized GPU ID #%d: %s\n", gpuid, gpu_info->gpu_dev[gpuid].prop.name);
     }
 
     return (stat == cudaSuccess);
@@ -337,7 +337,7 @@ int detect_cuda_gpus(gmx_gpu_info_t *gpu_info, char *err_str)
     int              i, ndev, checkres, retval;
     cudaError_t      stat;
     cudaDeviceProp   prop;
-    cuda_dev_info_t *devs;
+    gpu_info_t      *devs;
 
     assert(gpu_info);
     assert(err_str);
@@ -380,7 +380,7 @@ int detect_cuda_gpus(gmx_gpu_info_t *gpu_info, char *err_str)
     }
 
     gpu_info->n_dev = ndev;
-    gpu_info->cuda_dev  = devs;
+    gpu_info->gpu_dev = devs;
 
     return retval;
 }
@@ -406,13 +406,13 @@ void pick_compatible_cuda_gpus(const gmx_gpu_info_t *gpu_info,
 
     assert(gpu_info);
     /* cuda_dev/n_dev have to be either NULL/0 or not (NULL/0) */
-    assert((gpu_info->n_dev != 0 ? 0 : 1) ^ (gpu_info->cuda_dev == NULL ? 0 : 1));
+    assert((gpu_info->n_dev != 0 ? 0 : 1) ^ (gpu_info->gpu_dev == NULL ? 0 : 1));
 
     snew(compat, gpu_info->n_dev);
     ncompat = 0;
     for (i = 0; i < gpu_info->n_dev; i++)
     {
-        if (is_compatible_gpu(gpu_info->cuda_dev[i].stat))
+        if (is_compatible_gpu(gpu_info->gpu_dev[i].stat))
         {
             ncompat++;
             compat[ncompat - 1] = i;
@@ -467,7 +467,7 @@ gmx_bool check_selected_cuda_gpus(int                  *checkres,
         gpu_opt->dev_use[i] = id;
 
         checkres[i] = (id >= gpu_info->n_dev) ?
-            egpuNonexistent : gpu_info->cuda_dev[id].stat;
+            egpuNonexistent : gpu_info->gpu_dev[id].stat;
 
         bAllOk = bAllOk && is_compatible_gpu(checkres[i]);
     }
@@ -486,7 +486,7 @@ void free_cuda_gpu_info(const gmx_gpu_info_t *gpu_info)
         return;
     }
 
-    sfree(gpu_info->cuda_dev);
+    sfree(gpu_info->gpu_dev);
 }
 
 /*! \brief Formats and returns a device information string for a given GPU.
@@ -509,7 +509,7 @@ void get_cuda_gpu_device_info_string(char *s, const gmx_gpu_info_t *gpu_info, in
         return;
     }
 
-    cuda_dev_info_t *dinfo = &gpu_info->cuda_dev[index];
+    gpu_info_t *dinfo = &gpu_info->gpu_dev[index];
 
     bool             bGpuExists =
         dinfo->stat == egpuCompatible ||
@@ -550,7 +550,7 @@ int get_cuda_gpu_device_id(const gmx_gpu_info_t *gpu_info,
     assert(gpu_opt);
     assert(idx >= 0 && idx < gpu_opt->n_dev_use);
 
-    return gpu_info->cuda_dev[gpu_opt->dev_use[idx]].id;
+    return gpu_info->gpu_dev[gpu_opt->dev_use[idx]].id;
 }
 
 /*! \brief Returns the device ID of the GPU currently in use.
@@ -576,5 +576,5 @@ int get_current_gpu_device_id(void)
  */
 size_t sizeof_cuda_dev_info(void)
 {
-    return sizeof(cuda_dev_info);
+    return sizeof(gpu_info);
 }

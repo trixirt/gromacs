@@ -760,10 +760,7 @@ gmx_hw_info_t *gmx_detect_hardware(FILE *fplog, const t_commrec *cr,
         /* detect GPUs */
         hwinfo_g->gpu_info.n_dev            = 0;
         hwinfo_g->gpu_info.n_dev_compatible = 0;
-        hwinfo_g->gpu_info.cuda_dev         = NULL;        
-#ifdef GMX_USE_OPENCL        
-        hwinfo_g->gpu_info.ocl_dev          = NULL;        
-#endif
+        hwinfo_g->gpu_info.gpu_dev          = NULL;
 
         /* Run the detection if the binary was compiled with GPU support
          * and we requested detection.
