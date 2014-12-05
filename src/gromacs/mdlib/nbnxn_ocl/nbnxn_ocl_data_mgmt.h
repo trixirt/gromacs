@@ -40,10 +40,10 @@
 #if !defined(NBNXN_OCL_DATA_MGMT_H) && defined(GMX_USE_OPENCL)
 #define NBNXN_OCL_DATA_MGMT_H
 
-#include "types/simple.h"
-#include "types/interaction_const.h"
-#include "types/nbnxn_ocl_types_ext.h"
-#include "types/hw_info.h"
+#include "gromacs/legacyheaders/types/simple.h"
+#include "gromacs/legacyheaders/types/interaction_const.h"
+#include "gromacs/legacyheaders/types/nbnxn_ocl_types_ext.h"
+#include "gromacs/legacyheaders/types/hw_info.h"
 
 
 #if defined(GMX_GPU) && defined(GMX_USE_OPENCL)

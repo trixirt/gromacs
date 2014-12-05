@@ -45,12 +45,12 @@
 #define M_FLOAT_1_SQRTPI 0.564189583547756f
 #include "gromacs/utility/real.h"
 
-#include "types/interaction_const.h"
+#include "gromacs/legacyheaders/types/interaction_const.h"
 
 /* Fixing headers: Mixed host/device structure.. Header had to be modified to avoid irrelevant types in
  * device code, as tMPI_atomic_t.*/
 //#include "nbnxn_pairlist.h"
-#include "../nbnxn_pairlist.h"
+#include "gromacs/mdlib/nbnxn_pairlist.h"
 
 /* Fixing headers: not needed anymore, host structure nbnxn_opencl not included anymore in device code...
  * Dependency was wallclock_gpu_t */
@@ -58,7 +58,7 @@
 
 /* Fixing headers: Only dependency is WARP_SIZE. The rest are host api code.. In OpenCL warp size can
     differ anyway!. For now it is define in upper-level (kernel-utils.h) */
-/* #include "../../gmxlib/cuda_tools/cudautils.cuh" */
+/* #include "gromacs/mdlib/../gmxlib/cuda_tools/cudautils.cuh" */
 
 #ifdef __cplusplus
 extern "C" {

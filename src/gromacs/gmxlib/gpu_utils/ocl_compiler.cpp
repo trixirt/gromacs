@@ -45,8 +45,8 @@
 #include "config.h"
 
 #include "ocl_compiler.hpp"
-#include "../mdlib/nbnxn_ocl/nbnxn_ocl_types.h"
-#include "../mdlib/nbnxn_ocl/nbnxn_ocl_data_mgmt.h"
+#include "gromacs/mdlib/nbnxn_ocl/nbnxn_ocl_types.h"
+#include "gromacs/mdlib/nbnxn_ocl/nbnxn_ocl_data_mgmt.h"
 
 /* This path is defined by CMake and it depends on the install prefix option.
    The opencl kernels are installed in bin/opencl.*/

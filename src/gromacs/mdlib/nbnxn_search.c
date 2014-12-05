@@ -33,32 +33,35 @@
  * the research papers on the package. Check out http://www.gromacs.org.
  */
 
+#include "gmxpre.h"
+
+#include "nbnxn_search.h"
+
 #include "config.h"
 
+#include <assert.h>
 #include <math.h>
 #include <string.h>
-#include <assert.h>
 
-#include "types/commrec.h"
-#include "macros.h"
+#include "gromacs/legacyheaders/gmx_omp_nthreads.h"
+#include "gromacs/legacyheaders/macros.h"
+#include "gromacs/legacyheaders/nrnb.h"
+#include "gromacs/legacyheaders/ns.h"
+#include "gromacs/legacyheaders/types/commrec.h"
 #include "gromacs/math/utilities.h"
 #include "gromacs/math/vec.h"
-#include "nbnxn_consts.h"
-/* nbnxn_internal.h included gromacs/simd/macros.h */
-#include "nbnxn_internal.h"
-#ifdef GMX_NBNXN_SIMD
-#include "gromacs/simd/vector_operations.h"
-#endif
-#include "nbnxn_atomdata.h"
-#include "nbnxn_search.h"
-#include "gmx_omp_nthreads.h"
-#include "nrnb.h"
-#include "ns.h"
-
-#include "gromacs/pbcutil/ishift.h"
 #include "gromacs/mdlib/nb_verlet.h"
+#include "gromacs/mdlib/nbnxn_atomdata.h"
+#include "gromacs/mdlib/nbnxn_consts.h"
+#include "gromacs/pbcutil/ishift.h"
 #include "gromacs/pbcutil/pbc.h"
 #include "gromacs/utility/smalloc.h"
+
+/* nbnxn_internal.h included gromacs/simd/macros.h */
+#include "gromacs/mdlib/nbnxn_internal.h"
+#ifdef GMX_SIMD
+#include "gromacs/simd/vector_operations.h"
+#endif
 
 #ifdef NBNXN_SEARCH_BB_SIMD4
 /* Always use 4-wide SIMD for bounding box calculations */
@@ -1764,7 +1767,7 @@ static void init_buffer_flags(nbnxn_buffer_flags_t *flags,
     }
     for (b = 0; b < flags->nflag; b++)
     {
-        flags->flag[b] = 0;
+        bitmask_clear(&(flags->flag[b]));
     }
 }
 
@@ -1928,6 +1931,7 @@ void nbnxn_grid_add_simple(nbnxn_search_t    nbs,
     float        *bbcz;
     nbnxn_bb_t   *bb;
     int           ncd, sc;
+    int           nthreads gmx_unused;
 
     grid = &nbs->grid[0];
 
@@ -1954,7 +1958,8 @@ void nbnxn_grid_add_simple(nbnxn_search_t    nbs,
     bbcz = grid->bbcz_simple;
     bb   = grid->bb_simple;
 
-#pragma omp parallel for num_threads(gmx_omp_nthreads_get(emntPairsearch)) schedule(static)
+    nthreads = gmx_omp_nthreads_get(emntPairsearch);
+#pragma omp parallel for num_threads(nthreads) schedule(static)
     for (sc = 0; sc < grid->nc; sc++)
     {
         int c, tx, na;
@@ -2939,10 +2944,10 @@ static void make_cluster_list_simple(const nbnxn_grid_t *gridj,
 }
 
 #ifdef GMX_NBNXN_SIMD_4XN
-#include "nbnxn_search_simd_4xn.h"
+#include "gromacs/mdlib/nbnxn_search_simd_4xn.h"
 #endif
 #ifdef GMX_NBNXN_SIMD_2XNN
-#include "nbnxn_search_simd_2xnn.h"
+#include "gromacs/mdlib/nbnxn_search_simd_2xnn.h"
 #endif
 
 /* Plain C or SIMD4 code for making a pair list of super-cell sci vs scj.
@@ -4470,6 +4475,7 @@ static void combine_nblists(int nnbl, nbnxn_pairlist_t **nbl,
 {
     int nsci, ncj4, nexcl;
     int n, i;
+    int nthreads gmx_unused;
 
     if (nblc->bSimple)
     {
@@ -4510,7 +4516,8 @@ static void combine_nblists(int nnbl, nbnxn_pairlist_t **nbl,
     /* Each thread should copy its own data to the combined arrays,
      * as otherwise data will go back and forth between different caches.
      */
-#pragma omp parallel for num_threads(gmx_omp_nthreads_get(emntPairsearch)) schedule(static)
+    nthreads = gmx_omp_nthreads_get(emntPairsearch);
+#pragma omp parallel for num_threads(nthreads) schedule(static)
     for (n = 0; n < nnbl; n++)
     {
         int                     sci_offset;
@@ -4839,7 +4846,7 @@ static void nbnxn_make_pairlist_part(const nbnxn_search_t nbs,
     int               ndistc;
     int               ncpcheck;
     int               gridi_flag_shift = 0, gridj_flag_shift = 0;
-    unsigned int     *gridj_flag       = NULL;
+    gmx_bitmask_t    *gridj_flag       = NULL;
     int               ncj_old_i, ncj_old_j;
 
     nbs_cycle_start(&work->cc[enbsCCsearch]);
@@ -5345,7 +5352,7 @@ static void nbnxn_make_pairlist_part(const nbnxn_search_t nbs,
                                         cbl = nbl->cj[nbl->ncj-1].cj >> gridj_flag_shift;
                                         for (cb = cbf; cb <= cbl; cb++)
                                         {
-                                            gridj_flag[cb] = 1U<<th;
+                                            bitmask_init_bit(&gridj_flag[cb], th);
                                         }
                                     }
                                 }
@@ -5410,7 +5417,7 @@ static void nbnxn_make_pairlist_part(const nbnxn_search_t nbs,
 
         if (bFBufferFlag && nbl->ncj > ncj_old_i)
         {
-            work->buffer_flags.flag[(gridi->cell0+ci)>>gridi_flag_shift] = 1U<<th;
+            bitmask_init_bit(&(work->buffer_flags.flag[(gridi->cell0+ci)>>gridi_flag_shift]), th);
         }
     }
 
@@ -5444,8 +5451,8 @@ static void reduce_buffer_flags(const nbnxn_search_t        nbs,
                                 int                         nsrc,
                                 const nbnxn_buffer_flags_t *dest)
 {
-    int                 s, b;
-    const unsigned int *flag;
+    int            s, b;
+    gmx_bitmask_t *flag;
 
     for (s = 0; s < nsrc; s++)
     {
@@ -5453,33 +5460,35 @@ static void reduce_buffer_flags(const nbnxn_search_t        nbs,
 
         for (b = 0; b < dest->nflag; b++)
         {
-            dest->flag[b] |= flag[b];
+            bitmask_union(&(dest->flag[b]), flag[b]);
         }
     }
 }
 
 static void print_reduction_cost(const nbnxn_buffer_flags_t *flags, int nout)
 {
-    int nelem, nkeep, ncopy, nred, b, c, out;
+    int           nelem, nkeep, ncopy, nred, b, c, out;
+    gmx_bitmask_t mask_0;
 
     nelem = 0;
     nkeep = 0;
     ncopy = 0;
     nred  = 0;
+    bitmask_init_bit(&mask_0, 0);
     for (b = 0; b < flags->nflag; b++)
     {
-        if (flags->flag[b] == 1)
+        if (bitmask_is_equal(flags->flag[b], mask_0))
         {
             /* Only flag 0 is set, no copy of reduction required */
             nelem++;
             nkeep++;
         }
-        else if (flags->flag[b] > 0)
+        else if (!bitmask_is_zero(flags->flag[b]))
         {
             c = 0;
             for (out = 0; out < nout; out++)
             {
-                if (flags->flag[b] & (1U<<out))
+                if (bitmask_is_set(flags->flag[b], out))
                 {
                     c++;
                 }

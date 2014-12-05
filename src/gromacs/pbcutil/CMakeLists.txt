@@ -37,12 +37,11 @@ set(LIBGROMACS_SOURCES ${LIBGROMACS_SOURCES} ${PBCUTIL_SOURCES} PARENT_SCOPE)
 
 set(PBCUTIL_OPENCL_KERNEL_DEPENDENCIES ${PBCUTIL_OPENCL_KERNEL_DEPENDENCIES} pbcutil/ishift.h PARENT_SCOPE)
 
-set(PBCUTIL_PUBLIC_HEADERS
+gmx_install_headers(
     ishift.h
     pbc.h
-    rmpbc.h)
-
-gmx_install_headers(pbcutil ${PBCUTIL_PUBLIC_HEADERS})
+    rmpbc.h
+    )
 
 if (BUILD_TESTING)
 #    add_subdirectory(tests)

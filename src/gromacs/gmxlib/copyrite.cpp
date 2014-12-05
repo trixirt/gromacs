@@ -34,8 +34,9 @@
  * To help us fund GROMACS development, we humbly ask that you cite
  * the research papers on the package. Check out http://www.gromacs.org.
  */
-#include "copyrite.h"
-#include "buildinfo.h"
+#include "gmxpre.h"
+
+#include "gromacs/legacyheaders/copyrite.h"
 
 #include "config.h"
 
@@ -47,19 +48,17 @@
 #ifdef HAVE_LIBMKL
 #include <mkl.h>
 #endif
-
 #ifdef HAVE_EXTRAE
- #include "extrae_user_events.h"
+#include <extrae_user_events.h>
 #endif
-
 #include <boost/version.hpp>
 
 /* This file is completely threadsafe - keep it that way! */
 
-#include "gromacs/legacyheaders/macros.h"
-
+#include "buildinfo.h"
 #include "gromacs/fft/fft.h"
 #include "gromacs/fileio/strdb.h"
+#include "gromacs/legacyheaders/macros.h"
 #include "gromacs/math/vec.h"
 #include "gromacs/random/random.h"
 #include "gromacs/utility/baseversion.h"
@@ -69,8 +68,6 @@
 #include "gromacs/utility/gmxassert.h"
 #include "gromacs/utility/programcontext.h"
 #include "gromacs/utility/smalloc.h"
-
-#include "buildinfo.h"
 
 static gmx_bool be_cool(void)
 {
@@ -617,12 +614,16 @@ const char *GromacsVersion()
 
 const char *ShortProgram(void)
 {
+    const char *programName = NULL;
+
     try
     {
         // TODO: Use the display name once it doesn't break anything.
-        return gmx::getProgramContext().programName();
+        programName = gmx::getProgramContext().programName();
     }
     GMX_CATCH_ALL_AND_EXIT_WITH_FATAL_ERROR;
+
+    return programName;
 }
 
 const char *Program(void)
@@ -665,7 +666,7 @@ static void gmx_print_version_info(FILE *fp)
     fprintf(fp, "MPI library:        none\n");
 #endif
 #ifdef GMX_OPENMP
-    fprintf(fp, "OpenMP support:     enabled\n");
+    fprintf(fp, "OpenMP support:     enabled (GMX_OPENMP_MAX_THREADS = %d)\n", GMX_OPENMP_MAX_THREADS);
 #else
     fprintf(fp, "OpenMP support:     disabled\n");
 #endif

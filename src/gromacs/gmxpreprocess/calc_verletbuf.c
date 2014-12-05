@@ -32,7 +32,9 @@
  * To help us fund GROMACS development, we humbly ask that you cite
  * the research papers on the package. Check out http://www.gromacs.org.
  */
-#include "config.h"
+#include "gmxpre.h"
+
+#include "calc_verletbuf.h"
 
 #include <assert.h>
 #include <math.h>
@@ -40,14 +42,12 @@
 
 #include <sys/types.h>
 
-#include "typedefs.h"
+#include "gromacs/ewald/ewald-util.h"
+#include "gromacs/legacyheaders/macros.h"
+#include "gromacs/legacyheaders/typedefs.h"
 #include "gromacs/math/units.h"
-#include "macros.h"
 #include "gromacs/math/vec.h"
-#include "coulomb.h"
-#include "calc_verletbuf.h"
-#include "../mdlib/nbnxn_consts.h"
-
+#include "gromacs/mdlib/nbnxn_consts.h"
 #include "gromacs/utility/fatalerror.h"
 #include "gromacs/utility/smalloc.h"
 
@@ -208,8 +208,8 @@ static void get_vsite_masses(const gmx_moltype_t  *moltype,
             for (i = 0; i < il->nr; i += 1+NRAL(ft))
             {
                 const t_iparams *ip;
-                real             cam[5] = {0}, inv_mass, m_aj;
-                int              a1, j, aj, coeff;
+                real             cam[5] = {0}, inv_mass, coeff, m_aj;
+                int              a1, j, aj;
 
                 ip = &ffparams->iparams[il->iatoms[i]];
 
@@ -247,10 +247,10 @@ static void get_vsite_masses(const gmx_moltype_t  *moltype,
                     case F_VSITEN:
                         /* Exact */
                         inv_mass = 0;
-                        for (j = 0; j < 3*ip->vsiten.n; j += 3)
+                        for (j = 0; j < 3*ffparams->iparams[il->iatoms[i]].vsiten.n; j += 3)
                         {
                             aj    = il->iatoms[i+j+2];
-                            coeff = ip[il->iatoms[i+j]].vsiten.a;
+                            coeff = ffparams->iparams[il->iatoms[i+j]].vsiten.a;
                             if (moltype->atoms.atom[aj].ptype == eptVSite)
                             {
                                 m_aj = vsite_m[aj];
@@ -266,6 +266,8 @@ static void get_vsite_masses(const gmx_moltype_t  *moltype,
                             inv_mass += coeff*coeff/m_aj;
                         }
                         vsite_m[a1] = 1/inv_mass;
+                        /* Correct for loop increment of i */
+                        i += j - 1 - NRAL(ft);
                         break;
                     default:
                         /* Use the mass of the lightest constructing atom.

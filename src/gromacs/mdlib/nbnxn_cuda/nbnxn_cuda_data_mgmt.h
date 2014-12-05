@@ -36,10 +36,12 @@
 #ifndef NBNXN_CUDA_DATA_MGMT_H
 #define NBNXN_CUDA_DATA_MGMT_H
 
-#include "types/simple.h"
-#include "types/interaction_const.h"
-#include "types/nbnxn_cuda_types_ext.h"
-#include "types/hw_info.h"
+#include "config.h"
+
+#include "gromacs/legacyheaders/types/hw_info.h"
+#include "gromacs/legacyheaders/types/interaction_const.h"
+#include "gromacs/legacyheaders/types/nbnxn_cuda_types_ext.h"
+#include "gromacs/legacyheaders/types/simple.h"
 
 /* TODO This needs to be fixed
  *      Use universal generic interface functions for all OpenCL/CUDA ops here

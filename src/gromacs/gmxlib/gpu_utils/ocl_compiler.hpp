@@ -36,7 +36,7 @@
 #ifndef OCL_COMPILER_H
 #define OCL_COMPILER_H
 
-#include "../legacyheaders/types/hw_info.h"
+#include "gromacs/legacyheaders/types/hw_info.h"
 #include "../ocl_tools/oclutils.h"
 
 /**
