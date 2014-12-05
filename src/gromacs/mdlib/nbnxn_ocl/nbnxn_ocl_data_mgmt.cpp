@@ -782,7 +782,7 @@ void nbnxn_ocl_init(FILE                 *fplog,
     snew(nb->timings, 1);
 
     /* set device info, just point it to the right GPU among the detected ones */
-    nb->dev_info = gpu_info->ocl_dev + gpu_opt->ocl_dev_use[my_gpu_index];
+    nb->dev_info = gpu_info->ocl_dev + gpu_opt->dev_use[my_gpu_index];
 
     /* init the kernels */
     nbnxn_init_kernels(nb);

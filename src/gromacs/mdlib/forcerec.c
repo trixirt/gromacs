@@ -1829,20 +1829,11 @@ static void pick_nbnxn_resources(const t_commrec     *cr,
      * Note that you should freezing the system as otherwise it will explode.
      */
     *bEmulateGPU = (bEmulateGPUEnvVarSet ||
-                    (!bDoNonbonded &&
-#ifdef GMX_USE_OPENCL
-                     gpu_opt->nocl_dev_use > 0));
-#else
-                     gpu_opt->ncuda_dev_use > 0));
-#endif
+                    (!bDoNonbonded && gpu_opt->n_dev_use > 0));
 
     /* Enable GPU mode when GPUs are available or no GPU emulation is requested.
      */
-#ifdef GMX_USE_OPENCL
-    if (gpu_opt->nocl_dev_use > 0 && !(*bEmulateGPU))
-#else
-    if (gpu_opt->ncuda_dev_use > 0 && !(*bEmulateGPU))
-#endif
+    if (gpu_opt->n_dev_use > 0 && !(*bEmulateGPU))
     {
         /* Each PP node will use the intra-node id-th device from the
          * list of detected/selected GPUs. */

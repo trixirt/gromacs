@@ -115,19 +115,17 @@ typedef struct
 } ocl_gpu_info_t, *ocl_gpu_info_ptr_t;
 #endif
 
-/* GPU device information -- includes CUDA and OpenCL devices.
+/* GPU device information -- includes either CUDA or OpenCL devices.
  * The gmx_hardware_detect module initializes it. */
 typedef struct
 {
     gmx_bool             bDetectGPUs;          /* Did we try to detect GPUs? */
-    int                  ncuda_dev;            /* total number of CUDA devices detected */
+    int                  n_dev;                /* total number of GPU devices detected */
     cuda_dev_info_ptr_t  cuda_dev;             /* CUDA devices detected in the system (per node) */
-    int                  ncuda_dev_compatible; /* number of compatible CUDA GPUs */
+    int                  n_dev_compatible;     /* number of compatible GPUs */
 
-#ifdef GMX_USE_OPENCL
-    int                  nocl_dev;             /* total number of OpenCL devices detected */
+#ifdef GMX_USE_OPENCL    
     ocl_gpu_info_ptr_t   ocl_dev;              /* OpenCL devices detected in the system (per node) */
-    int                  nocl_dev_compatible;  /* number of compatible OpenCL GPUs */
 #endif
 } gmx_gpu_info_t;
 
@@ -153,19 +151,14 @@ enum {
     threadaffSEL, threadaffAUTO, threadaffON, threadaffOFF, threadaffNR
 };
 
-/* GPU device selection information -- includes CUDA and OpenCL devices */
+/* GPU device selection information -- includes either CUDA or OpenCL devices */
 typedef struct
 {
     char     *gpu_id;        /* GPU id's to use, each specified as chars */
-    gmx_bool  bUserSet;      /* true if the GPUs in cuda_dev_use are manually provided by the user */
-
-    int       ncuda_dev_use; /* number of CUDA device (IDs) selected to be used */
-    int      *cuda_dev_use;  /* device index list providing GPU to PP rank mapping, GPUs can be listed multiple times when ranks share them */
-
-#ifdef GMX_USE_OPENCL
-    int        nocl_dev_use; /* number of OpenCL device (IDs) selected to be used */
-    int       *ocl_dev_use;  /* device index list providing GPU to PP rank mapping, GPUs can be listed multiple times when ranks share them */
-#endif
+    gmx_bool  bUserSet;      /* true if the GPUs in dev_use are manually provided by the user */
+    
+    int       n_dev_use;     /* number of GPU device (IDs) selected to be used */
+    int      *dev_use;       /* device index list providing GPU to PP rank mapping, GPUs can be listed multiple times when ranks share them */
 } gmx_gpu_opt_t;
 
 /* Threading and GPU options, can be set automatically or by the user */
