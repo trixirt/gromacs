@@ -50,8 +50,8 @@
 
 /* This path is defined by CMake and it depends on the install prefix option.
    The opencl kernels are installed in bin/opencl.*/
-#if !defined(OCL_INSTALL_DIR_NAME)
-#pragma error "OCL_INSTALL_DIR_NAME has not been defined"
+#if !defined(OCL_INSTALL_FULL_PATH)
+#pragma error "OCL_INSTALL_FULL_PATH has not been defined"
 #endif
 
 #if defined(__linux__) || (defined(__APPLE__) && defined(__MACH__))
@@ -85,16 +85,16 @@ typedef enum {
  */
 static const char* build_options_list[] = {
     "",
-    "-x clc++",                 /**< AMD C++ extension */
-    "-cl-nv-verbose",           /**< Nvidia verbose build log */
-    "-cl-std=CL1.1",            /**< Force CL 1.1  */
-    "-cl-std=CL1.2",            /**< Force CL 1.2  */
-    "-cl-fast-relaxed-math",    /**< Fast math */
-    "-cl-opt-disable",          /**< Disable optimisations */
-    "-g",                       /**< Debug symbols */
-    "-save-temps",              /**< AMD option to dump intermediate temporary
-                                   files such as IL or ISA code */
-    "-I"OCL_INSTALL_DIR_NAME    /**< Include path to kernel sources */
+    "-x clc++",                        /**< AMD C++ extension */
+    "-cl-nv-verbose",                  /**< Nvidia verbose build log */
+    "-cl-std=CL1.1",                   /**< Force CL 1.1  */
+    "-cl-std=CL1.2",                   /**< Force CL 1.2  */
+    "-cl-fast-relaxed-math",           /**< Fast math */
+    "-cl-opt-disable",                 /**< Disable optimisations */
+    "-g",                              /**< Debug symbols */
+    "-save-temps",                     /**< AMD option to dump intermediate temporary
+                                            files such as IL or ISA code */
+    "-I""\""OCL_INSTALL_FULL_PATH"\""  /**< Include path to kernel sources */
     /*,
        "-I../../src/gromacs/gmxlib/ocl_tools           -I../../src/gromacs/mdlib/nbnxn_ocl            -I../../src/gromacs/pbcutil            -I../../src/gromacs/mdlib"
        -I../../../gromacs/src/gromacs/gmxlib/ocl_tools -I../../../gromacs/src/gromacs/mdlib/nbnxn_ocl -I../../../gromacs/src/gromacs/pbcutil -I../../../gromacs/src/gromacs/mdlib" */
@@ -396,9 +396,9 @@ create_ocl_build_options(
  *
  * If GMX_OCL_FILE_PATH is defined in the environment the following full path size is returned:
  *  strlen($GMX_OCL_FILE_PATH) + strlen(kernel_id.cl) + separator + null term
- * Otherwise the following full path size is returned (OCL_INSTALL_DIR_NAME is provided by CMAKE
+ * Otherwise the following full path size is returned (OCL_INSTALL_FULL_PATH is provided by CMAKE
  *  installation prefix path) :
- *  strlen( OCL_INSTALL_DIR_NAME ) + strlen(kernel_id.cl) + separator + null term
+ *  strlen( OCL_INSTALL_FULL_PATH ) + strlen(kernel_id.cl) + separator + null term
  *
  * \param kernel_src_id Id of the kernel source (auto,nvidia,amd,nowarp)
  * \return Size in bytes of the full kernel source file path and name including
@@ -420,7 +420,7 @@ get_ocl_kernel_source_file_info(kernel_source_index_t kernel_src_id)
     {
         /* Kernel source are located in the installation folder of Gromacs */
         return( strlen(kernel_filenames[kernel_src_id])     /* Kernel source filename     */
-                + strlen(OCL_INSTALL_DIR_NAME)              /* Full path to kernel source */
+                + strlen(OCL_INSTALL_FULL_PATH)              /* Full path to kernel source */
                 + 2);                                       /* separator and null char    */
     }
 }
@@ -430,9 +430,9 @@ get_ocl_kernel_source_file_info(kernel_source_index_t kernel_src_id)
  *
  * If GMX_OCL_FILE_PATH is defined in the environment the following full path size is composed:
  *  $GMX_OCL_FILE_PATH/kernel_id.cl
- * Otherwise the following full path is composed (OCL_INSTALL_DIR_NAME is provided by CMAKE
+ * Otherwise the following full path is composed (OCL_INSTALL_FULL_PATH is provided by CMAKE
  *  installation prefix path):
- *  OCL_INSTALL_DIR_NAME/kernel_id.cl
+ *  OCL_INSTALL_FULL_PATH/kernel_id.cl
  *
  * \param ocl_kernel_filename   String where the full path and name will be saved
  * \param kernel_src_id         Id of the kernel source (default)
@@ -490,8 +490,8 @@ get_ocl_kernel_source_path(
     else
     {
         size_t chars_copied = 0;
-        strncpy(ocl_kernel_filename, OCL_INSTALL_DIR_NAME, strlen(OCL_INSTALL_DIR_NAME));
-        chars_copied += strlen(OCL_INSTALL_DIR_NAME);
+        strncpy(ocl_kernel_filename, OCL_INSTALL_FULL_PATH, strlen(OCL_INSTALL_FULL_PATH));
+        chars_copied += strlen(OCL_INSTALL_FULL_PATH);
 
         ocl_kernel_filename[chars_copied++] = SEPARATOR;
 
