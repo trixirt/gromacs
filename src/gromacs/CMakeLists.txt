@@ -245,12 +245,12 @@ if(GMX_GPU AND GMX_USE_OPENCL)
     #if (INSTALL_OPENCL_KERNELS)
         set(OPENCL_KERNELS ${GMXLIB_OPENCL_KERNELS} ${MDLIB_OPENCL_KERNELS})       
         
-        message(STATUS "Will Install OpenCL kernels: " ${OPENCL_KERNELS} " in " ${OCL_INSTALL_FULL_PATH} )
+        #message(STATUS "Will Install OpenCL kernels: " ${OPENCL_KERNELS} " in " ${OCL_INSTALL_FULL_PATH} )
         install(FILES ${OPENCL_KERNELS} DESTINATION
             ${OCL_INSTALL_FULL_PATH} COMPONENT development)
             
         set(OPENCL_KERNEL_DEPENDENCIES ${PBCUTIL_OPENCL_KERNEL_DEPENDENCIES} ${MDLIB_OPENCL_KERNEL_DEPENDENCIES})
-        message(STATUS "Will Install OpenCL kernel dependencies: " ${OPENCL_KERNEL_DEPENDENCIES} " in " ${OCL_INSTALL_FULL_PATH} )
+        #message(STATUS "Will Install OpenCL kernel dependencies: " ${OPENCL_KERNEL_DEPENDENCIES} " in " ${OCL_INSTALL_FULL_PATH} )
         install(FILES ${OPENCL_KERNEL_DEPENDENCIES} DESTINATION
             ${OCL_INSTALL_FULL_PATH} COMPONENT development)                
     #elseif(EMBED_OPENCL_KERNELS)
