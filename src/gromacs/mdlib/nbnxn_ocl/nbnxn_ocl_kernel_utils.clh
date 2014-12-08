@@ -34,7 +34,7 @@
  */
  
 #include "vectype_ops.clh"
-#include "../nbnxn_consts.h"
+#include "nbnxn_consts.h"
 
 #define CL_SIZE                 (NBNXN_GPU_CLUSTER_SIZE)
 #define NCL_PER_SUPERCL         (NBNXN_GPU_NCLUSTER_PER_SUPERCLUSTER)
