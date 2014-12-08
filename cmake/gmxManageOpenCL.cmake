@@ -32,7 +32,6 @@
 # To help us fund GROMACS development, we humbly ask that you cite
 # the research papers on the package. Check out http://www.gromacs.org.
 
-option(GMX_OPENCL_FORCE_LOCAL_HEADERS "Use the OpenCL headers redistributed with Gromacs" OFF)
 option(GMX_OPENCL_FORCE_CL11_API "Try this if you are having compilations issues with OpenCL enabled" OFF)
 option(GMX_OPENCL_HIDE_COMMENT_WARNING "Tell compiler to hide warnings for comments caused by cl_gl_ext.h on Linux" ON)
 
@@ -69,11 +68,7 @@ message(STATUS "Setting OpenCL specific options")
     #1: In system
     #2: In paths indicated by environtment variables
     #3: In standard installation paths (e.g. /opt/AMDAPP, /usr/local/cuda etc..
-    #4: In Gromacs  
-
-if(GMX_OPENCL_FORCE_LOCAL_HEADERS)
-    set(OPENCL_INCLUDE_DIRS ../src)
-endif(GMX_OPENCL_FORCE_LOCAL_HEADERS)    
+    #4: In Gromacs
 
 if(GMX_OPENCL_FORCE_CL11_API)
     set(OPENCL_DEFINITIONS "-DCL_USE_DEPRECATED_OPENCL_1_1_APIS")
