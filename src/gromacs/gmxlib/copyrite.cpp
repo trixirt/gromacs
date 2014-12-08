@@ -188,7 +188,9 @@ static void printCopyright(FILE *fp)
         "Alfons Sijbers",
         "Peter Tieleman",
         "Christian Wennberg",
-        "Maarten Wolf"
+        "Maarten Wolf",
+        "Dimitrios Karkoulis",
+        "StreamComputing (Vincent Hindriksen, Anca Hamuraru, Teemu Virolainen)"
     };
     static const char * const CopyrightText[] = {
         "Copyright (c) 1991-2000, University of Groningen, The Netherlands.",
