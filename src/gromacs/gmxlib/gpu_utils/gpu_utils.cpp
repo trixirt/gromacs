@@ -82,7 +82,7 @@ static bool is_compatible_ocl_gpu(int stat)
  * \returns             true if the GPU properties passed indicate a compatible
  *                      GPU, otherwise false.
  */
-static int is_gmx_supported_ocl_gpu_id(gpu_info_ptr_t ocl_gpu_device)
+static int is_gmx_supported_ocl_gpu_id(struct gmx_device_info_t *ocl_gpu_device)
 {
     /* Only AMD and NVIDIA GPUs are supported for now */
     if ((_OCL_VENDOR_NVIDIA_ == ocl_gpu_device->vendor_e) ||
@@ -260,7 +260,7 @@ int detect_ocl_gpus(gmx_gpu_info_t *gpu_info, char *err_str)
                     {
                         if ((last + 1) < i)
                         {
-                            gpu_info_t ocl_gpu_info;
+                            gmx_device_info_t ocl_gpu_info;
                             ocl_gpu_info = gpu_info->gpu_dev[i];
                             last++;
                             gpu_info->gpu_dev[i]    = gpu_info->gpu_dev[last];
@@ -278,7 +278,7 @@ int detect_ocl_gpus(gmx_gpu_info_t *gpu_info, char *err_str)
                         {
                             if ((last + 1) < i)
                             {
-                                gpu_info_t ocl_gpu_info;
+                                gmx_device_info_t ocl_gpu_info;
                                 ocl_gpu_info = gpu_info->gpu_dev[i];
                                 last++;
                                 gpu_info->gpu_dev[i] = gpu_info->gpu_dev[last];
@@ -441,7 +441,7 @@ void get_ocl_gpu_device_info_string(char gmx_unused *s, const gmx_gpu_info_t gmx
         return;
     }
 
-    gpu_info_t  *dinfo = &gpu_info->gpu_dev[index];
+    gmx_device_info_t  *dinfo = &gpu_info->gpu_dev[index];
 
     bool             bGpuExists =
         dinfo->stat == egpuCompatible ||
@@ -492,7 +492,7 @@ gmx_bool init_ocl_gpu(int gmx_unused                   mygpu,
                       )
 {
     cl_context_properties context_properties[3];
-    gpu_info_ptr_t        selected_ocl_gpu;
+    struct gmx_device_info_t *selected_ocl_gpu;
     cl_platform_id        platform_id;
     cl_device_id          device_id;
     cl_context            context;
@@ -523,6 +523,9 @@ gmx_bool init_ocl_gpu(int gmx_unused                   mygpu,
         gmx_incons(sbuf);
     }
 
+    /* TODO This content would be better in src/gromacs/mdlib, because it
+     * pertains only to compiling non-bonded kernels. src/gromacs/gpu_utils
+     * is intended to be available for generic use. */
     while (1)
     {
         selected_ocl_gpu = gpu_info->gpu_dev + gpu_opt->dev_use[mygpu];
@@ -619,7 +622,7 @@ char* get_ocl_gpu_device_name(const gmx_gpu_info_t *gpu_info,
  */
 size_t sizeof_ocl_dev_info(void)
 {
-    return sizeof(gpu_info_t);
+    return sizeof(gmx_device_info_t);
 }
 
 /*! \brief Allocates nbytes of host memory. Use ocl_free to free memory allocated with this function.

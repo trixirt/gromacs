@@ -70,7 +70,7 @@ typedef struct
 * interop) and do not provide general device information as the data structure
 * name indicates.
 */
-struct gpu_info
+struct gmx_device_info_t
 {
     ocl_gpu_id_t        ocl_gpu_id;
     char                device_name[256];

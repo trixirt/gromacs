@@ -338,7 +338,7 @@ int detect_cuda_gpus(gmx_gpu_info_t *gpu_info, char *err_str)
     int              i, ndev, checkres, retval;
     cudaError_t      stat;
     cudaDeviceProp   prop;
-    gpu_info_t      *devs;
+    gmx_device_info_t *devs;
 
     assert(gpu_info);
     assert(err_str);
@@ -510,7 +510,7 @@ void get_cuda_gpu_device_info_string(char *s, const gmx_gpu_info_t *gpu_info, in
         return;
     }
 
-    gpu_info_t *dinfo = &gpu_info->gpu_dev[index];
+    gmx_device_info_t *dinfo = &gpu_info->gpu_dev[index];
 
     bool             bGpuExists =
         dinfo->stat == egpuCompatible ||
@@ -577,5 +577,5 @@ int get_current_gpu_device_id(void)
  */
 size_t sizeof_cuda_dev_info(void)
 {
-    return sizeof(gpu_info);
+    return sizeof(gmx_device_info_t);
 }

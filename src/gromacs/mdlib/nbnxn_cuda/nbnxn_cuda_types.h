@@ -48,7 +48,6 @@
 
 #include "gromacs/gmxlib/cuda_tools/cudautils.cuh"
 #include "gromacs/legacyheaders/types/interaction_const.h"
-#include "gromacs/legacyheaders/types/nbnxn_cuda_types_ext.h"
 #include "gromacs/mdlib/nbnxn_pairlist.h"
 
 /* CUDA versions from 5.0 above support texture objects. */
@@ -228,9 +227,9 @@ struct cu_timers
 /** \internal
  * \brief Main data structure for CUDA nonbonded force calculations.
  */
-struct nbnxn_cuda
+struct gmx_nbnxn_cuda_t
 {
-    gpu_info_t      *dev_info;       /**< CUDA device information                              */
+    struct gmx_device_info_t *dev_info;       /**< CUDA device information                              */
     bool             bUseTwoStreams; /**< true if doing both local/non-local NB work on GPU    */
     bool             bUseStreamSync; /**< true if the standard cudaStreamSynchronize is used
                                           and not memory polling-based waiting                 */
@@ -253,7 +252,7 @@ struct nbnxn_cuda
      * setting bDoTime needs to be change if this CUDA "feature" gets fixed. */
     bool             bDoTime;       /**< True if event-based timing is enabled.               */
     cu_timers_t     *timers;        /**< CUDA event-based timers.                             */
-    wallclock_gpu_t *timings;       /**< Timing data.                                         */
+    gmx_wallclock_gpu_t *timings;       /**< Timing data.                                         */
 };
 
 #ifdef __cplusplus

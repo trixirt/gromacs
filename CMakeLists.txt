@@ -173,7 +173,7 @@ if(NOT GMX_USE_OPENCL)
     endif()
     set(REQUIRED_CUDA_COMPUTE_CAPABILITY 2.0)
     include(gmxManageGPU)
-else(NOT GMX_USE_OPENCL)
+else()
     #Now the OpenCL path
     if(GMX_GPU)
         #1.1 For nvidia, 1.2 for amd/intel. 2.0 cannot test
@@ -183,7 +183,7 @@ else(NOT GMX_USE_OPENCL)
     else(GMX_GPU)
         message(FATAL_ERROR "OpenCL requested but GPU option is not enabled (try -DGMX_GPU=on) ")
     endif(GMX_GPU)    
-endif(NOT GMX_USE_OPENCL)
+endif()
 
 # Detect the architecture the compiler is targetting, detect
 # SIMD instructions possibilities on that hardware, suggest SIMD instruction set

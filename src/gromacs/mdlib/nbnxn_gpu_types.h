@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2012, by the GROMACS development team, led by
+ * Copyright (c) 2012,2013,2014, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -33,47 +33,54 @@
  * the research papers on the package. Check out http://www.gromacs.org.
  */
 
-#ifndef NBNXN_CUDA_TYPES_EXT_H
-#define NBNXN_CUDA_TYPES_EXT_H
+#ifndef GMX_MDLIB_NBNXN_GPU_TYPES_H
+#define GMX_MDLIB_NBNXN_GPU_TYPES_H
+
+#include "config.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* Abstract types */
-/* CUDA nonbonded structure */
-typedef struct nbnxn_cuda *nbnxn_cuda_ptr_t;
+/* These macros that let us define inlineable null implementations so
+   that non-GPU Gromacs can run with no overhead without conditionality
+   everywhere a GPU function is called. */
+#if defined GMX_GPU
 
-/* Abstract GPU device info structures */
-typedef struct gpu_info *gpu_info_ptr_t;
-typedef struct gpu_info gpu_info_t;
+#define FUNC_TERM ;
+#define FUNC_QUALIFIER
+#define FUNC_TERM_WITH_RETURN(arg) ;
 
-/* Types defined for the structs below. */
-typedef struct wallclock_gpu wallclock_gpu_t;
-typedef struct nbnxn_cuda_ktime nbnxn_cuda_ktime_t;
+#else /* No accelerator support */
 
-/* Nonbonded kernel time and call count. */
-struct nbnxn_cuda_ktime
-{
-    double  t;
-    int     c;
-};
+#define FUNC_TERM {}
+#define FUNC_QUALIFIER static
+#define FUNC_TERM_WITH_RETURN(arg) { return (arg); }
 
-/* GPU timings for kernels and H2d/D2H transfers. */
-struct wallclock_gpu
-{
-    nbnxn_cuda_ktime_t ktime[2][2]; /* table containing the timings of the four
-                                       version of the nonbonded kernels: force-only,
-                                       force+energy, force+pruning, and force+energy+pruning */
-    double  nb_h2d_t;               /* host to device transfer time in nb calculation  */
-    double  nb_d2h_t;               /* device to host transfer time in nb calculation */
-    int     nb_c;                   /* total call count of the nonbonded gpu operations */
-    double  pl_h2d_t;               /* pair search step host to device transfer time */
-    int     pl_h2d_c;               /* pair search step  host to device transfer call count */
-};
+#endif
+
+#ifdef GMX_GPU
+
+#  if defined GMX_USE_OPENCL
+
+struct gmx_nbnxn_ocl_t;
+typedef struct gmx_nbnxn_ocl_t gmx_nbnxn_gpu_t;
+
+#  else
+
+struct gmx_nbnxn_cuda_t;
+typedef struct gmx_nbnxn_cuda_t gmx_nbnxn_gpu_t;
+
+#  endif
+
+#else
+
+typedef int gmx_nbnxn_gpu_t;
+
+#endif
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* NBNXN_CUDA_TYPES_EXT_H */
+#endif

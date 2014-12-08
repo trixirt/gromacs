@@ -57,13 +57,14 @@
 
 #include "gromacs/mdlib/../gmxlib/ocl_tools/oclutils.h"
 #include "gromacs/mdlib/nbnxn_ocl/nbnxn_ocl_types.h"
-#include "gromacs/mdlib/nbnxn_ocl/nbnxn_ocl_data_mgmt.h"
+#include "gromacs/mdlib/nbnxn_gpu_data_mgmt.h"
 #include "gromacs/legacyheaders/gpu_utils.h"
 
 #include "gromacs/pbcutil/ishift.h"
 #include "gromacs/utility/cstringutil.h"
 #include "gromacs/utility/fatalerror.h"
 #include "gromacs/utility/smalloc.h"
+#include "gromacs/timing/gpu_timing.h"
 
 
 /* This is a heuristically determined parameter for the Fermi architecture for
@@ -194,7 +195,7 @@ void ocl_realloc_buffered(cl_mem *d_dest, void *h_src,
     OpenCL equivalent of init_ewald_coulomb_force_table from nbnxn_cuda_data_mgmt.cu
  */
 static void init_ewald_coulomb_force_table(cl_nbparam_t             *nbp,
-                                           const gpu_info_t         *dev_info)
+                                           const gmx_device_info_t *dev_info)
 {
     float       *ftmp;
     cl_mem       coul_tab;
@@ -244,7 +245,7 @@ static void init_ewald_coulomb_force_table(cl_nbparam_t             *nbp,
     pair-search.
     OpenCL equivalent of init_atomdata_first from nbnxn_cuda_data_mgmt.cu
  */
-static void init_atomdata_first(cl_atomdata_t *ad, int ntypes, gpu_info_t *dev_info)
+static void init_atomdata_first(cl_atomdata_t *ad, int ntypes, gmx_device_info_t *dev_info)
 {
     cl_int cl_error;
 
@@ -268,7 +269,7 @@ static void init_atomdata_first(cl_atomdata_t *ad, int ntypes, gpu_info_t *dev_i
     // TODO: handle errors, check clCreateBuffer flags
 
     /* initialize to NULL pointers to data that is not allocated here and will
-       need reallocation in nbnxn_ocl_init_atomdata */
+       need reallocation in nbnxn_gpu_init_atomdata */
     ad->xq = NULL;
     ad->f  = NULL;
 
@@ -427,7 +428,7 @@ void nbnxn_ocl_convert_gmx_to_gpu_flavors(
 static void init_nbparam(cl_nbparam_t              *nbp,
                          const interaction_const_t *ic,
                          const nbnxn_atomdata_t    *nbat,
-                         const gpu_info_t          *dev_info)
+                         const gmx_device_info_t   *dev_info)
 {
     int         ntypes, nnbfp, nnbfp_comb;
     cl_int      cl_error;
@@ -532,21 +533,21 @@ static void init_nbparam(cl_nbparam_t              *nbp,
  *  electrostatic type switching to twin cut-off (or back) if needed.
  *  OpenCL equivalent of nbnxn_cuda_pme_loadbal_update_param
  */
-void nbnxn_ocl_pme_loadbal_update_param(const nonbonded_verlet_t    *nbv,
+void nbnxn_gpu_pme_loadbal_update_param(const nonbonded_verlet_t    *nbv,
                                         const interaction_const_t   *ic)
 {
     if (!nbv || nbv->grp[0].kernel_type != nbnxnk8x8x8_CUDA)
     {
         return;
     }
-    nbnxn_opencl_ptr_t ocl_nb   = nbv->ocl_nbv;
-    cl_nbparam_t      *nbp      = ocl_nb->nbparam;
+    gmx_nbnxn_ocl_t *nb  = nbv->gpu_nbv;
+    cl_nbparam_t       *nbp = nb->nbparam;
 
     set_cutoff_parameters(nbp, ic);
 
     nbp->eeltype = pick_ewald_kernel_type(ic->rcoulomb != ic->rvdw);
 
-    init_ewald_coulomb_force_table(ocl_nb->nbparam, ocl_nb->dev_info);
+    init_ewald_coulomb_force_table(nb->nbparam, nb->dev_info);
 }
 
 /*! Initializes the pair list data structure.
@@ -555,7 +556,7 @@ void nbnxn_ocl_pme_loadbal_update_param(const nonbonded_verlet_t    *nbv,
 static void init_plist(cl_plist_t *pl)
 {
     /* initialize to NULL pointers to data that is not allocated here and will
-       need reallocation in nbnxn_cuda_init_pairlist */
+       need reallocation in nbnxn_gpu_init_pairlist */
     pl->sci     = NULL;
     pl->cj4     = NULL;
     pl->excl    = NULL;
@@ -582,7 +583,7 @@ static void init_timers(cl_timers_t *t, bool bUseTwoStreams)
 /*! Initializes the timings data structure.
     OpenCL equivalent of init_timings from nbnxn_cuda_data_mgmt.cu
  */
-static void init_timings(wallclock_gpu_t *t)
+static void init_timings(gmx_wallclock_gpu_t *t)
 {
     int i, j;
 
@@ -601,8 +602,8 @@ static void init_timings(wallclock_gpu_t *t)
     }
 }
 
-/*! Initializes the OpenCL kernel pointers of the nbnxn_opencl_ptr_t input data structure. */
-void nbnxn_init_kernels(nbnxn_opencl_ptr_t  nb)
+/*! Initializes the OpenCL kernel pointers of the nbnxn_ocl_ptr_t input data structure. */
+void nbnxn_init_kernels(gmx_nbnxn_ocl_t *nb)
 {
     cl_int cl_error;
 
@@ -627,17 +628,17 @@ void nbnxn_init_kernels(nbnxn_opencl_ptr_t  nb)
     assert(cl_error == CL_SUCCESS);
 }
 
-/*! Initializes the input nbnxn_opencl_ptr_t data structure.
+/*! Initializes the input nbnxn_ocl_ptr_t data structure.
     OpenCL equivalent of nbnxn_cuda_init
  */
-void nbnxn_ocl_init(FILE                 *fplog,
-                    nbnxn_opencl_ptr_t   *p_ocl_nb,
+void nbnxn_gpu_init(FILE                 *fplog,
+                    gmx_nbnxn_ocl_t **p_nb,
                     const gmx_gpu_info_t *gpu_info,
                     const gmx_gpu_opt_t  *gpu_opt,
                     int                   my_gpu_index,
                     gmx_bool              bLocalAndNonlocal)
 {
-    nbnxn_opencl_ptr_t          nb;
+    gmx_nbnxn_ocl_t *nb;
     cl_int                      cl_error;
     char                        sbuf[STRLEN];
     bool                        bStreamSync, bNoStreamSync, bTMPIAtomics, bX86, bOldDriver;
@@ -645,7 +646,7 @@ void nbnxn_ocl_init(FILE                 *fplog,
 
     assert(gpu_info);
 
-    if (p_ocl_nb == NULL)
+    if (p_nb == NULL)
     {
         return;
     }
@@ -836,9 +837,9 @@ void nbnxn_ocl_init(FILE                 *fplog,
     // TODO: check if it's worth implementing for NVIDIA GPUs
     ///////////* set the kernel type for the current GPU */
     ///////////* pick L1 cache configuration */
-    //////////nbnxn_cuda_set_cacheconfig(nb->dev_info);
+    //////////nbnxn_gpu_set_cacheconfig(nb->dev_info);
 
-    *p_ocl_nb = nb;
+    *p_nb = nb;
 
     if (debug)
     {
@@ -850,13 +851,13 @@ void nbnxn_ocl_init(FILE                 *fplog,
     OpenCL equivalent of nbnxn_cuda_clear_e_fshift
  */
 static void
-nbnxn_ocl_clear_e_fshift(nbnxn_opencl_ptr_t ocl_nb)
+nbnxn_ocl_clear_e_fshift(gmx_nbnxn_ocl_t *nb)
 {
 
     cl_int               cl_error = CL_SUCCESS;
-    cl_atomdata_t *      adat     = ocl_nb->atdat;
-    cl_command_queue     ls       = ocl_nb->stream[eintLocal];
-    gpu_info_t *         dev_info = ocl_nb->dev_info;
+    cl_atomdata_t *      adat     = nb->atdat;
+    cl_command_queue     ls       = nb->stream[eintLocal];
+    gmx_device_info_t *dev_info = nb->dev_info;
 
     size_t               dim_block[3] = {1, 1, 1};
     size_t               dim_grid[3]  = {1, 1, 1};
@@ -864,7 +865,7 @@ nbnxn_ocl_clear_e_fshift(nbnxn_opencl_ptr_t ocl_nb)
 
     cl_int               arg_no;
 
-    cl_kernel            zero_e_fshift = ocl_nb->kernel_zero_e_fshift;
+    cl_kernel            zero_e_fshift = nb->kernel_zero_e_fshift;
 
     dim_block[0] = 64;
     dim_grid[0]  = ((shifts/64)*64) + ((shifts%64) ? 64 : 0);
@@ -884,13 +885,13 @@ nbnxn_ocl_clear_e_fshift(nbnxn_opencl_ptr_t ocl_nb)
 /*! Clears the first natoms_clear elements of the GPU nonbonded force output array.
     OpenCL equivalent of nbnxn_cuda_clear_f
  */
-static void nbnxn_ocl_clear_f(nbnxn_opencl_ptr_t ocl_nb, int natoms_clear)
+static void nbnxn_ocl_clear_f(gmx_nbnxn_ocl_t *nb, int natoms_clear)
 {
 
     cl_int               cl_error = CL_SUCCESS;
-    cl_atomdata_t *      adat     = ocl_nb->atdat;
-    cl_command_queue     ls       = ocl_nb->stream[eintLocal];
-    gpu_info_t *         dev_info = ocl_nb->dev_info;
+    cl_atomdata_t *      adat     = nb->atdat;
+    cl_command_queue     ls       = nb->stream[eintLocal];
+    gmx_device_info_t *dev_info = nb->dev_info;
     cl_float             value    = 0.0f;
 
     size_t               dim_block[3] = {1, 1, 1};
@@ -898,7 +899,7 @@ static void nbnxn_ocl_clear_f(nbnxn_opencl_ptr_t ocl_nb, int natoms_clear)
 
     cl_int               arg_no;
 
-    cl_kernel            memset_f = ocl_nb->kernel_memset_f;
+    cl_kernel            memset_f = nb->kernel_memset_f;
 
     cl_uint              natoms_flat = natoms_clear * (sizeof(rvec)/sizeof(real));
 
@@ -917,40 +918,40 @@ static void nbnxn_ocl_clear_f(nbnxn_opencl_ptr_t ocl_nb, int natoms_clear)
 
 /*! OpenCL equivalent of nbnxn_cuda_clear_outputs */
 void
-nbnxn_ocl_clear_outputs(nbnxn_opencl_ptr_t ocl_nb,
+nbnxn_gpu_clear_outputs(gmx_nbnxn_ocl_t *nb,
                         int                flags)
 {
-    nbnxn_ocl_clear_f(ocl_nb, ocl_nb->atdat->natoms);
+    nbnxn_ocl_clear_f(nb, nb->atdat->natoms);
     /* clear shift force array and energies if the outputs were
        used in the current step */
     if (flags & GMX_FORCE_VIRIAL)
     {
-        nbnxn_ocl_clear_e_fshift(ocl_nb);
+        nbnxn_ocl_clear_e_fshift(nb);
     }
 }
 
 /*! OpenCL equivalent of nbnxn_cuda_init_const */
-void nbnxn_ocl_init_const(nbnxn_opencl_ptr_t              ocl_nb,
+void nbnxn_gpu_init_const(gmx_nbnxn_ocl_t *nb,
                           const interaction_const_t      *ic,
                           const nonbonded_verlet_group_t *nbv_group)
 {
-    init_atomdata_first(ocl_nb->atdat, nbv_group[0].nbat->ntype, ocl_nb->dev_info);
+    init_atomdata_first(nb->atdat, nbv_group[0].nbat->ntype, nb->dev_info);
 
-    init_nbparam(ocl_nb->nbparam, ic, nbv_group[0].nbat, ocl_nb->dev_info);
+    init_nbparam(nb->nbparam, ic, nbv_group[0].nbat, nb->dev_info);
 
     /* clear energy and shift force outputs */
-    nbnxn_ocl_clear_e_fshift(ocl_nb);
+    nbnxn_ocl_clear_e_fshift(nb);
 }
 
 /*! OpenCL equivalent of nbnxn_cuda_init_pairlist */
-void nbnxn_ocl_init_pairlist(nbnxn_opencl_ptr_t      ocl_nb,
+void nbnxn_gpu_init_pairlist(gmx_nbnxn_ocl_t *nb,
                              const nbnxn_pairlist_t *h_plist,
                              int                     iloc)
 {
     char             sbuf[STRLEN];
-    bool             bDoTime    = ocl_nb->bDoTime;
-    cl_command_queue stream     = ocl_nb->stream[iloc];
-    cl_plist_t      *d_plist    = ocl_nb->plist[iloc];
+    bool             bDoTime    = nb->bDoTime;
+    cl_command_queue stream     = nb->stream[iloc];
+    cl_plist_t      *d_plist    = nb->plist[iloc];
 
     if (d_plist->na_c < 0)
     {
@@ -969,31 +970,31 @@ void nbnxn_ocl_init_pairlist(nbnxn_opencl_ptr_t      ocl_nb,
     ocl_realloc_buffered(&d_plist->sci, h_plist->sci, sizeof(nbnxn_sci_t),
                          &d_plist->nsci, &d_plist->sci_nalloc,
                          h_plist->nsci,
-                         ocl_nb->dev_info->context,
-                         stream, true, &(ocl_nb->timers->pl_h2d_sci[iloc]));
+                         nb->dev_info->context,
+                         stream, true, &(nb->timers->pl_h2d_sci[iloc]));
 
     ocl_realloc_buffered(&d_plist->cj4, h_plist->cj4, sizeof(nbnxn_cj4_t),
                          &d_plist->ncj4, &d_plist->cj4_nalloc,
                          h_plist->ncj4,
-                         ocl_nb->dev_info->context,
-                         stream, true, &(ocl_nb->timers->pl_h2d_cj4[iloc]));
+                         nb->dev_info->context,
+                         stream, true, &(nb->timers->pl_h2d_cj4[iloc]));
 
     ocl_realloc_buffered(&d_plist->excl, h_plist->excl, sizeof(nbnxn_excl_t),
                          &d_plist->nexcl, &d_plist->excl_nalloc,
                          h_plist->nexcl,
-                         ocl_nb->dev_info->context,
-                         stream, true, &(ocl_nb->timers->pl_h2d_excl[iloc]));
+                         nb->dev_info->context,
+                         stream, true, &(nb->timers->pl_h2d_excl[iloc]));
 
     /* need to prune the pair list during the next step */
     d_plist->bDoPrune = true;
 }
 
 /*! OpenCL equivalent of nbnxn_cuda_upload_shiftvec */
-void nbnxn_ocl_upload_shiftvec(nbnxn_opencl_ptr_t      ocl_nb,
+void nbnxn_gpu_upload_shiftvec(gmx_nbnxn_ocl_t *nb,
                                const nbnxn_atomdata_t *nbatom)
 {
-    cl_atomdata_t   *adat  = ocl_nb->atdat;
-    cl_command_queue ls    = ocl_nb->stream[eintLocal];
+    cl_atomdata_t   *adat  = nb->atdat;
+    cl_command_queue ls    = nb->stream[eintLocal];
 
     /* only if we have a dynamic box */
     if (nbatom->bDynamicBox || !adat->bShiftVecUploaded)
@@ -1004,17 +1005,17 @@ void nbnxn_ocl_upload_shiftvec(nbnxn_opencl_ptr_t      ocl_nb,
     }
 }
 
-/*! OpenCL equivalent of nbnxn_cuda_init_atomdata */
-void nbnxn_ocl_init_atomdata(nbnxn_opencl_ptr_t      ocl_nb,
-                             const nbnxn_atomdata_t *nbat)
+/*! Initialize atomdata */
+void nbnxn_gpu_init_atomdata(gmx_nbnxn_ocl_t *nb,
+                             const struct nbnxn_atomdata_t *nbat)
 {
     cl_int           cl_error;
     int              nalloc, natoms;
     bool             realloced;
-    bool             bDoTime = ocl_nb->bDoTime;
-    cl_timers_t     *timers  = ocl_nb->timers;
-    cl_atomdata_t   *d_atdat = ocl_nb->atdat;
-    cl_command_queue ls      = ocl_nb->stream[eintLocal];
+    bool             bDoTime = nb->bDoTime;
+    cl_timers_t     *timers  = nb->timers;
+    cl_atomdata_t   *d_atdat = nb->atdat;
+    cl_command_queue ls      = nb->stream[eintLocal];
 
     natoms    = nbat->natoms;
     realloced = false;
@@ -1033,15 +1034,15 @@ void nbnxn_ocl_init_atomdata(nbnxn_opencl_ptr_t      ocl_nb,
             ocl_free_buffered(d_atdat->atom_types, NULL, NULL);
         }
 
-        d_atdat->f = clCreateBuffer(ocl_nb->dev_info->context, CL_MEM_READ_WRITE, nalloc * sizeof(rvec), NULL, &cl_error);
+        d_atdat->f = clCreateBuffer(nb->dev_info->context, CL_MEM_READ_WRITE, nalloc * sizeof(rvec), NULL, &cl_error);
         assert(CL_SUCCESS == cl_error);
         // TODO: handle errors, check clCreateBuffer flags
 
-        d_atdat->xq = clCreateBuffer(ocl_nb->dev_info->context, CL_MEM_READ_WRITE, nalloc * sizeof(cl_float4), NULL, &cl_error);
+        d_atdat->xq = clCreateBuffer(nb->dev_info->context, CL_MEM_READ_WRITE, nalloc * sizeof(cl_float4), NULL, &cl_error);
         assert(CL_SUCCESS == cl_error);
         // TODO: handle errors, check clCreateBuffer flags
 
-        d_atdat->atom_types = clCreateBuffer(ocl_nb->dev_info->context, CL_MEM_READ_WRITE, nalloc * sizeof(int), NULL, &cl_error);
+        d_atdat->atom_types = clCreateBuffer(nb->dev_info->context, CL_MEM_READ_WRITE, nalloc * sizeof(int), NULL, &cl_error);
         assert(CL_SUCCESS == cl_error);
         // TODO: handle errors, check clCreateBuffer flags
 
@@ -1055,7 +1056,7 @@ void nbnxn_ocl_init_atomdata(nbnxn_opencl_ptr_t      ocl_nb,
     /* need to clear GPU f output if realloc happened */
     if (realloced)
     {
-        nbnxn_ocl_clear_f(ocl_nb, nalloc);
+        nbnxn_ocl_clear_f(nb, nalloc);
     }
 
     ocl_copy_H2D_async(d_atdat->atom_types, nbat->type, 0,
@@ -1105,101 +1106,101 @@ void free_ocl_buffer(cl_mem *buffer)
 }
 
 /*! OpenCL equivalent of nbnxn_cuda_free */
-void nbnxn_ocl_free(nbnxn_opencl_ptr_t ocl_nb)
+void nbnxn_gpu_free(gmx_nbnxn_ocl_t *nb)
 {
     // TODO: Implement this functions for OpenCL
     cl_int cl_error;
     int    kernel_count;
 
     /* Free kernels */
-    kernel_count = sizeof(ocl_nb->kernel_ener_noprune_ptr) / sizeof(ocl_nb->kernel_ener_noprune_ptr[0][0]);
-    free_kernels((cl_kernel*)ocl_nb->kernel_ener_noprune_ptr, kernel_count);
+    kernel_count = sizeof(nb->kernel_ener_noprune_ptr) / sizeof(nb->kernel_ener_noprune_ptr[0][0]);
+    free_kernels((cl_kernel*)nb->kernel_ener_noprune_ptr, kernel_count);
 
-    kernel_count = sizeof(ocl_nb->kernel_ener_prune_ptr) / sizeof(ocl_nb->kernel_ener_prune_ptr[0][0]);
-    free_kernels((cl_kernel*)ocl_nb->kernel_ener_prune_ptr, kernel_count);
+    kernel_count = sizeof(nb->kernel_ener_prune_ptr) / sizeof(nb->kernel_ener_prune_ptr[0][0]);
+    free_kernels((cl_kernel*)nb->kernel_ener_prune_ptr, kernel_count);
 
-    kernel_count = sizeof(ocl_nb->kernel_noener_noprune_ptr) / sizeof(ocl_nb->kernel_noener_noprune_ptr[0][0]);
-    free_kernels((cl_kernel*)ocl_nb->kernel_noener_noprune_ptr, kernel_count);
+    kernel_count = sizeof(nb->kernel_noener_noprune_ptr) / sizeof(nb->kernel_noener_noprune_ptr[0][0]);
+    free_kernels((cl_kernel*)nb->kernel_noener_noprune_ptr, kernel_count);
 
-    kernel_count = sizeof(ocl_nb->kernel_noener_prune_ptr) / sizeof(ocl_nb->kernel_noener_prune_ptr[0][0]);
-    free_kernels((cl_kernel*)ocl_nb->kernel_noener_prune_ptr, kernel_count);
+    kernel_count = sizeof(nb->kernel_noener_prune_ptr) / sizeof(nb->kernel_noener_prune_ptr[0][0]);
+    free_kernels((cl_kernel*)nb->kernel_noener_prune_ptr, kernel_count);
 
-    free_kernel(&(ocl_nb->kernel_memset_f));
-    free_kernel(&(ocl_nb->kernel_memset_f2));
-    free_kernel(&(ocl_nb->kernel_memset_f3));
-    free_kernel(&(ocl_nb->kernel_zero_e_fshift));
+    free_kernel(&(nb->kernel_memset_f));
+    free_kernel(&(nb->kernel_memset_f2));
+    free_kernel(&(nb->kernel_memset_f3));
+    free_kernel(&(nb->kernel_zero_e_fshift));
 
     /* Free atdat */
-    free_ocl_buffer(&(ocl_nb->atdat->xq));
-    free_ocl_buffer(&(ocl_nb->atdat->f));
-    free_ocl_buffer(&(ocl_nb->atdat->e_lj));
-    free_ocl_buffer(&(ocl_nb->atdat->e_el));
-    free_ocl_buffer(&(ocl_nb->atdat->fshift));
-    free_ocl_buffer(&(ocl_nb->atdat->atom_types));
-    free_ocl_buffer(&(ocl_nb->atdat->shift_vec));
-    sfree(ocl_nb->atdat);
+    free_ocl_buffer(&(nb->atdat->xq));
+    free_ocl_buffer(&(nb->atdat->f));
+    free_ocl_buffer(&(nb->atdat->e_lj));
+    free_ocl_buffer(&(nb->atdat->e_el));
+    free_ocl_buffer(&(nb->atdat->fshift));
+    free_ocl_buffer(&(nb->atdat->atom_types));
+    free_ocl_buffer(&(nb->atdat->shift_vec));
+    sfree(nb->atdat);
 
     /* Free nbparam */
-    free_ocl_buffer(&(ocl_nb->nbparam->nbfp_climg2d));
-    free_ocl_buffer(&(ocl_nb->nbparam->nbfp_comb_climg2d));
-    free_ocl_buffer(&(ocl_nb->nbparam->coulomb_tab_climg2d));
-    sfree(ocl_nb->nbparam);
+    free_ocl_buffer(&(nb->nbparam->nbfp_climg2d));
+    free_ocl_buffer(&(nb->nbparam->nbfp_comb_climg2d));
+    free_ocl_buffer(&(nb->nbparam->coulomb_tab_climg2d));
+    sfree(nb->nbparam);
 
     /* Free plist */
-    free_ocl_buffer(&(ocl_nb->plist[eintLocal]->sci));
-    free_ocl_buffer(&(ocl_nb->plist[eintLocal]->cj4));
-    free_ocl_buffer(&(ocl_nb->plist[eintLocal]->excl));
-    sfree(ocl_nb->plist[eintLocal]);
-    if (ocl_nb->bUseTwoStreams)
+    free_ocl_buffer(&(nb->plist[eintLocal]->sci));
+    free_ocl_buffer(&(nb->plist[eintLocal]->cj4));
+    free_ocl_buffer(&(nb->plist[eintLocal]->excl));
+    sfree(nb->plist[eintLocal]);
+    if (nb->bUseTwoStreams)
     {
-        free_ocl_buffer(&(ocl_nb->plist[eintNonlocal]->sci));
-        free_ocl_buffer(&(ocl_nb->plist[eintNonlocal]->cj4));
-        free_ocl_buffer(&(ocl_nb->plist[eintNonlocal]->excl));
-        sfree(ocl_nb->plist[eintNonlocal]);
+        free_ocl_buffer(&(nb->plist[eintNonlocal]->sci));
+        free_ocl_buffer(&(nb->plist[eintNonlocal]->cj4));
+        free_ocl_buffer(&(nb->plist[eintNonlocal]->excl));
+        sfree(nb->plist[eintNonlocal]);
     }
 
     /* Free nbst */
-    ocl_pfree(ocl_nb->nbst.e_lj);
-    ocl_nb->nbst.e_lj = NULL;
+    ocl_pfree(nb->nbst.e_lj);
+    nb->nbst.e_lj = NULL;
 
-    ocl_pfree(ocl_nb->nbst.e_el);
-    ocl_nb->nbst.e_el = NULL;
+    ocl_pfree(nb->nbst.e_el);
+    nb->nbst.e_el = NULL;
 
-    ocl_pfree(ocl_nb->nbst.fshift);
-    ocl_nb->nbst.fshift = NULL;
+    ocl_pfree(nb->nbst.fshift);
+    nb->nbst.fshift = NULL;
 
     /* Free debug buffer */
-    if (NULL != ocl_nb->debug_buffer)
+    if (NULL != nb->debug_buffer)
     {
-        cl_error = clReleaseMemObject(ocl_nb->debug_buffer);
+        cl_error = clReleaseMemObject(nb->debug_buffer);
         assert(CL_SUCCESS == cl_error);
-        ocl_nb->debug_buffer = NULL;
+        nb->debug_buffer = NULL;
     }
 
     /* Free command queues */
-    clReleaseCommandQueue(ocl_nb->stream[eintLocal]);
-    ocl_nb->stream[eintLocal] = NULL;
-    if (ocl_nb->bUseTwoStreams)
+    clReleaseCommandQueue(nb->stream[eintLocal]);
+    nb->stream[eintLocal] = NULL;
+    if (nb->bUseTwoStreams)
     {
-        clReleaseCommandQueue(ocl_nb->stream[eintNonlocal]);
-        ocl_nb->stream[eintNonlocal] = NULL;
+        clReleaseCommandQueue(nb->stream[eintNonlocal]);
+        nb->stream[eintNonlocal] = NULL;
     }
     /* Free other events */
-    if (ocl_nb->nonlocal_done)
+    if (nb->nonlocal_done)
     {
-        clReleaseEvent(ocl_nb->nonlocal_done);
-        ocl_nb->nonlocal_done = NULL;
+        clReleaseEvent(nb->nonlocal_done);
+        nb->nonlocal_done = NULL;
     }
-    if (ocl_nb->misc_ops_done)
+    if (nb->misc_ops_done)
     {
-        clReleaseEvent(ocl_nb->misc_ops_done);
-        ocl_nb->misc_ops_done = NULL;
+        clReleaseEvent(nb->misc_ops_done);
+        nb->misc_ops_done = NULL;
     }
 
     /* Free timers and timings */
-    sfree(ocl_nb->timers);
-    sfree(ocl_nb->timings);
-    sfree(ocl_nb);
+    sfree(nb->timers);
+    sfree(nb->timings);
+    sfree(nb);
 
     if (debug)
     {
@@ -1208,30 +1209,30 @@ void nbnxn_ocl_free(nbnxn_opencl_ptr_t ocl_nb)
 }
 
 /*! OpenCL equivalent of nbnxn_cuda_get_timings */
-wallclock_gpu_t * nbnxn_ocl_get_timings(nbnxn_opencl_ptr_t cu_nb)
+gmx_wallclock_gpu_t * nbnxn_gpu_get_timings(gmx_nbnxn_ocl_t *nb)
 {
-    return (cu_nb != NULL && cu_nb->bDoTime) ? cu_nb->timings : NULL;
+    return (nb != NULL && nb->bDoTime) ? nb->timings : NULL;
 }
 
 /*! OpenCL equivalent of nbnxn_cuda_reset_timings */
-void nbnxn_ocl_reset_timings(nonbonded_verlet_t* nbv)
+void nbnxn_gpu_reset_timings(nonbonded_verlet_t* nbv)
 {
-    if (nbv->ocl_nbv && nbv->ocl_nbv->bDoTime)
+    if (nbv->gpu_nbv && nbv->gpu_nbv->bDoTime)
     {
-        init_timings(nbv->ocl_nbv->timings);
+        init_timings(nbv->gpu_nbv->timings);
     }
 }
 
 /*! OpenCL equivalent of nbnxn_cuda_min_ci_balanced */
-int nbnxn_ocl_min_ci_balanced(nbnxn_opencl_ptr_t ocl_nb)
+int nbnxn_gpu_min_ci_balanced(gmx_nbnxn_ocl_t *nb)
 {
-    return ocl_nb != NULL ?
-           gpu_min_ci_balanced_factor * ocl_nb->dev_info->compute_units : 0;
+    return nb != NULL ?
+           gpu_min_ci_balanced_factor * nb->dev_info->compute_units : 0;
 }
 
 /*! OpenCL equivalent of nbnxn_cuda_is_kernel_ewald_analytical */
-gmx_bool nbnxn_ocl_is_kernel_ewald_analytical(const nbnxn_opencl_ptr_t ocl_nb)
+gmx_bool nbnxn_gpu_is_kernel_ewald_analytical(const gmx_nbnxn_ocl_t *nb)
 {
-    return ((ocl_nb->nbparam->eeltype == eelOclEWALD_ANA) ||
-            (ocl_nb->nbparam->eeltype == eelOclEWALD_ANA_TWIN));
+    return ((nb->nbparam->eeltype == eelOclEWALD_ANA) ||
+            (nb->nbparam->eeltype == eelOclEWALD_ANA_TWIN));
 }

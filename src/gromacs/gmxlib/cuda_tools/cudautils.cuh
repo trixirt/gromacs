@@ -113,7 +113,7 @@ extern "C" {
 #endif
 
 /*! CUDA device information. */
-struct gpu_info
+struct gmx_device_info_t
 {
     int             id;      /* id of the CUDA device */
     cudaDeviceProp  prop;    /* CUDA device properties */

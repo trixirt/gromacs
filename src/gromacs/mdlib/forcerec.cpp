@@ -63,18 +63,15 @@
 #include "gromacs/legacyheaders/txtdump.h"
 #include "gromacs/legacyheaders/typedefs.h"
 #include "gromacs/legacyheaders/types/commrec.h"
-#include "gromacs/legacyheaders/types/nbnxn_cuda_types_ext.h"
-#include "gromacs/legacyheaders/types/nbnxn_ocl_types_ext.h"
 #include "gromacs/math/units.h"
 #include "gromacs/math/utilities.h"
 #include "gromacs/math/vec.h"
 #include "gromacs/mdlib/nb_verlet.h"
 #include "gromacs/mdlib/nbnxn_atomdata.h"
 #include "gromacs/mdlib/nbnxn_consts.h"
+#include "gromacs/mdlib/nbnxn_gpu_data_mgmt.h"
 #include "gromacs/mdlib/nbnxn_search.h"
 #include "gromacs/mdlib/nbnxn_simd.h"
-#include "gromacs/mdlib/nbnxn_cuda/nbnxn_cuda_data_mgmt.h"
-#include "gromacs/mdlib/nbnxn_ocl/nbnxn_ocl_data_mgmt.h"
 #include "gromacs/pbcutil/ishift.h"
 #include "gromacs/pbcutil/pbc.h"
 #include "gromacs/topology/mtop_util.h"
@@ -2124,11 +2121,7 @@ init_interaction_const(FILE                       *fp,
 
     if (fr->nbv != NULL && fr->nbv->bUseGPU)
     {
-#ifdef GMX_USE_OPENCL
-        nbnxn_ocl_init_const(fr->nbv->ocl_nbv, ic, fr->nbv->grp);
-#else
-        nbnxn_cuda_init_const(fr->nbv->cu_nbv, ic, fr->nbv->grp);
-#endif
+        nbnxn_gpu_init_const(fr->nbv->gpu_nbv, ic, fr->nbv->grp);
 
         /* With tMPI + GPUs some ranks may be sharing GPU(s) and therefore
          * also sharing texture references. To keep the code simple, we don't
@@ -2226,17 +2219,10 @@ static void init_nb_verlet(FILE                *fp,
     {
         /* init the NxN GPU data; the last argument tells whether we'll have
          * both local and non-local NB calculation on GPU */
-#ifdef GMX_USE_OPENCL
-        nbnxn_ocl_init(fp, &nbv->ocl_nbv,
+        nbnxn_gpu_init(fp, &nbv->gpu_nbv,
                        &fr->hwinfo->gpu_info, fr->gpu_opt,
                        cr->rank_pp_intranode,
                        (nbv->ngrp > 1) && !bHybridGPURun);
-#else
-        nbnxn_cuda_init(fp, &nbv->cu_nbv,
-                        &fr->hwinfo->gpu_info, fr->gpu_opt,
-                        cr->rank_pp_intranode,
-                        (nbv->ngrp > 1) && !bHybridGPURun);
-#endif
 
         if ((env = getenv("GMX_NB_MIN_CI")) != NULL)
         {
@@ -2256,11 +2242,7 @@ static void init_nb_verlet(FILE                *fp,
         }
         else
         {
-#ifdef GMX_USE_OPENCL
-            nbv->min_ci_balanced = nbnxn_ocl_min_ci_balanced(nbv->ocl_nbv);
-#else
-            nbv->min_ci_balanced = nbnxn_cuda_min_ci_balanced(nbv->cu_nbv);
-#endif
+            nbv->min_ci_balanced = nbnxn_gpu_min_ci_balanced(nbv->gpu_nbv);
             if (debug)
             {
                 fprintf(debug, "Neighbor-list balancing parameter: %d (auto-adjusted to the number of GPU multi-processors)\n",
@@ -3381,11 +3363,7 @@ void free_gpu_resources(const t_forcerec *fr,
     if (bIsPPrankUsingGPU)
     {
         /* free nbnxn data in GPU memory */
-#ifdef GMX_USE_OPENCL
-        nbnxn_ocl_free(fr->nbv->ocl_nbv);
-#else
-        nbnxn_cuda_free(fr->nbv->cu_nbv);
-#endif
+        nbnxn_gpu_free(fr->nbv->gpu_nbv);
 
         /* With tMPI we need to wait for all ranks to finish deallocation before
          * destroying the context in free_gpu() as some ranks may be sharing

@@ -32,19 +32,18 @@
  * To help us fund GROMACS development, we humbly ask that you cite
  * the research papers on the package. Check out http://www.gromacs.org.
  */
-#ifndef NBNXN_CUDA_H
-#define NBNXN_CUDA_H
+
+/** \internal \file 
+ *  \brief Declares functions for nbnxn GPU control
+ */
+
+#ifndef GMX_MDLIB_NBNXN_GPU_H
+#define GMX_MDLIB_NBNXN_GPU_H
 
 #include "config.h"
 
-#include "gromacs/legacyheaders/types/nbnxn_cuda_types_ext.h"
 #include "gromacs/legacyheaders/types/simple.h"
-
-#ifdef GMX_GPU
-#define FUNC_TERM ;
-#else
-#define FUNC_TERM {}
-#endif
+#include "gromacs/mdlib/nbnxn_gpu_types.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -62,36 +61,34 @@ struct nbnxn_atomdata_t;
  *  The local and non-local interaction calculations are launched in two
  *  separate streams.
  */
-void nbnxn_cuda_launch_kernel(nbnxn_cuda_ptr_t              gmx_unused  cu_nb,
-                              const struct nbnxn_atomdata_t gmx_unused *nbdata,
-                              int                           gmx_unused  flags,
-                              int                           gmx_unused  iloc) FUNC_TERM
+void nbnxn_gpu_launch_kernel(gmx_nbnxn_gpu_t *gmx_unused nb,
+                             const struct nbnxn_atomdata_t gmx_unused *nbdata,
+                             int                    gmx_unused  flags,
+                             int                    gmx_unused  iloc) FUNC_TERM
 
 /*! \brief
  * Launch asynchronously the download of nonbonded forces from the GPU
  * (and energies/shift forces if required).
  */
-void nbnxn_cuda_launch_cpyback(nbnxn_cuda_ptr_t              gmx_unused  cu_nb,
-                               const struct nbnxn_atomdata_t gmx_unused *nbatom,
-                               int                           gmx_unused  flags,
-                               int                           gmx_unused  aloc) FUNC_TERM
+void nbnxn_gpu_launch_cpyback(gmx_nbnxn_gpu_t *gmx_unused nb,
+                              const struct nbnxn_atomdata_t gmx_unused *nbatom,
+                              int                    gmx_unused  flags,
+                              int                    gmx_unused  aloc) FUNC_TERM
 
 /*! \brief
  * Wait for the asynchronously launched nonbonded calculations and data
  * transfers to finish.
  */
-void nbnxn_cuda_wait_gpu(nbnxn_cuda_ptr_t              gmx_unused  cu_nb,
-                         const struct nbnxn_atomdata_t gmx_unused *nbatom,
-                         int                           gmx_unused  flags,
-                         int                           gmx_unused  aloc,
-                         real                          gmx_unused *e_lj,
-                         real                          gmx_unused *e_el,
-                         rvec                          gmx_unused *fshift) FUNC_TERM
+void nbnxn_gpu_wait_for_gpu(gmx_nbnxn_gpu_t *gmx_unused nb,
+                            const struct nbnxn_atomdata_t gmx_unused *nbatom,
+                            int                    gmx_unused  flags,
+                            int                    gmx_unused  aloc,
+                            real                   gmx_unused *e_lj,
+                            real                   gmx_unused *e_el,
+                            rvec                   gmx_unused *fshift) FUNC_TERM
 
 #ifdef __cplusplus
 }
 #endif
 
-#undef FUNC_TERM
-
-#endif /* NBNXN_CUDA_H */
+#endif
