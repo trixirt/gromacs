@@ -36,9 +36,8 @@
 #ifndef NB_VERLET_H
 #define NB_VERLET_H
 
-#include "gromacs/legacyheaders/types/nbnxn_cuda_types_ext.h"
-#include "gromacs/legacyheaders/types/nbnxn_ocl_types_ext.h"
 #include "gromacs/mdlib/nbnxn_pairlist.h"
+#include "gromacs/mdlib/nbnxn_gpu_types.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -103,10 +102,7 @@ typedef struct nonbonded_verlet_t {
     nonbonded_verlet_group_t grp[2];          /* local and non-local interaction group */
 
     gmx_bool                 bUseGPU;         /* TRUE when GPU acceleration is used */
-    nbnxn_cuda_ptr_t         cu_nbv;          /* pointer to CUDA nb verlet data     */
-#ifdef GMX_USE_OPENCL
-    nbnxn_opencl_ptr_t       ocl_nbv;
-#endif
+    gmx_nbnxn_gpu_t         *gpu_nbv;         /* pointer to GPU nb verlet data     */
     int                      min_ci_balanced; /* pair list balancing parameter
                                                  used for the 8x8x8 CUDA kernels    */
 } nonbonded_verlet_t;

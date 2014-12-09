@@ -52,7 +52,7 @@
 #include "gromacs/legacyheaders/types/force_flags.h"
 #include "gromacs/mdlib/nbnxn_consts.h"
 #include "gromacs/legacyheaders/types/hw_info.h"
-
+#include "gromacs/timing/gpu_timing.h"
 
 #include "gromacs/mdlib/../gmxlib/ocl_tools/oclutils.h"
 
@@ -62,8 +62,8 @@
 
 #include "nbnxn_ocl_types.h"
 
-#include "nbnxn_ocl.h"
-#include "gromacs/mdlib/nbnxn_ocl/nbnxn_ocl_data_mgmt.h"
+#include "../nbnxn_gpu.h"
+#include "gromacs/mdlib/nbnxn_gpu_data_mgmt.h"
 
 #include "gromacs/pbcutil/ishift.h"
 #include "gromacs/utility/cstringutil.h"
@@ -97,7 +97,7 @@ static unsigned int poll_wait_pattern = (0x7FU << 23);
 /*! Returns the number of blocks to be used for the nonbonded GPU kernel.
     OpenCL equivalent of calc_nb_kernel_nblock from nbnxn_cuda.cu
  */
-static inline int calc_nb_kernel_nblock(int nwork_units, gpu_info_t *dinfo)
+static inline int calc_nb_kernel_nblock(int nwork_units, gmx_device_info_t *dinfo)
 {
     int max_grid_x_size;
 
@@ -170,12 +170,12 @@ static const char* nb_kfunc_ener_prune_ptr[eelOclNR][evdwOclNR] =
 };
 
 /*! Return a pointer to the kernel version to be executed at the current step.
- *  OpenCL kernel objects are cached in ocl_nb. If the requested kernel is not
+ *  OpenCL kernel objects are cached in nb. If the requested kernel is not
  *  found in the cache, it will be created and the cache will be updated.
  *
  *  OpenCL equivalent of nbnxn_cu_kfunc_ptr_t.
  */
-static inline cl_kernel select_nbnxn_kernel(nbnxn_opencl_ptr_t ocl_nb,
+static inline cl_kernel select_nbnxn_kernel(gmx_nbnxn_ocl_t *nb,
                                             int                eeltype,
                                             int                evdwtype,
                                             bool               bDoEne,
@@ -193,12 +193,12 @@ static inline cl_kernel select_nbnxn_kernel(nbnxn_opencl_ptr_t ocl_nb,
         if (bDoPrune)
         {
             kernel_name_to_run = nb_kfunc_ener_prune_ptr[eeltype][evdwtype];
-            kernel_ptr         = &(ocl_nb->kernel_ener_prune_ptr[eeltype][evdwtype]);
+            kernel_ptr         = &(nb->kernel_ener_prune_ptr[eeltype][evdwtype]);
         }
         else
         {
             kernel_name_to_run = nb_kfunc_ener_noprune_ptr[eeltype][evdwtype];
-            kernel_ptr         = &(ocl_nb->kernel_ener_noprune_ptr[eeltype][evdwtype]);
+            kernel_ptr         = &(nb->kernel_ener_noprune_ptr[eeltype][evdwtype]);
         }
     }
     else
@@ -206,12 +206,12 @@ static inline cl_kernel select_nbnxn_kernel(nbnxn_opencl_ptr_t ocl_nb,
         if (bDoPrune)
         {
             kernel_name_to_run = nb_kfunc_noener_prune_ptr[eeltype][evdwtype];
-            kernel_ptr         = &(ocl_nb->kernel_noener_prune_ptr[eeltype][evdwtype]);
+            kernel_ptr         = &(nb->kernel_noener_prune_ptr[eeltype][evdwtype]);
         }
         else
         {
             kernel_name_to_run = nb_kfunc_noener_noprune_ptr[eeltype][evdwtype];
-            kernel_ptr         = &(ocl_nb->kernel_noener_noprune_ptr[eeltype][evdwtype]);
+            kernel_ptr         = &(nb->kernel_noener_noprune_ptr[eeltype][evdwtype]);
         }
     }
 #ifndef NDEBUG
@@ -220,7 +220,7 @@ static inline cl_kernel select_nbnxn_kernel(nbnxn_opencl_ptr_t ocl_nb,
 
     if (NULL == kernel_ptr[0])
     {
-        *kernel_ptr = clCreateKernel(ocl_nb->dev_info->program, kernel_name_to_run, &cl_error);
+        *kernel_ptr = clCreateKernel(nb->dev_info->program, kernel_name_to_run, &cl_error);
         assert(cl_error == CL_SUCCESS);
     }
     // TODO: handle errors
@@ -372,8 +372,8 @@ double ocl_event_elapsed_ms(cl_event *ocl_event)
 
    OpenCL equivalent of nbnxn_cuda_launch_kernel
  */
-void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t      ocl_nb,
-                             const nbnxn_atomdata_t *nbatom,
+void nbnxn_gpu_launch_kernel(gmx_nbnxn_ocl_t *nb,
+                             const struct nbnxn_atomdata_t *nbatom,
                              int                     flags,
                              int                     iloc)
 {
@@ -384,15 +384,15 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t      ocl_nb,
     size_t               dim_block[3], dim_grid[3];
     cl_kernel            nb_kernel = NULL; /* fn pointer to the nonbonded kernel */
 
-    cl_atomdata_t       *adat    = ocl_nb->atdat;
-    cl_nbparam_t        *nbp     = ocl_nb->nbparam;
-    cl_plist_t          *plist   = ocl_nb->plist[iloc];
-    cl_timers_t         *t       = ocl_nb->timers;
-    cl_command_queue     stream  = ocl_nb->stream[iloc];
+    cl_atomdata_t       *adat    = nb->atdat;
+    cl_nbparam_t        *nbp     = nb->nbparam;
+    cl_plist_t          *plist   = nb->plist[iloc];
+    cl_timers_t         *t       = nb->timers;
+    cl_command_queue     stream  = nb->stream[iloc];
 
     bool                 bCalcEner   = flags & GMX_FORCE_VIRIAL;
     bool                 bCalcFshift = flags & GMX_FORCE_VIRIAL;
-    bool                 bDoTime     = ocl_nb->bDoTime;
+    bool                 bDoTime     = nb->bDoTime;
     cl_uint              arg_no;
 
     cl_nbparam_params_t  nbparams_params;
@@ -424,16 +424,16 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t      ocl_nb,
 
     /* When we get here all misc operations issues in the local stream are done,
        so we record that in the local stream and wait for it in the nonlocal one. */
-    if (ocl_nb->bUseTwoStreams)
+    if (nb->bUseTwoStreams)
     {
         if (iloc == eintLocal)
         {
-            cl_error = clEnqueueMarker(stream, &(ocl_nb->misc_ops_done));
+            cl_error = clEnqueueMarker(stream, &(nb->misc_ops_done));
             assert(CL_SUCCESS == cl_error);
         }
         else
         {
-            sync_ocl_event(stream, &(ocl_nb->misc_ops_done));
+            sync_ocl_event(stream, &(nb->misc_ops_done));
         }
     }
 
@@ -446,14 +446,14 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t      ocl_nb,
     /* beginning of timed nonbonded calculation section */
 
     /* get the pointer to the kernel flavor we need to use */
-    nb_kernel = select_nbnxn_kernel(ocl_nb,
+    nb_kernel = select_nbnxn_kernel(nb,
                                     nbp->eeltype,
                                     nbp->vdwtype,
                                     bCalcEner,
                                     plist->bDoPrune || always_prune);
 
     /* kernel launch config */
-    nblock       = calc_nb_kernel_nblock(plist->nsci, ocl_nb->dev_info);
+    nblock       = calc_nb_kernel_nblock(plist->nsci, nb->dev_info);
     dim_block[0] = CL_SIZE;
     dim_block[1] = CL_SIZE;
     dim_block[2] = 1;
@@ -474,10 +474,10 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t      ocl_nb,
             debug_buffer_h    = (float*)calloc(1, debug_buffer_size);
             assert(NULL != debug_buffer_h);
 
-            if (NULL == ocl_nb->debug_buffer)
+            if (NULL == nb->debug_buffer)
             {
-                ocl_nb->debug_buffer = clCreateBuffer(ocl_nb->dev_info->context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                                                      debug_buffer_size, debug_buffer_h, &cl_error);
+                nb->debug_buffer = clCreateBuffer(nb->dev_info->context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+                                                  debug_buffer_size, debug_buffer_h, &cl_error);
 
                 assert(CL_SUCCESS == cl_error);
             }
@@ -515,7 +515,7 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t      ocl_nb,
     cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(plist->excl));
     cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(int), &bCalcFshift);
     cl_error |= clSetKernelArg(nb_kernel, arg_no++, shmem, NULL);
-    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(ocl_nb->debug_buffer));
+    cl_error |= clSetKernelArg(nb_kernel, arg_no++, sizeof(cl_mem), &(nb->debug_buffer));
 
     assert(cl_error == CL_SUCCESS);
 
@@ -535,7 +535,7 @@ void nbnxn_ocl_launch_kernel(nbnxn_opencl_ptr_t      ocl_nb,
             FILE *pf;
             char  file_name[256] = {0};
 
-            ocl_copy_D2H_async(debug_buffer_h, ocl_nb->debug_buffer, 0,
+            ocl_copy_D2H_async(debug_buffer_h, nb->debug_buffer, 0,
                                debug_buffer_size, stream, NULL);
 
             // Make sure all data has been transfered back from device
@@ -715,8 +715,8 @@ void dump_compare_results_f(float* results, int cnt, char* out_file, char* ref_f
 }
 
 /*! OpenCL equivalent of nbnxn_cuda_launch_cpyback */
-void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t      ocl_nb,
-                              const nbnxn_atomdata_t *nbatom,
+void nbnxn_gpu_launch_cpyback(gmx_nbnxn_ocl_t *nb,
+                              const struct nbnxn_atomdata_t *nbatom,
                               int                     flags,
                               int                     aloc)
 {
@@ -742,16 +742,16 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t      ocl_nb,
         gmx_incons(stmp);
     }
 
-    cl_atomdata_t   *adat    = ocl_nb->atdat;
-    cl_timers_t     *t       = ocl_nb->timers;
-    bool             bDoTime = ocl_nb->bDoTime;
-    cl_command_queue stream  = ocl_nb->stream[iloc];
+    cl_atomdata_t   *adat    = nb->atdat;
+    cl_timers_t     *t       = nb->timers;
+    bool             bDoTime = nb->bDoTime;
+    cl_command_queue stream  = nb->stream[iloc];
 
     bool             bCalcEner   = flags & GMX_FORCE_VIRIAL;
     bool             bCalcFshift = flags & GMX_FORCE_VIRIAL;
 
     /* don't launch copy-back if there was no work to do */
-    if (ocl_nb->plist[iloc]->nsci == 0)
+    if (nb->plist[iloc]->nsci == 0)
     {
         return;
     }
@@ -761,18 +761,18 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t      ocl_nb,
     {
         adat_begin  = 0;
         adat_len    = adat->natoms_local;
-        adat_end    = ocl_nb->atdat->natoms_local;
+        adat_end    = nb->atdat->natoms_local;
     }
     else
     {
         adat_begin  = adat->natoms_local;
         adat_len    = adat->natoms - adat->natoms_local;
-        adat_end    = ocl_nb->atdat->natoms;
+        adat_end    = nb->atdat->natoms;
     }
 
     /* beginning of timed D2H section */
 
-    if (!ocl_nb->bUseStreamSync)
+    if (!nb->bUseStreamSync)
     {
         /* For safety reasons set a few (5%) forces to NaN. This way even if the
            polling "hack" fails with some future NVIDIA driver we'll get a crash. */
@@ -802,9 +802,9 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t      ocl_nb,
 
     /* With DD the local D2H transfer can only start after the non-local
        has been launched. */
-    if (iloc == eintLocal && ocl_nb->bUseTwoStreams)
+    if (iloc == eintLocal && nb->bUseTwoStreams)
     {
-        sync_ocl_event(stream, &(ocl_nb->nonlocal_done));
+        sync_ocl_event(stream, &(nb->nonlocal_done));
     }
 
     /* DtoH f */
@@ -817,7 +817,7 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t      ocl_nb,
        data back first. */
     if (iloc == eintNonlocal)
     {
-        cl_error = clEnqueueMarker(stream, &(ocl_nb->nonlocal_done));
+        cl_error = clEnqueueMarker(stream, &(nb->nonlocal_done));
         assert(CL_SUCCESS == cl_error);
     }
 
@@ -828,17 +828,17 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t      ocl_nb,
         if (bCalcFshift)
         {
             // TODO: review fshift data type and how its size is computed
-            ocl_copy_D2H_async(ocl_nb->nbst.fshift, adat->fshift, 0,
+            ocl_copy_D2H_async(nb->nbst.fshift, adat->fshift, 0,
                                3 * SHIFTS * sizeof(float), stream, bDoTime ? &(t->nb_d2h_fshift[iloc]) : NULL);
         }
 
         /* DtoH energies */
         if (bCalcEner)
         {
-            ocl_copy_D2H_async(ocl_nb->nbst.e_lj, adat->e_lj, 0,
+            ocl_copy_D2H_async(nb->nbst.e_lj, adat->e_lj, 0,
                                sizeof(float), stream, bDoTime ? &(t->nb_d2h_e_lj[iloc]) : NULL);
 
-            ocl_copy_D2H_async(ocl_nb->nbst.e_el, adat->e_el, 0,
+            ocl_copy_D2H_async(nb->nbst.e_el, adat->e_el, 0,
                                sizeof(float), stream, bDoTime ? &(t->nb_d2h_e_el[iloc]) : NULL);
         }
     }
@@ -857,11 +857,11 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t      ocl_nb,
             char         ocl_file_name[256]  = {0};
             char         cuda_file_name[256] = {0};
 
-            cnt      = ocl_nb->plist[0]->ncj4;
+            cnt      = nb->plist[0]->ncj4;
             size     = cnt * sizeof(nbnxn_cj4_t);
             temp_cj4 = (nbnxn_cj4_t*)malloc(size);
 
-            ocl_copy_D2H_async(temp_cj4, ocl_nb->plist[0]->cj4, 0,
+            ocl_copy_D2H_async(temp_cj4, nb->plist[0]->cj4, 0,
                                size, stream, NULL);
 
             // Make sure all data has been transfered back from device
@@ -920,7 +920,7 @@ void nbnxn_ocl_launch_cpyback(nbnxn_opencl_ptr_t      ocl_nb,
             sprintf(ocl_file_name, "ocl_fshift_%d.txt", DEBUG_RUN_STEP);
             sprintf(cuda_file_name, "cuda_fshift_%d.txt", DEBUG_RUN_STEP);
 
-            dump_compare_results_f(ocl_nb->nbst.fshift, SHIFTS * 3,
+            dump_compare_results_f(nb->nbst.fshift, SHIFTS * 3,
                                    ocl_file_name, cuda_file_name);
         }
 
@@ -949,10 +949,10 @@ static inline bool atomic_cas(volatile unsigned int *ptr,
 }
 
 /*! OpenCL equivalent of nbnxn_cuda_wait_gpu */
-void nbnxn_ocl_wait_gpu(nbnxn_opencl_ptr_t ocl_nb,
-                        const nbnxn_atomdata_t *nbatom,
-                        int flags, int aloc,
-                        real *e_lj, real *e_el, rvec *fshift)
+void nbnxn_gpu_wait_for_gpu(gmx_nbnxn_ocl_t *nb,
+                            const nbnxn_atomdata_t *nbatom,
+                            int flags, int aloc,
+                            real *e_lj, real *e_el, rvec *fshift)
 {
     /* NOTE:  only implemented for single-precision at this time */
     cl_int                 cl_error;
@@ -976,10 +976,10 @@ void nbnxn_ocl_wait_gpu(nbnxn_opencl_ptr_t ocl_nb,
         gmx_incons(stmp);
     }
 
-    cl_plist_t      *plist    = ocl_nb->plist[iloc];
-    cl_timers_t     *timers   = ocl_nb->timers;
-    wallclock_gpu_t *timings  = ocl_nb->timings;
-    cl_nb_staging    nbst     = ocl_nb->nbst;
+    cl_plist_t      *plist    = nb->plist[iloc];
+    cl_timers_t     *timers   = nb->timers;
+    struct gmx_wallclock_gpu_t *timings  = nb->timings;
+    cl_nb_staging    nbst     = nb->nbst;
 
     bool             bCalcEner   = flags & GMX_FORCE_VIRIAL;
     bool             bCalcFshift = flags & GMX_FORCE_VIRIAL;
@@ -992,7 +992,7 @@ void nbnxn_ocl_wait_gpu(nbnxn_opencl_ptr_t ocl_nb,
        NOTE: if timing with multiple GPUs (streams) becomes possible, the
        counters could end up being inconsistent due to not being incremented
        on some of the nodes! */
-    if (ocl_nb->plist[iloc]->nsci == 0)
+    if (nb->plist[iloc]->nsci == 0)
     {
         return;
     }
@@ -1000,18 +1000,18 @@ void nbnxn_ocl_wait_gpu(nbnxn_opencl_ptr_t ocl_nb,
     /* calculate the atom data index range based on locality */
     if (LOCAL_A(aloc))
     {
-        adat_end = ocl_nb->atdat->natoms_local;
+        adat_end = nb->atdat->natoms_local;
     }
     else
     {
-        adat_end = ocl_nb->atdat->natoms;
+        adat_end = nb->atdat->natoms;
     }
 
-    if (ocl_nb->bUseStreamSync)
+    if (nb->bUseStreamSync)
     {
 
         /* Actual sync point. Waits for everything to be finished in the command queue. TODO: Find out if a more fine grained solution is needed */
-        cl_error = clFinish(ocl_nb->stream[iloc]);
+        cl_error = clFinish(nb->stream[iloc]);
         assert(CL_SUCCESS == cl_error);
     }
     else
@@ -1029,7 +1029,7 @@ void nbnxn_ocl_wait_gpu(nbnxn_opencl_ptr_t ocl_nb,
     }
 
     /* timing data accumulation */
-    if (ocl_nb->bDoTime)
+    if (nb->bDoTime)
     {
         /* only increase counter once (at local F wait) */
         if (LOCAL_I(iloc))

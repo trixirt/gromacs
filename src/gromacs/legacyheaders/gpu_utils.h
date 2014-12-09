@@ -89,44 +89,46 @@ typedef int ocl_vendor_id_t;
 extern "C" {
 #endif
 
+struct gmx_gpu_info_t;
+ 
 FUNC_QUALIFIER
-int detect_cuda_gpus(gmx_gpu_info_t gmx_unused *gpu_info, char gmx_unused *err_str) FUNC_TERM_INT
+int detect_cuda_gpus(struct gmx_gpu_info_t gmx_unused *gpu_info, char gmx_unused *err_str) FUNC_TERM_INT
 
 FUNC_QUALIFIER_OPENCL
-int detect_ocl_gpus(gmx_gpu_info_t gmx_unused *gpu_info, char gmx_unused *err_str) FUNC_TERM_INT_OPENCL
+int detect_ocl_gpus(struct gmx_gpu_info_t gmx_unused *gpu_info, char gmx_unused *err_str) FUNC_TERM_INT_OPENCL
 
 FUNC_QUALIFIER
-void pick_compatible_cuda_gpus(const gmx_gpu_info_t gmx_unused *gpu_info,
+void pick_compatible_cuda_gpus(const struct gmx_gpu_info_t gmx_unused *gpu_info,
                                gmx_gpu_opt_t gmx_unused        *gpu_opt) FUNC_TERM_VOID
 
 FUNC_QUALIFIER_OPENCL
-void pick_compatible_ocl_gpus(const gmx_gpu_info_t gmx_unused *gpu_info,
+void pick_compatible_ocl_gpus(const struct gmx_gpu_info_t gmx_unused *gpu_info,
                               gmx_gpu_opt_t gmx_unused        *gpu_opt) FUNC_TERM_VOID_OPENCL
 
 FUNC_QUALIFIER
 gmx_bool check_selected_cuda_gpus(int gmx_unused                  *checkres,
-                                  const gmx_gpu_info_t gmx_unused *gpu_info,
+                                  const struct gmx_gpu_info_t gmx_unused *gpu_info,
                                   gmx_gpu_opt_t gmx_unused        *gpu_opt) FUNC_TERM_INT
 
 FUNC_QUALIFIER_OPENCL
 gmx_bool check_selected_ocl_gpus(int gmx_unused                  *checkres,
-                                 const gmx_gpu_info_t gmx_unused *gpu_info,
+                                 const struct gmx_gpu_info_t gmx_unused *gpu_info,
                                  gmx_gpu_opt_t gmx_unused        *gpu_opt) FUNC_TERM_INT_OPENCL
 
 FUNC_QUALIFIER
-void free_cuda_gpu_info(const gmx_gpu_info_t gmx_unused *gpu_info) FUNC_TERM_VOID
+void free_cuda_gpu_info(const struct gmx_gpu_info_t gmx_unused *gpu_info) FUNC_TERM_VOID
 
 FUNC_QUALIFIER_OPENCL
-void free_ocl_gpu_info(const gmx_gpu_info_t gmx_unused *gpu_info) FUNC_TERM_VOID_OPENCL
+void free_ocl_gpu_info(const struct gmx_gpu_info_t gmx_unused *gpu_info) FUNC_TERM_VOID_OPENCL
 
 FUNC_QUALIFIER
 gmx_bool init_cuda_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
-                       const gmx_gpu_info_t gmx_unused *gpu_info,
+                       const struct gmx_gpu_info_t gmx_unused *gpu_info,
                        const gmx_gpu_opt_t gmx_unused *gpu_opt) FUNC_TERM_INT
 
 FUNC_QUALIFIER_OPENCL
 gmx_bool init_ocl_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
-                      const gmx_gpu_info_t gmx_unused *gpu_info,
+                      const struct gmx_gpu_info_t gmx_unused *gpu_info,
                       const gmx_gpu_opt_t gmx_unused *gpu_opt,
                       const int gmx_unused eeltype,
                       const int gmx_unused vdwtype,
@@ -143,7 +145,7 @@ FUNC_QUALIFIER
 int get_current_gpu_device_id(void) FUNC_TERM_INT
 
 FUNC_QUALIFIER
-int get_cuda_gpu_device_id(const gmx_gpu_info_t gmx_unused *gpu_info,
+int get_cuda_gpu_device_id(const struct gmx_gpu_info_t gmx_unused *gpu_info,
                            const gmx_gpu_opt_t gmx_unused  *gpu_opt,
                            int gmx_unused                   index) FUNC_TERM_INT
 
@@ -153,10 +155,10 @@ char* get_ocl_gpu_device_name(const gmx_gpu_info_t *gpu_info,
                               int                   idx) FUNC_TERM_PTR_OPENCL
 
 FUNC_QUALIFIER
-void get_cuda_gpu_device_info_string(char gmx_unused *s, const gmx_gpu_info_t gmx_unused *gpu_info, int gmx_unused index) FUNC_TERM_VOID
+void get_cuda_gpu_device_info_string(char gmx_unused *s, const struct gmx_gpu_info_t gmx_unused *gpu_info, int gmx_unused index) FUNC_TERM_VOID
 
 FUNC_QUALIFIER_OPENCL
-void get_ocl_gpu_device_info_string(char gmx_unused *s, const gmx_gpu_info_t gmx_unused *gpu_info, int gmx_unused index) FUNC_TERM_VOID_OPENCL
+void get_ocl_gpu_device_info_string(char gmx_unused *s, const struct gmx_gpu_info_t gmx_unused *gpu_info, int gmx_unused index) FUNC_TERM_VOID_OPENCL
 
 FUNC_QUALIFIER
 size_t sizeof_cuda_dev_info(void) FUNC_TERM_SIZE_T

@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2012,2014, by the GROMACS development team, led by
+ * Copyright (c) 2012, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -33,24 +33,35 @@
  * the research papers on the package. Check out http://www.gromacs.org.
  */
 
-/** \file nbnxn_ocl_types_ext.h
- *  \brief OpenCL equivalent of nbnxn_cuda_types_ext.h
- */
-
-#ifndef NBNXN_OCL_TYPES_EXT_H
-#define NBNXN_OCL_TYPES_EXT_H
+#ifndef GMX_TIMING_GPU_TIMING_H
+#define GMX_TIMING_GPU_TIMING_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* Abstract types */
-/* OpenCL nonbonded structure */
-typedef struct nbnxn_opencl *nbnxn_opencl_ptr_t;
+/*! \brief Nonbonded kernel time and call count. */
+struct gmx_nbnxn_kernel_timing_data_t
+{
+    double  t;
+    int     c;
+};
 
+/*! \brief GPU timings for kernels and H2d/D2H transfers. */
+struct gmx_wallclock_gpu_t
+{
+    struct gmx_nbnxn_kernel_timing_data_t ktime[2][2]; /**< table containing the timings of the four
+                                                          versions of the nonbonded kernels: force-only,
+                                                          force+energy, force+pruning, and force+energy+pruning */
+    double  nb_h2d_t;                                  /**< host to device transfer time in nb calculation  */
+    double  nb_d2h_t;                                  /**< device to host transfer time in nb calculation */
+    int     nb_c;                                      /**< total call count of the nonbonded gpu operations */
+    double  pl_h2d_t;                                  /**< pair search step host to device transfer time */
+    int     pl_h2d_c;                                  /**< pair search step  host to device transfer call count */
+};
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* NBNXN_OCL_TYPES_EXT_H */
+#endif

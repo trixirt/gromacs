@@ -45,8 +45,11 @@
 #include "config.h"
 
 #include "ocl_compiler.hpp"
+
+#include "gromacs/mdlib/nbnxn_gpu_types.h"
 #include "gromacs/mdlib/nbnxn_ocl/nbnxn_ocl_types.h"
-#include "gromacs/mdlib/nbnxn_ocl/nbnxn_ocl_data_mgmt.h"
+// TODO needed only for nxnxn_ocl_convert_gmx_to_gpu_flavours, refactor something
+#include "gromacs/mdlib/nbnxn_gpu_data_mgmt.h"
 
 /* This path is defined by CMake and it depends on the install prefix option.
    The opencl kernels are installed in bin/opencl.*/

@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2012,2013,2014, by the GROMACS development team, led by
+ * Copyright (c) 2014, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -32,29 +32,15 @@
  * To help us fund GROMACS development, we humbly ask that you cite
  * the research papers on the package. Check out http://www.gromacs.org.
  */
+#ifndef NBNXN_GPU_DATA_MGMT_H
+#define NBNXN_GPU_DATA_MGMT_H
 
-/** \file nbnxn_ocl_data_mgmt.h
- *  \brief OpenCL equivalent of nbnxn_cuda_data_mgmt.h
- */
+#include "config.h"
 
-#if !defined(NBNXN_OCL_DATA_MGMT_H) && defined(GMX_USE_OPENCL)
-#define NBNXN_OCL_DATA_MGMT_H
-
-#include "gromacs/legacyheaders/types/simple.h"
-#include "gromacs/legacyheaders/types/interaction_const.h"
-#include "gromacs/legacyheaders/types/nbnxn_ocl_types_ext.h"
 #include "gromacs/legacyheaders/types/hw_info.h"
-
-
-#if defined(GMX_GPU) && defined(GMX_USE_OPENCL)
-#define FUNC_TERM ;
-#define FUNC_QUALIFIER
-#define FUNC_TERM_P ;
-#else
-#define FUNC_TERM {}
-#define FUNC_QUALIFIER static;
-#define FUNC_TERM_P {return NULL}
-#endif
+#include "gromacs/legacyheaders/types/interaction_const.h"
+#include "gromacs/legacyheaders/types/simple.h"
+#include "gromacs/mdlib/nbnxn_gpu_types.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -63,7 +49,11 @@ extern "C" {
 struct nonbonded_verlet_group_t;
 struct nbnxn_pairlist_t;
 struct nbnxn_atomdata_t;
+struct gmx_wallclock_gpu_t;
+struct gmx_gpu_info_t;
 
+#ifdef GMX_USE_OPENCL
+/** Fastgen in ocl_compiler.cpp needs to know what kernels will be used */
 FUNC_QUALIFIER
 void nbnxn_ocl_convert_gmx_to_gpu_flavors(
         const int gmx_eeltype,
@@ -72,83 +62,70 @@ void nbnxn_ocl_convert_gmx_to_gpu_flavors(
         const int gmx_ljpme_comb_rule,
         int      *gpu_eeltype,
         int      *gpu_vdwtype) FUNC_TERM
+#endif
 
-/** Initializes the data structures related to OpenCL nonbonded calculations. */
+/** Initializes the data structures related to GPU nonbonded calculations. */
 FUNC_QUALIFIER
-void nbnxn_ocl_init(FILE gmx_unused                  *fplog,
-                    nbnxn_opencl_ptr_t gmx_unused    *p_ocl_nb,
-                    const gmx_gpu_info_t gmx_unused  *gpu_info,
-                    const gmx_gpu_opt_t gmx_unused   *gpu_opt,
-                    int gmx_unused                    my_gpu_index,
+void nbnxn_gpu_init(FILE gmx_unused                 *fplog,
+                    gmx_nbnxn_gpu_t gmx_unused **p_nb,
+                    const struct gmx_gpu_info_t gmx_unused *gpu_info,
+                    const gmx_gpu_opt_t gmx_unused  *gpu_opt,
+                    int gmx_unused                   my_gpu_index,
                     /* true of both local and non-local are don on GPU */
-                    gmx_bool gmx_unused               bLocalAndNonlocal) FUNC_TERM
+                    gmx_bool gmx_unused              bLocalAndNonlocal) FUNC_TERM
 
 /** Initializes simulation constant data. */
 FUNC_QUALIFIER
-void nbnxn_ocl_init_const(nbnxn_opencl_ptr_t             gmx_unused         ocl_nb,
+void nbnxn_gpu_init_const(gmx_nbnxn_gpu_t gmx_unused *nb,
                           const interaction_const_t      gmx_unused        *ic,
                           const struct nonbonded_verlet_group_t gmx_unused *nbv_group) FUNC_TERM
 
 /** Initializes pair-list data for GPU, called at every pair search step. */
 FUNC_QUALIFIER
-void nbnxn_ocl_init_pairlist(nbnxn_opencl_ptr_t       gmx_unused       ocl_nb,
+void nbnxn_gpu_init_pairlist(gmx_nbnxn_gpu_t gmx_unused *nb,
                              const struct nbnxn_pairlist_t gmx_unused *h_nblist,
                              int                    gmx_unused         iloc) FUNC_TERM
 
 /** Initializes atom-data on the GPU, called at every pair search step. */
 FUNC_QUALIFIER
-void nbnxn_ocl_init_atomdata(const nbnxn_opencl_ptr_t      gmx_unused  ocl_nb,
-                             const struct nbnxn_atomdata_t gmx_unused *atomdata) FUNC_TERM
+void nbnxn_gpu_init_atomdata(gmx_nbnxn_gpu_t gmx_unused *nb,
+                             const struct nbnxn_atomdata_t gmx_unused *nbat) FUNC_TERM
 
 /*! \brief Update parameters during PP-PME load balancing. */
 FUNC_QUALIFIER
-void nbnxn_ocl_pme_loadbal_update_param(const struct nonbonded_verlet_t gmx_unused *nbv,
+void nbnxn_gpu_pme_loadbal_update_param(const struct nonbonded_verlet_t gmx_unused *nbv,
                                         const interaction_const_t gmx_unused       *ic) FUNC_TERM
 
 /** Uploads shift vector to the GPU if the box is dynamic (otherwise just returns). */
 FUNC_QUALIFIER
-void nbnxn_ocl_upload_shiftvec(nbnxn_opencl_ptr_t       gmx_unused       ocl_nb,
+void nbnxn_gpu_upload_shiftvec(gmx_nbnxn_gpu_t gmx_unused *nb,
                                const struct nbnxn_atomdata_t gmx_unused *nbatom) FUNC_TERM
 
 /** Clears GPU outputs: nonbonded force, shift force and energy. */
 FUNC_QUALIFIER
-void nbnxn_ocl_clear_outputs(nbnxn_opencl_ptr_t  ocl_nb,
-                             int gmx_unused      flags) FUNC_TERM
+void nbnxn_gpu_clear_outputs(gmx_nbnxn_gpu_t gmx_unused *nb,
+                             int              gmx_unused flags) FUNC_TERM
 
 /** Frees all GPU resources used for the nonbonded calculations. */
 FUNC_QUALIFIER
-void nbnxn_ocl_free(nbnxn_opencl_ptr_t gmx_unused ocl_nb) FUNC_TERM
+void nbnxn_gpu_free(gmx_nbnxn_gpu_t gmx_unused *nb) FUNC_TERM
 
 /** Returns the GPU timings structure or NULL if GPU is not used or timing is off. */
 FUNC_QUALIFIER
-wallclock_gpu_t * nbnxn_ocl_get_timings(nbnxn_opencl_ptr_t gmx_unused ocl_nb) FUNC_TERM_P
+struct gmx_wallclock_gpu_t * nbnxn_gpu_get_timings(gmx_nbnxn_gpu_t gmx_unused *nb) FUNC_TERM_WITH_RETURN(NULL)
 
 /** Resets nonbonded GPU timings. */
 FUNC_QUALIFIER
-void nbnxn_ocl_reset_timings(struct nonbonded_verlet_t gmx_unused *nbv) FUNC_TERM
+void nbnxn_gpu_reset_timings(struct nonbonded_verlet_t gmx_unused *nbv) FUNC_TERM
 
 /** Calculates the minimum size of proximity lists to improve SM load balance
- *  with OpenCL non-bonded kernels. */
+ *  with GPU non-bonded kernels. */
 FUNC_QUALIFIER
-int nbnxn_ocl_min_ci_balanced(nbnxn_opencl_ptr_t gmx_unused ocl_nb)
-#if defined(GMX_GPU) && defined(GMX_USE_OPENCL)
-;
-#else
-{
-    return -1;
-}
-#endif
+int nbnxn_gpu_min_ci_balanced(gmx_nbnxn_gpu_t gmx_unused *nb) FUNC_TERM_WITH_RETURN(-1)
 
-/** Returns if analytical Ewald OpenCL kernels are used. */
+/** Returns if analytical Ewald GPU kernels are used. */
 FUNC_QUALIFIER
-gmx_bool nbnxn_ocl_is_kernel_ewald_analytical(const nbnxn_opencl_ptr_t gmx_unused ocl_nb)
-#if defined(GMX_GPU) && defined(GMX_USE_OPENCL)
-;
-#else
-{
-    return FALSE;
-}
-#endif
+gmx_bool nbnxn_gpu_is_kernel_ewald_analytical(const gmx_nbnxn_gpu_t gmx_unused *nb) FUNC_TERM_WITH_RETURN(FALSE)
 
 #ifdef __cplusplus
 }
@@ -156,5 +133,6 @@ gmx_bool nbnxn_ocl_is_kernel_ewald_analytical(const nbnxn_opencl_ptr_t gmx_unuse
 
 #undef FUNC_TERM
 #undef FUNC_QUALIFIER
+#undef FUNC_TERM_WITH_RETURN
 
-#endif /* NBNXN_OCL_DATA_MGMT_H */
+#endif

@@ -52,10 +52,6 @@
 //#include "nbnxn_pairlist.h"
 #include "gromacs/mdlib/nbnxn_pairlist.h"
 
-/* Fixing headers: not needed anymore, host structure nbnxn_opencl not included anymore in device code...
- * Dependency was wallclock_gpu_t */
-/* #include "nbnxn_opencl_types_ext.h" */
-
 /* Fixing headers: Only dependency is WARP_SIZE. The rest are host api code.. In OpenCL warp size can
     differ anyway!. For now it is define in upper-level (kernel-utils.h) */
 /* #include "gromacs/mdlib/../gmxlib/cuda_tools/cudautils.cuh" */
@@ -106,7 +102,7 @@ typedef struct cl_nb_staging
     float   *e_el;      /**< electrostatic energy            */
     float   *fshift;    /**< float3 buffer with shift forces */
     // TODO: review fshift data type and how its size is computed
-}cl_nb_staging_t;
+} cl_nb_staging_t;
 
 /** \internal
  * \brief Nonbonded atom data - both inputs and outputs.
@@ -167,7 +163,7 @@ typedef struct cl_nbparam
     int                    coulomb_tab_size;    /**< table size (s.t. it fits in texture cache) */
     float                  coulomb_tab_scale;   /**< table scale/spacing                        */
     cl_mem                 coulomb_tab_climg2d; /**< pointer to the table in the device memory  */
-}cl_nbparam_t;
+} cl_nbparam_t;
 
 // Data structure shared between the OpenCL device code and OpenCL host code
 // Must not contain OpenCL objects (buffers)
@@ -199,7 +195,7 @@ typedef struct cl_nbparam_params
     /* Ewald Coulomb force table data - accessed through texture memory */
     int                    coulomb_tab_size;   /**< table size (s.t. it fits in texture cache) */
     float                  coulomb_tab_scale;  /**< table scale/spacing                        */
-}cl_nbparam_params_t;
+} cl_nbparam_params_t;
 
 
 /** \internal
@@ -251,14 +247,14 @@ typedef struct cl_timers
     cl_event pl_h2d_excl[2];    /**< events for pair-list excl H2D transfers (l/nl, every PS step)*/
 
     cl_event nb_k[2];           /**< event for non-bonded kernels (l/nl, every step)              */
-}cl_timers_t;
+} cl_timers_t;
 
 /** \internal
  * \brief Main data structure for OpenCL nonbonded force calculations.
  */
-struct nbnxn_opencl
+struct gmx_nbnxn_ocl_t
 {
-    gpu_info_t *dev_info;        /**< OpenCL device information                                  */
+    struct gmx_device_info_t *dev_info;        /**< OpenCL device information                                  */
 
     /** non-bonded kernels */
     /** organized similar with nb_kfunc_xxx arrays in nbnxn_ocl.cpp */
@@ -297,7 +293,7 @@ struct nbnxn_opencl
      * setting bDoTime needs to be change if this CUDA "feature" gets fixed. */
     cl_bool          bDoTime;       /**< True if event-based timing is enabled.                     */
     cl_timers_t     *timers;        /**< OpenCL event-based timers.                                 */
-    wallclock_gpu_t *timings;       /**< Timing data.                                               */
+    struct gmx_wallclock_gpu_t *timings;       /**< Timing data.                                               */
 };
 
 #ifdef __cplusplus
