@@ -50,9 +50,9 @@
 #include "gromacs/utility/fatalerror.h"
 
 void
-nbnxn_ocl_convert_gmx_to_gpu_flavors(const interaction_const_t *ic,
-                                     int                       *gpu_eeltype,
-                                     int                       *gpu_vdwtype)
+nbnxn_ocl_map_interaction_types_to_gpu_kernel_flavors(const interaction_const_t *ic,
+                                                      int                       *gpu_eeltype,
+                                                      int                       *gpu_vdwtype)
 {
     if (ic->vdwtype == evdwCUT)
     {
@@ -138,9 +138,9 @@ nbnxn_ocl_compile_kernels_inner(int                        mygpu,
 
     gmx_algo_family_t         gmx_algo_family;
 
-    nbnxn_ocl_convert_gmx_to_gpu_flavors(ic,
-                                         &gmx_algo_family.eeltype,
-                                         &gmx_algo_family.vdwtype);
+    nbnxn_ocl_map_interaction_types_to_gpu_kernel_flavors(ic,
+                                                          &gmx_algo_family.eeltype,
+                                                          &gmx_algo_family.vdwtype);
 
     assert(gpu_info);
     assert(result_str);

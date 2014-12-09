@@ -321,9 +321,9 @@ static void init_nbparam(cl_nbparam_t              *nbp,
 
     set_cutoff_parameters(nbp, ic);
 
-    nbnxn_ocl_convert_gmx_to_gpu_flavors(ic,
-                                         &(nbp->eeltype),
-                                         &(nbp->vdwtype));
+    nbnxn_ocl_map_interaction_types_to_gpu_kernel_flavors(ic,
+                                                          &(nbp->eeltype),
+                                                          &(nbp->vdwtype));
 
     if (ic->vdwtype == evdwPME)
     {
