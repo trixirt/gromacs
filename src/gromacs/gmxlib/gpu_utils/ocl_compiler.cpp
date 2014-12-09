@@ -48,8 +48,7 @@
 
 #include "gromacs/mdlib/nbnxn_gpu_types.h"
 #include "gromacs/mdlib/nbnxn_ocl/nbnxn_ocl_types.h"
-// TODO needed only for nxnxn_ocl_convert_gmx_to_gpu_flavours, refactor something
-#include "gromacs/mdlib/nbnxn_gpu_data_mgmt.h"
+#include "gromacs/mdlib/nbnxn_gpu_jit_support.h"
 
 /* This path is defined by CMake and it depends on the install prefix option.
    The opencl kernels are installed in bin/opencl.*/
@@ -779,22 +778,13 @@ ocl_get_fastgen_define(
         gmx_algo_family_t * p_gmx_algo_family,
         char *              p_algo_defines)
 {
-    int eeltype, vdwtype;
-    nbnxn_ocl_convert_gmx_to_gpu_flavors(
-            p_gmx_algo_family->eeltype,
-            p_gmx_algo_family->vdwtype,
-            p_gmx_algo_family->vdw_modifier,
-            p_gmx_algo_family->ljpme_comb_rule,
-            &eeltype,
-            &vdwtype);
-
-    assert(eeltype < eelOclNR);
-    assert(vdwtype < evdwOclNR);
+    assert(p_gmx_algo_family->eeltype < eelOclNR);
+    assert(p_gmx_algo_family->vdwtype < evdwOclNR);
 
     printf("Setting up kernel fastgen definitions: ");
     sprintf(p_algo_defines, "-D_OCL_FASTGEN_ %s %s ",
-            kernel_electrostatic_family_definitions[eeltype],
-            kernel_VdW_family_definitions[vdwtype]
+            kernel_electrostatic_family_definitions[p_gmx_algo_family->eeltype],
+            kernel_VdW_family_definitions[p_gmx_algo_family->vdwtype]
             );
     printf(" %s \n", p_algo_defines);
 }

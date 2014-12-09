@@ -129,13 +129,7 @@ gmx_bool init_cuda_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
 FUNC_QUALIFIER_OPENCL
 gmx_bool init_ocl_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
                       const struct gmx_gpu_info_t gmx_unused *gpu_info,
-                      const gmx_gpu_opt_t gmx_unused *gpu_opt,
-                      const int gmx_unused eeltype,
-                      const int gmx_unused vdwtype,
-                      const int gmx_unused vdw_modifier,
-                      const int gmx_unused ljpme_comb_rule,
-                      const gmx_bool gmx_unused bOclDoFastGen
-                      ) FUNC_TERM_INT_OPENCL
+                      const gmx_gpu_opt_t gmx_unused *gpu_opt) FUNC_TERM_INT_OPENCL
 
 FUNC_QUALIFIER
 gmx_bool free_gpu(char gmx_unused *result_str) FUNC_TERM_INT

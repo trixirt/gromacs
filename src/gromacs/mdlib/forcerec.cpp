@@ -70,6 +70,7 @@
 #include "gromacs/mdlib/nbnxn_atomdata.h"
 #include "gromacs/mdlib/nbnxn_consts.h"
 #include "gromacs/mdlib/nbnxn_gpu_data_mgmt.h"
+#include "gromacs/mdlib/nbnxn_gpu_jit_support.h"
 #include "gromacs/mdlib/nbnxn_search.h"
 #include "gromacs/mdlib/nbnxn_simd.h"
 #include "gromacs/pbcutil/ishift.h"
@@ -1779,28 +1780,12 @@ static void pick_nbnxn_resources(const t_commrec     *cr,
                                  gmx_bool             bDoNonbonded,
                                  gmx_bool            *bUseGPU,
                                  gmx_bool            *bEmulateGPU,
-                                 const gmx_gpu_opt_t *gpu_opt,
-                                 const int            eeltype,
-                                 const int            vdwtype,
-                                 const int            vdw_modifier,
-                                 const int            ljpme_comb_rule
-                                 )
+                                 const gmx_gpu_opt_t *gpu_opt)
 {
-    gmx_bool bEmulateGPUEnvVarSet, bOclDoFastGen = FALSE;
+    gmx_bool bEmulateGPUEnvVarSet;
     char     gpu_err_str[STRLEN];
 
     *bUseGPU = FALSE;
-
-    bOclDoFastGen        = (getenv("GMX_OCL_NOFASTGEN") == NULL);
-#ifdef GMX_USE_OPENCL
-    if (bOclDoFastGen)
-    {
-        bOclDoFastGen = 0;
-#ifndef NDEBUG
-        printf("\nFastGen temporary disabled. All kernel flavours will be generated.");
-#endif
-    }
-#endif
 
     bEmulateGPUEnvVarSet = (getenv("GMX_EMULATE_GPU") != NULL);
 
@@ -1827,7 +1812,7 @@ static void pick_nbnxn_resources(const t_commrec     *cr,
 
 #ifdef GMX_USE_OPENCL
         if (!init_ocl_gpu(cr->rank_pp_intranode, gpu_err_str,
-                          &hwinfo->gpu_info, gpu_opt, eeltype, vdwtype, vdw_modifier, ljpme_comb_rule, bOclDoFastGen))
+                          &hwinfo->gpu_info, gpu_opt))
 #else
         if (!init_cuda_gpu(cr->rank_pp_intranode, gpu_err_str,
                            &hwinfo->gpu_info, gpu_opt))
@@ -1986,15 +1971,19 @@ static void potential_switch_constants(real rsw, real rc,
     sc->c5 =  -6*pow(rc - rsw, -5);
 }
 
+/*! \brief Do first stage of construction of interaction constants
+ *
+ * In particular, implementing JIT kernel compilation is more
+ * convenient if this stage is complete. This is useful because with
+ * OpenCL that compilation has to happen before they can be
+ * transferred in nbnxn_gpu_init().
+ */
 static void
-init_interaction_const(FILE                       *fp,
-                       const t_commrec gmx_unused *cr,
-                       interaction_const_t       **interaction_const,
-                       const t_forcerec           *fr,
-                       real                        rtab)
+init_interaction_const_first_stage(FILE                       *fp,
+                                   interaction_const_t       **interaction_const,
+                                   const t_forcerec           *fr)
 {
     interaction_const_t *ic;
-    gmx_bool             bUsesSimpleTables = TRUE;
     const real           minusSix          = -6.0;
     const real           minusTwelve       = -12.0;
 
@@ -2119,9 +2108,29 @@ init_interaction_const(FILE                       *fp,
 
     *interaction_const = ic;
 
+    // Note that there is further construction in
+    // init_interaction_cost_second_stage()
+}
+
+/*! \brief Do second stage of construction of interaction constants
+ *
+ * Some parts of the interaction constants depend on which flavour of
+ * the Verlet scheme is being used at run time.
+ *
+ * \todo There may be a better design available here.
+ */
+static void
+init_interaction_const_second_stage(FILE                       *fp,
+                                    const t_commrec gmx_unused *cr,
+                                    interaction_const_t        *interaction_const,
+                                    const t_forcerec           *fr,
+                                    real                        rtab)
+{
+    gmx_bool bUsesSimpleTables;
+
     if (fr->nbv != NULL && fr->nbv->bUseGPU)
     {
-        nbnxn_gpu_init_const(fr->nbv->gpu_nbv, ic, fr->nbv->grp);
+        nbnxn_gpu_init_const(fr->nbv->gpu_nbv, interaction_const, fr->nbv->grp);
 
         /* With tMPI + GPUs some ranks may be sharing GPU(s) and therefore
          * also sharing texture references. To keep the code simple, we don't
@@ -2133,7 +2142,7 @@ init_interaction_const(FILE                       *fp,
          *
          * Note that we could omit this barrier if GPUs are not shared (or
          * texture objects are used), but as this is initialization code, there
-         * is not point in complicating things.
+         * is no point in complicating things.
          */
 #ifdef GMX_THREAD_MPI
         if (PAR(cr))
@@ -2144,7 +2153,7 @@ init_interaction_const(FILE                       *fp,
     }
 
     bUsesSimpleTables = uses_simple_tables(fr->cutoff_scheme, fr->nbv, -1);
-    init_interaction_const_tables(fp, ic, bUsesSimpleTables, rtab);
+    init_interaction_const_tables(fp, interaction_const, bUsesSimpleTables, rtab);
 }
 
 static void init_nb_verlet(FILE                *fp,
@@ -2169,12 +2178,7 @@ static void init_nb_verlet(FILE                *fp,
                          fr->bNonbonded,
                          &nbv->bUseGPU,
                          &bEmulateGPU,
-                         fr->gpu_opt,
-                         fr->eeltype,
-                         fr->vdwtype,
-                         fr->vdw_modifier,
-                         fr->ljpme_combination_rule
-                         );
+                         fr->gpu_opt);
 
     nbv->nbs = NULL;
 
@@ -2217,6 +2221,8 @@ static void init_nb_verlet(FILE                *fp,
 
     if (nbv->bUseGPU)
     {
+        nbnxn_gpu_compile_kernels(cr->rank_pp_intranode, cr->nodeid, &fr->hwinfo->gpu_info, fr->gpu_opt, fr->ic);
+
         /* init the NxN GPU data; the last argument tells whether we'll have
          * both local and non-local NB calculation on GPU */
         nbnxn_gpu_init(fp, &nbv->gpu_nbv,
@@ -3260,6 +3266,9 @@ void init_forcerec(FILE              *fp,
 
     snew(fr->excl_load, fr->nthreads+1);
 
+    /* fr->ic is used both by verlet and group kernels (to some extent) now */
+    init_interaction_const_first_stage(fp, &fr->ic, fr);
+
     if (fr->cutoff_scheme == ecutsVERLET)
     {
         if (ir->rcoulomb != ir->rvdw)
@@ -3270,8 +3279,7 @@ void init_forcerec(FILE              *fp,
         init_nb_verlet(fp, &fr->nbv, bFEP_NonBonded, ir, fr, cr, nbpu_opt);
     }
 
-    /* fr->ic is used both by verlet and group kernels (to some extent) now */
-    init_interaction_const(fp, cr, &fr->ic, fr, rtab);
+    init_interaction_const_second_stage(fp, cr, fr->ic, fr, rtab);
 
     if (ir->eDispCorr != edispcNO)
     {

@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2012,2013,2014, by the GROMACS development team, led by
+ * Copyright (c) 2014, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -32,38 +32,32 @@
  * To help us fund GROMACS development, we humbly ask that you cite
  * the research papers on the package. Check out http://www.gromacs.org.
  */
-
-#ifndef GMX_MDLIB_NBNXN_GPU_TYPES_H
-#define GMX_MDLIB_NBNXN_GPU_TYPES_H
+#ifndef GMX_MDLIB_NBNXN_OCL_JIT_SUPPORT_H
+#define GMX_MDLIB_NBNXN_OCL_JIT_SUPPORT_H
 
 #include "config.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include "gromacs/gmxlib/gpu_utils/gpu_macros.h"
+#include "gromacs/legacyheaders/types/interaction_const.h"
+#include "gromacs/legacyheaders/types/hw_info.h"
 
-#ifdef GMX_GPU
+/*! \brief Returns the families of the electrostatics and Vdw OpenCL
+    kernels that will be used */
+GPU_FUNC_QUALIFIER void
+nbnxn_ocl_convert_gmx_to_gpu_flavors(const interaction_const_t *ic,
+                                     int                       *gpu_eeltype,
+                                     int                       *gpu_vdwtype) GPU_FUNC_TERM
 
-#  if defined GMX_USE_OPENCL
+#include "gromacs/legacyheaders/types/simple.h"
+struct gmx_gpu_info_t;
 
-struct gmx_nbnxn_ocl_t;
-typedef struct gmx_nbnxn_ocl_t gmx_nbnxn_gpu_t;
-
-#  else
-
-struct gmx_nbnxn_cuda_t;
-typedef struct gmx_nbnxn_cuda_t gmx_nbnxn_gpu_t;
-
-#  endif
-
-#else
-
-typedef int gmx_nbnxn_gpu_t;
-
-#endif
-
-#ifdef __cplusplus
-}
-#endif
+/*! \brief Handles any JIT compilation of nbnxn kernels (e.g. for
+    OpenCL) for the GPU given by \p mygpu */
+GPU_FUNC_QUALIFIER void
+nbnxn_gpu_compile_kernels(int                        mygpu,
+                          int                        rank,
+                          const gmx_gpu_info_t      *gpu_info,
+                          const gmx_gpu_opt_t       *gpu_opt,
+                          const interaction_const_t *ic) GPU_FUNC_TERM
 
 #endif

@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2012,2013,2014, by the GROMACS development team, led by
+ * Copyright (c) 2014, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -32,38 +32,17 @@
  * To help us fund GROMACS development, we humbly ask that you cite
  * the research papers on the package. Check out http://www.gromacs.org.
  */
+#include "../nbnxn_gpu_jit_support.h"
 
-#ifndef GMX_MDLIB_NBNXN_GPU_TYPES_H
-#define GMX_MDLIB_NBNXN_GPU_TYPES_H
+#include "gromacs/mdlib/nbnxn_gpu.h"
 
-#include "config.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#ifdef GMX_GPU
-
-#  if defined GMX_USE_OPENCL
-
-struct gmx_nbnxn_ocl_t;
-typedef struct gmx_nbnxn_ocl_t gmx_nbnxn_gpu_t;
-
-#  else
-
-struct gmx_nbnxn_cuda_t;
-typedef struct gmx_nbnxn_cuda_t gmx_nbnxn_gpu_t;
-
-#  endif
-
-#else
-
-typedef int gmx_nbnxn_gpu_t;
-
-#endif
-
-#ifdef __cplusplus
+void
+nbnxn_gpu_compile_kernels(int                        /*mygpu*/,
+                          int                        /*rank*/,
+                          const gmx_gpu_info_t      */*gpu_info*/,
+                          const gmx_gpu_opt_t       */*gpu_opt*/,
+                          const interaction_const_t */*ic*/)
+{
+    /* CUDA support does not use JIT (yet). It would be nice if this
+     * function inlined away to nothing, but it's only used during setup. */
 }
-#endif
-
-#endif

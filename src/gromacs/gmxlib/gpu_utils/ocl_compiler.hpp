@@ -66,10 +66,8 @@ typedef enum{
  */
 typedef struct
 {
-    int eeltype;
-    int vdwtype;
-    int vdw_modifier;
-    int ljpme_comb_rule;
+    int eeltype;  /**< Value must be of enum eelOcl type */
+    int vdwtype;  /**< Value must be of enum evdwOcl type */
 } gmx_algo_family_t;
 
 

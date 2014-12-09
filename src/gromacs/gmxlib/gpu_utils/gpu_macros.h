@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2012,2013,2014, by the GROMACS development team, led by
+ * Copyright (c) 2014, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -32,38 +32,26 @@
  * To help us fund GROMACS development, we humbly ask that you cite
  * the research papers on the package. Check out http://www.gromacs.org.
  */
-
-#ifndef GMX_MDLIB_NBNXN_GPU_TYPES_H
-#define GMX_MDLIB_NBNXN_GPU_TYPES_H
+#ifndef GMX_GMXLIB_GPU_UTILS_MACROS_H
+#define GMX_GMXLIB_GPU_UTILS_MACROS_H
 
 #include "config.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+/* These macros that let us define inlineable null implementations so
+   that non-GPU Gromacs can run with no overhead without conditionality
+   everywhere a GPU function is called. */
+#if defined GMX_GPU
 
-#ifdef GMX_GPU
+#define GPU_FUNC_TERM ;
+#define GPU_FUNC_QUALIFIER
+#define GPU_FUNC_TERM_WITH_RETURN(arg) ;
 
-#  if defined GMX_USE_OPENCL
+#else /* No accelerator support */
 
-struct gmx_nbnxn_ocl_t;
-typedef struct gmx_nbnxn_ocl_t gmx_nbnxn_gpu_t;
+#define GPU_FUNC_TERM {}
+#define GPU_FUNC_QUALIFIER static
+#define GPU_FUNC_TERM_WITH_RETURN(arg) { return (arg); }
 
-#  else
-
-struct gmx_nbnxn_cuda_t;
-typedef struct gmx_nbnxn_cuda_t gmx_nbnxn_gpu_t;
-
-#  endif
-
-#else
-
-typedef int gmx_nbnxn_gpu_t;
-
-#endif
-
-#ifdef __cplusplus
-}
 #endif
 
 #endif

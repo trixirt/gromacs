@@ -46,6 +46,7 @@
 #include <math.h>
 #include <string.h>
 
+#include "gromacs/gmxlib/gpu_utils/ocl_compiler.hpp"
 #include "gromacs/legacyheaders/tables.h"
 #include "gromacs/legacyheaders/typedefs.h"
 #include "gromacs/legacyheaders/types/enums.h"
@@ -55,9 +56,11 @@
 #include "gromacs/mdlib/nbnxn_consts.h"
 #include "gromacs/legacyheaders/gmx_detect_hardware.h"
 
-#include "gromacs/mdlib/../gmxlib/ocl_tools/oclutils.h"
-#include "gromacs/mdlib/nbnxn_ocl/nbnxn_ocl_types.h"
+#include "gromacs/gmxlib/ocl_tools/oclutils.h"
+#include "gromacs/mdlib/nbnxn_gpu.h"
 #include "gromacs/mdlib/nbnxn_gpu_data_mgmt.h"
+#include "gromacs/mdlib/nbnxn_gpu_jit_support.h"
+#include "gromacs/mdlib/nbnxn_ocl/nbnxn_ocl_types.h"
 #include "gromacs/legacyheaders/gpu_utils.h"
 
 #include "gromacs/pbcutil/ishift.h"
@@ -278,62 +281,6 @@ static void init_atomdata_first(cl_atomdata_t *ad, int ntypes, gmx_device_info_t
     ad->nalloc = -1;
 }
 
-/*! Selects the Ewald kernel type, analytical or tabulated, single or twin cut-off.
-    OpenCL equivalent of pick_ewald_kernel_type from nbnxn_cuda_data_mgmt.cu
- */
-static int pick_ewald_kernel_type(bool bTwinCut)
-{
-    bool bUseAnalyticalEwald, bForceAnalyticalEwald, bForceTabulatedEwald;
-    int  kernel_type;
-
-    /* Benchmarking/development environment variables to force the use of
-       analytical or tabulated Ewald kernel. */
-    bForceAnalyticalEwald = (getenv("GMX_OCL_NB_ANA_EWALD") != NULL);
-    bForceTabulatedEwald  = (getenv("GMX_OCL_NB_TAB_EWALD") != NULL);
-
-    if (bForceAnalyticalEwald && bForceTabulatedEwald)
-    {
-        gmx_incons("Both analytical and tabulated Ewald OpenCL non-bonded kernels "
-                   "requested through environment variables.");
-    }
-
-    /* CUDA: By default, on SM 3.0 and later use analytical Ewald, on earlier tabulated. */
-    /* OpenCL: By default, use analytical Ewald, on earlier tabulated. */
-    // TODO: decide if dev_info parameter should be added to recognize NVIDIA CC>=3.0 devices.
-    //if ((dev_info->prop.major >= 3 || bForceAnalyticalEwald) && !bForceTabulatedEwald)
-    if ((1                         || bForceAnalyticalEwald) && !bForceTabulatedEwald)
-    {
-        bUseAnalyticalEwald = true;
-
-        if (debug)
-        {
-            fprintf(debug, "Using analytical Ewald OpenCL kernels\n");
-        }
-    }
-    else
-    {
-        bUseAnalyticalEwald = false;
-
-        if (debug)
-        {
-            fprintf(debug, "Using tabulated Ewald OpenCL kernels\n");
-        }
-    }
-
-    /* Use twin cut-off kernels if requested by bTwinCut or the env. var.
-       forces it (use it for debugging/benchmarking only). */
-    if (!bTwinCut && (getenv("GMX_OCL_NB_EWALD_TWINCUT") == NULL))
-    {
-        kernel_type = bUseAnalyticalEwald ? eelOclEWALD_ANA : eelOclEWALD_TAB;
-    }
-    else
-    {
-        kernel_type = bUseAnalyticalEwald ? eelOclEWALD_ANA_TWIN : eelOclEWALD_TAB_TWIN;
-    }
-
-    return kernel_type;
-}
-
 /*! Copies all parameters related to the cut-off from ic to nbp
     OpenCL equivalent of set_cutoff_parameters from nbnxn_cuda_data_mgmt.cu
  */
@@ -357,70 +304,6 @@ static void set_cutoff_parameters(cl_nbparam_t              *nbp,
     nbp->repulsion_shift  = ic->repulsion_shift;
     nbp->vdw_switch       = ic->vdw_switch;
 }
-/*! Determines the families of electrostatics and Vdw OpenCL kernels.
- */
-void nbnxn_ocl_convert_gmx_to_gpu_flavors(
-        const int gmx_eeltype,
-        const int gmx_vdwtype,
-        const int gmx_vdw_modifier,
-        const int gmx_ljpme_comb_rule,
-        int      *gpu_eeltype,
-        int      *gpu_vdwtype)
-{
-    if (gmx_vdwtype == evdwCUT)
-    {
-        switch (gmx_vdw_modifier)
-        {
-            case eintmodNONE:
-            case eintmodPOTSHIFT:
-                *gpu_vdwtype = evdwOclCUT;
-                break;
-            case eintmodFORCESWITCH:
-                *gpu_vdwtype = evdwOclFSWITCH;
-                break;
-            case eintmodPOTSWITCH:
-                *gpu_vdwtype = evdwOclPSWITCH;
-                break;
-            default:
-                gmx_incons("The requested VdW interaction modifier is not implemented in the GPU accelerated kernels!");
-                break;
-        }
-    }
-    else if (gmx_vdwtype == evdwPME)
-    {
-        if (gmx_ljpme_comb_rule == ljcrGEOM)
-        {
-            *gpu_vdwtype = evdwOclEWALDGEOM;
-        }
-        else
-        {
-            *gpu_vdwtype = evdwOclEWALDLB;
-        }
-    }
-    else
-    {
-        gmx_incons("The requested VdW type is not implemented in the GPU accelerated kernels!");
-    }
-
-    if (gmx_eeltype == eelCUT)
-    {
-        *gpu_eeltype = eelOclCUT;
-    }
-    else if (EEL_RF(gmx_eeltype))
-    {
-        *gpu_eeltype = eelOclRF;
-    }
-    else if ((EEL_PME(gmx_eeltype) || gmx_eeltype == eelEWALD))
-    {
-        /* Initially rcoulomb == rvdw, so it's surely not twin cut-off. */
-        *gpu_eeltype = pick_ewald_kernel_type(false);
-    }
-    else
-    {
-        /* Shouldn't happen, as this is checked when choosing Verlet-scheme */
-        gmx_incons("The requested electrostatics type is not implemented in the GPU accelerated kernels!");
-    }
-}
 
 /*! Initializes the nonbonded parameter data structure.
     OpenCL equivalent of init_nbparam from nbnxn_cuda_data_mgmt.cu
@@ -438,13 +321,9 @@ static void init_nbparam(cl_nbparam_t              *nbp,
 
     set_cutoff_parameters(nbp, ic);
 
-    nbnxn_ocl_convert_gmx_to_gpu_flavors(
-            ic->eeltype,
-            ic->vdwtype,
-            ic->vdw_modifier,
-            ic->ljpme_comb_rule,
-            &(nbp->eeltype),
-            &(nbp->vdwtype));
+    nbnxn_ocl_convert_gmx_to_gpu_flavors(ic,
+                                         &(nbp->eeltype),
+                                         &(nbp->vdwtype));
 
     if (ic->vdwtype == evdwPME)
     {
@@ -545,7 +424,7 @@ void nbnxn_gpu_pme_loadbal_update_param(const nonbonded_verlet_t    *nbv,
 
     set_cutoff_parameters(nbp, ic);
 
-    nbp->eeltype = pick_ewald_kernel_type(ic->rcoulomb != ic->rvdw);
+    nbp->eeltype = nbnxn_gpu_pick_ewald_kernel_type(ic->rcoulomb != ic->rvdw);
 
     init_ewald_coulomb_force_table(nb->nbparam, nb->dev_info);
 }
