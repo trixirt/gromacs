@@ -46,6 +46,7 @@
 #include <math.h>
 #include <string.h>
 
+#include "gromacs/gmxlib/gpu_utils/gpu_utils.h"
 #include "gromacs/gmxlib/gpu_utils/ocl_compiler.hpp"
 #include "gromacs/legacyheaders/tables.h"
 #include "gromacs/legacyheaders/typedefs.h"
@@ -61,7 +62,6 @@
 #include "gromacs/mdlib/nbnxn_gpu_data_mgmt.h"
 #include "gromacs/mdlib/nbnxn_gpu_jit_support.h"
 #include "gromacs/mdlib/nbnxn_ocl/nbnxn_ocl_types.h"
-#include "gromacs/legacyheaders/gpu_utils.h"
 
 #include "gromacs/pbcutil/ishift.h"
 #include "gromacs/utility/cstringutil.h"

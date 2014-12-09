@@ -1,7 +1,7 @@
 /*
 * This file is part of the GROMACS molecular simulation package.
 *
-* Copyright (c) 2012,2014, by the GROMACS development team, led by
+* Copyright (c) 2014, by the GROMACS development team, led by
 * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
 * and including many others, as listed in the AUTHORS file in the
 * top-level source directory and at http://www.gromacs.org.
@@ -108,6 +108,12 @@ int ocl_copy_D2H_async(void * h_dest, cl_mem d_src,
 int ocl_copy_H2D(cl_mem d_dest, void * h_src,
     size_t offset, size_t bytes,
     cl_command_queue command_queue);
+
+/*! \brief Allocate host memory in malloc style */
+void ocl_pmalloc(void **h_ptr, size_t nbytes);
+
+/*! \brief Free host memory in malloc style */
+void ocl_pfree(void *h_ptr);
 
 
 #ifdef __cplusplus
