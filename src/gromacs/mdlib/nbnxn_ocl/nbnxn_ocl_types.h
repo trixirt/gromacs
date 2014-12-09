@@ -40,6 +40,8 @@
 #ifndef NBNXN_OPENCL_TYPES_H
 #define NBNXN_OPENCL_TYPES_H
 
+#include <CL/opencl.h>
+
 /* kernel does #include "gromacs/math/utilities.h" */
 /* Move the actual useful stuff here: */
 #define M_FLOAT_1_SQRTPI 0.564189583547756f

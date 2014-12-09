@@ -462,7 +462,7 @@ void get_ocl_gpu_device_info_string(char gmx_unused *s, const gmx_gpu_info_t gmx
     }
 }
 
-/*! \brief Initializes the OpenCL GPU with the given index.
+/*! \brief Initializes the OpenCL GPU given by \p mygpu.
  *
  * Initializes the OpenCL context for the OpenCL GPU with the given index and also
  * compiles the OpenCL kernels.
@@ -472,46 +472,16 @@ void get_ocl_gpu_device_info_string(char gmx_unused *s, const gmx_gpu_info_t gmx
  *                            during the initialization (if there was any).
  * \param[in] gpu_info        GPU info of all detected devices in the system.
  * \param[in] gpu_opt         Options for using the GPUs in gpu_info
- * \param[in] eeltype         Type of electrostatics kernels that will be launched on this device. Ignored if bOclDoFastGen is false.
- * \param[in] vdwtype         Type of Vdw kernels that will be launched on this device. Ignored if bOclDoFastGen is false.
- * \param[in] vdw_modifier    Vdw interaction modifier. Ignored if bOclDoFastGen is false.
- * \param[in] ljpme_comb_rule LJ-PME combination rule. Ignored if bOclDoFastGen is false.
- * \param[in] bOclDoFastGen   If true, only the requested kernels are compiled, significantly reducing
- * the total compilatin time. If false, all OpenCL kernels are compiled.
  * \returns                   true if no error occurs during initialization.
  */
-gmx_bool init_ocl_gpu(int gmx_unused                   mygpu,
-                      char gmx_unused                 *result_str,
+gmx_bool init_ocl_gpu(int                              mygpu,
+                      char                            *result_str,
                       const gmx_gpu_info_t gmx_unused *gpu_info,
-                      const gmx_gpu_opt_t gmx_unused  *gpu_opt,
-                      const int gmx_unused             eeltype,
-                      const int gmx_unused             vdwtype,
-                      const int gmx_unused             vdw_modifier,
-                      const int gmx_unused             ljpme_comb_rule,
-                      const gmx_bool gmx_unused        bOclDoFastGen
+                      const gmx_gpu_opt_t             *gpu_opt
                       )
 {
-    cl_context_properties context_properties[3];
-    struct gmx_device_info_t *selected_ocl_gpu;
-    cl_platform_id        platform_id;
-    cl_device_id          device_id;
-    cl_context            context;
-    cl_program            program;
-    cl_int                cl_error;
-
-    gmx_algo_family_t     gmx_algo_family;
-
-    gmx_algo_family.eeltype         = eeltype;
-    gmx_algo_family.vdwtype         = vdwtype;
-    gmx_algo_family.vdw_modifier    = vdw_modifier;
-    gmx_algo_family.ljpme_comb_rule = ljpme_comb_rule;
-
-    int retval;
-
-    assert(gpu_info);
     assert(result_str);
 
-    retval        = -1;
     result_str[0] = 0;
 
     if (mygpu < 0 || mygpu >= gpu_opt->n_dev_use)
@@ -523,54 +493,7 @@ gmx_bool init_ocl_gpu(int gmx_unused                   mygpu,
         gmx_incons(sbuf);
     }
 
-    /* TODO This content would be better in src/gromacs/mdlib, because it
-     * pertains only to compiling non-bonded kernels. src/gromacs/gpu_utils
-     * is intended to be available for generic use. */
-    while (1)
-    {
-        selected_ocl_gpu = gpu_info->gpu_dev + gpu_opt->dev_use[mygpu];
-        platform_id      = selected_ocl_gpu->ocl_gpu_id.ocl_platform_id;
-        device_id        = selected_ocl_gpu->ocl_gpu_id.ocl_device_id;
-
-        context_properties[0] = CL_CONTEXT_PLATFORM;
-        context_properties[1] = (cl_context_properties)platform_id;
-        context_properties[2] = 0;
-
-        context = clCreateContext(context_properties, 1, &device_id, NULL, NULL, &cl_error);
-        CALLOCLFUNC_LOGERROR(cl_error, result_str, retval)
-        if (0 != retval)
-        {
-            break;
-        }
-
-        cl_error =
-            ocl_compile_program(_default_source_,
-                                _auto_vendor_kernels_,
-                                &gmx_algo_family,
-                                bOclDoFastGen,
-                                result_str,
-                                context,
-                                device_id,
-                                selected_ocl_gpu->vendor_e,
-                                &program
-                                );
-        if (cl_error != CL_SUCCESS)
-        {
-            retval = -1;
-            break;
-        }
-
-        retval = 0;
-        break;
-    }
-
-    if (0 == retval)
-    {
-        selected_ocl_gpu->context = context;
-        selected_ocl_gpu->program = program;
-    }
-
-    return (0 == retval);
+    return TRUE;
 }
 
 /*! \brief Returns an identifier for the OpenCL GPU with a given index into the array of used GPUs.

@@ -1092,3 +1092,56 @@ void nbnxn_gpu_wait_for_gpu(gmx_nbnxn_ocl_t *nb,
     plist->bDoPrune = false;
 
 }
+
+int nbnxn_gpu_pick_ewald_kernel_type(bool bTwinCut)
+{
+    bool bUseAnalyticalEwald, bForceAnalyticalEwald, bForceTabulatedEwald;
+    int  kernel_type;
+
+    /* Benchmarking/development environment variables to force the use of
+       analytical or tabulated Ewald kernel. */
+    bForceAnalyticalEwald = (getenv("GMX_OCL_NB_ANA_EWALD") != NULL);
+    bForceTabulatedEwald  = (getenv("GMX_OCL_NB_TAB_EWALD") != NULL);
+
+    if (bForceAnalyticalEwald && bForceTabulatedEwald)
+    {
+        gmx_incons("Both analytical and tabulated Ewald OpenCL non-bonded kernels "
+                   "requested through environment variables.");
+    }
+
+    /* CUDA: By default, on SM 3.0 and later use analytical Ewald, on earlier tabulated. */
+    /* OpenCL: By default, use analytical Ewald, on earlier tabulated. */
+    // TODO: decide if dev_info parameter should be added to recognize NVIDIA CC>=3.0 devices.
+    //if ((dev_info->prop.major >= 3 || bForceAnalyticalEwald) && !bForceTabulatedEwald)
+    if ((1                         || bForceAnalyticalEwald) && !bForceTabulatedEwald)
+    {
+        bUseAnalyticalEwald = true;
+
+        if (debug)
+        {
+            fprintf(debug, "Using analytical Ewald OpenCL kernels\n");
+        }
+    }
+    else
+    {
+        bUseAnalyticalEwald = false;
+
+        if (debug)
+        {
+            fprintf(debug, "Using tabulated Ewald OpenCL kernels\n");
+        }
+    }
+
+    /* Use twin cut-off kernels if requested by bTwinCut or the env. var.
+       forces it (use it for debugging/benchmarking only). */
+    if (!bTwinCut && (getenv("GMX_OCL_NB_EWALD_TWINCUT") == NULL))
+    {
+        kernel_type = bUseAnalyticalEwald ? eelOclEWALD_ANA : eelOclEWALD_TAB;
+    }
+    else
+    {
+        kernel_type = bUseAnalyticalEwald ? eelOclEWALD_ANA_TWIN : eelOclEWALD_TAB_TWIN;
+    }
+
+    return kernel_type;
+}
