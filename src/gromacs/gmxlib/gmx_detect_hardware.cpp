@@ -56,9 +56,9 @@
 
 #include "thread_mpi/threads.h"
 
+#include "gromacs/gmxlib/gpu_utils/gpu_utils.h"
 #include "gromacs/legacyheaders/copyrite.h"
 #include "gromacs/legacyheaders/gmx_cpuid.h"
-#include "gromacs/legacyheaders/gpu_utils.h"
 #include "gromacs/legacyheaders/md_logging.h"
 #include "gromacs/legacyheaders/network.h"
 #include "gromacs/legacyheaders/types/commrec.h"
@@ -105,11 +105,7 @@ static void sprint_gpus(char *sbuf, const gmx_gpu_info_t *gpu_info)
     sbuf[0] = '\0';
     for (i = 0; i < ndev; i++)
     {
-#if defined(GMX_GPU) && defined(GMX_USE_OPENCL)
-        get_ocl_gpu_device_info_string(stmp, gpu_info, i);
-#else
-        get_cuda_gpu_device_info_string(stmp, gpu_info, i);
-#endif
+        get_gpu_device_info_string(stmp, gpu_info, i);
         strcat(sbuf, "  ");
         strcat(sbuf, stmp);
         if (i < ndev - 1)
@@ -667,11 +663,7 @@ static void gmx_detect_gpus(FILE *fplog, const t_commrec *cr)
 
         int  detect_gpu_ret;
 
-#ifdef GMX_USE_OPENCL
-        detect_gpu_ret = detect_ocl_gpus(&hwinfo_g->gpu_info, detection_error);
-#else
-        detect_gpu_ret = detect_cuda_gpus(&hwinfo_g->gpu_info, detection_error);
-#endif
+        detect_gpu_ret = detect_gpus(&hwinfo_g->gpu_info, detection_error);
         if (detect_gpu_ret != 0)
         {
             if (detection_error[0] != '\0')
@@ -693,39 +685,21 @@ static void gmx_detect_gpus(FILE *fplog, const t_commrec *cr)
     /* Broadcast the GPU info to the other ranks within this node */
     MPI_Bcast(&hwinfo_g->gpu_info.n_dev, 1, MPI_INT, 0, physicalnode_comm);
     if (hwinfo_g->gpu_info.n_dev > 0)
-#ifdef GMX_USE_OPENCL    
     {
-        int ocl_dev_size;
+        int dev_size;
 
-        ocl_dev_size = hwinfo_g->gpu_info.n_dev*sizeof_ocl_dev_info();
+        dev_size = hwinfo_g->gpu_info.n_dev*sizeof_gpu_dev_info();
 
         if (rank_local > 0)
         {
-            hwinfo_g->gpu_info.ocl_dev =
-                (ocl_gpu_info_ptr_t)malloc(ocl_dev_size);
+            hwinfo_g->gpu_info.gpu_dev =
+                (struct gmx_device_info_t *)malloc(dev_size);
         }
-        MPI_Bcast(hwinfo_g->gpu_info.ocl_dev, ocl_dev_size, MPI_BYTE,
+        MPI_Bcast(hwinfo_g->gpu_info.gpu_dev, dev_size, MPI_BYTE,
                   0, physicalnode_comm);
         MPI_Bcast(&hwinfo_g->gpu_info.n_dev_compatible, 1, MPI_INT,
                   0, physicalnode_comm);
     }
-#else    
-    {
-        int cuda_dev_size;
-
-        cuda_dev_size = hwinfo_g->gpu_info.n_dev*sizeof_cuda_dev_info();
-
-        if (rank_local > 0)
-        {
-            hwinfo_g->gpu_info.cuda_dev =
-                (cuda_dev_info_ptr_t)malloc(cuda_dev_size);
-        }
-        MPI_Bcast(hwinfo_g->gpu_info.cuda_dev, cuda_dev_size, MPI_BYTE,
-                  0, physicalnode_comm);
-        MPI_Bcast(&hwinfo_g->gpu_info.n_dev_compatible, 1, MPI_INT,
-                  0, physicalnode_comm);
-    }
-#endif
 
     MPI_Comm_free(&physicalnode_comm);
 #endif
@@ -849,11 +823,7 @@ void gmx_select_gpu_ids(FILE *fplog, const t_commrec *cr,
         int  res;
 
         snew(checkres, gpu_opt->n_dev_use);
-#ifdef GMX_USE_OPENCL
-        res = check_selected_ocl_gpus(checkres, gpu_info, gpu_opt);
-#else
-        res = check_selected_cuda_gpus(checkres, gpu_info, gpu_opt);
-#endif
+        res = check_selected_gpus(checkres, gpu_info, gpu_opt);
 
         if (!res)
         {
@@ -877,11 +847,7 @@ void gmx_select_gpu_ids(FILE *fplog, const t_commrec *cr,
     }
     else
     {
-#ifdef GMX_USE_OPENCL
-        pick_compatible_ocl_gpus(&hwinfo_g->gpu_info, gpu_opt);
-#else
-        pick_compatible_cuda_gpus(&hwinfo_g->gpu_info, gpu_opt);
-#endif
+        pick_compatible_gpus(&hwinfo_g->gpu_info, gpu_opt);
 
         if (gpu_opt->n_dev_use > cr->nrank_pp_intranode)
         {
@@ -955,11 +921,7 @@ void gmx_hardware_info_free(gmx_hw_info_t *hwinfo)
     if (n_hwinfo == 0)
     {
         gmx_cpuid_done(hwinfo_g->cpuid_info);
-#ifdef GMX_USE_OPENCL
-        free_ocl_gpu_info(&hwinfo_g->gpu_info);
-#else
-        free_cuda_gpu_info(&hwinfo_g->gpu_info);
-#endif
+        free_gpu_info(&hwinfo_g->gpu_info);
         sfree(hwinfo_g);
     }
 

@@ -50,6 +50,7 @@
 #include "gromacs/ewald/ewald-util.h"
 #include "gromacs/ewald/pme.h"
 #include "gromacs/fileio/tpxio.h"
+#include "gromacs/gmxlib/gpu_utils/gpu_utils.h"
 #include "gromacs/gmxpreprocess/calc_verletbuf.h"
 #include "gromacs/legacyheaders/checkpoint.h"
 #include "gromacs/legacyheaders/constr.h"
@@ -93,8 +94,6 @@
 #ifdef GMX_FAHCORE
 #include "corewrap.h"
 #endif
-
-#include "gromacs/legacyheaders/gpu_utils.h"
 
 typedef struct {
     gmx_integrator_t *func;

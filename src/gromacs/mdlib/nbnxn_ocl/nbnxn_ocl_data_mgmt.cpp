@@ -46,6 +46,7 @@
 #include <math.h>
 #include <string.h>
 
+#include "gromacs/gmxlib/gpu_utils/gpu_utils.h"
 #include "gromacs/gmxlib/gpu_utils/ocl_compiler.hpp"
 #include "gromacs/legacyheaders/tables.h"
 #include "gromacs/legacyheaders/typedefs.h"
@@ -61,7 +62,6 @@
 #include "gromacs/mdlib/nbnxn_gpu_data_mgmt.h"
 #include "gromacs/mdlib/nbnxn_gpu_jit_support.h"
 #include "gromacs/mdlib/nbnxn_ocl/nbnxn_ocl_types.h"
-#include "gromacs/legacyheaders/gpu_utils.h"
 
 #include "gromacs/pbcutil/ishift.h"
 #include "gromacs/utility/cstringutil.h"
@@ -321,9 +321,9 @@ static void init_nbparam(cl_nbparam_t              *nbp,
 
     set_cutoff_parameters(nbp, ic);
 
-    nbnxn_ocl_convert_gmx_to_gpu_flavors(ic,
-                                         &(nbp->eeltype),
-                                         &(nbp->vdwtype));
+    nbnxn_ocl_map_interaction_types_to_gpu_kernel_flavors(ic,
+                                                          &(nbp->eeltype),
+                                                          &(nbp->vdwtype));
 
     if (ic->vdwtype == evdwPME)
     {

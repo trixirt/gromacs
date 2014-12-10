@@ -35,13 +35,14 @@
 
 #include "gmxpre.h"
 
-#include "gromacs/legacyheaders/gpu_utils.h"
+#include "gpu_utils.h"
 
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 #include "gromacs/gmxlib/cuda_tools/cudautils.cuh"
+#include "gromacs/gmxlib/cuda_tools/pmalloc_cuda.h"
 #include "gromacs/legacyheaders/types/hw_info.h"
 #include "gromacs/utility/cstringutil.h"
 #include "gromacs/utility/smalloc.h"
@@ -184,9 +185,9 @@ static int do_sanity_checks(int dev_id, cudaDeviceProp *dev_prop)
  * \param[in] gpu_opt       options for using the GPUs in gpu_info
  * \returns                 true if no error occurs during initialization.
  */
-gmx_bool init_cuda_gpu(int mygpu, char *result_str,
-                       const gmx_gpu_info_t *gpu_info,
-                       const gmx_gpu_opt_t *gpu_opt)
+gmx_bool init_gpu(int mygpu, char *result_str,
+                  const gmx_gpu_info_t *gpu_info,
+                  const gmx_gpu_opt_t *gpu_opt)
 {
     cudaError_t stat;
     char        sbuf[STRLEN];
@@ -225,7 +226,7 @@ gmx_bool init_cuda_gpu(int mygpu, char *result_str,
  *                          during the initialization (if there was any).
  * \returns                 true if no error occurs during the freeing.
  */
-gmx_bool free_gpu(char *result_str)
+gmx_bool free_cuda_gpu(char *result_str)
 {
     cudaError_t stat;
 
@@ -333,7 +334,7 @@ static int is_gmx_supported_gpu_id(int dev_id, cudaDeviceProp *dev_prop)
  *                         the pointer points to should be managed externally.
  *  \returns               non-zero if the detection encountered a failure, zero otherwise.
  */
-int detect_cuda_gpus(gmx_gpu_info_t *gpu_info, char *err_str)
+int detect_gpus(gmx_gpu_info_t *gpu_info, char *err_str)
 {
     int              i, ndev, checkres, retval;
     cudaError_t      stat;
@@ -394,13 +395,13 @@ int detect_cuda_gpus(gmx_gpu_info_t *gpu_info, char *err_str)
  * Given the list of GPUs available in the system check each device in
  * gpu_info->cuda_dev and place the indices of the compatible GPUs into
  * dev_use with this marking the respective GPUs as "available for use."
- * Note that \detect_cuda_gpus must have been called before.
+ * Note that \detect_gpus must have been called before.
  *
  * \param[in]     gpu_info    pointer to structure holding GPU information
  * \param[in,out] gpu_opt     pointer to structure holding GPU options
  */
-void pick_compatible_cuda_gpus(const gmx_gpu_info_t *gpu_info,
-                               gmx_gpu_opt_t        *gpu_opt)
+void pick_compatible_gpus(const gmx_gpu_info_t *gpu_info,
+                          gmx_gpu_opt_t        *gpu_opt)
 {
     int  i, ncompat;
     int *compat;
@@ -438,9 +439,9 @@ void pick_compatible_cuda_gpus(const gmx_gpu_info_t *gpu_info,
  * \param[out]  gpu_opt     pointer to structure holding GPU options
  * \returns                 TRUE if every the requested GPUs are compatible
  */
-gmx_bool check_selected_cuda_gpus(int                  *checkres,
-                                  const gmx_gpu_info_t *gpu_info,
-                                  gmx_gpu_opt_t        *gpu_opt)
+gmx_bool check_selected_gpus(int                  *checkres,
+                             const gmx_gpu_info_t *gpu_info,
+                             gmx_gpu_opt_t        *gpu_opt)
 {
     int  i, id;
     bool bAllOk;
@@ -480,7 +481,7 @@ gmx_bool check_selected_cuda_gpus(int                  *checkres,
  *
  * \param[in]    gpu_info    pointer to structure holding GPU information
  */
-void free_cuda_gpu_info(const gmx_gpu_info_t *gpu_info)
+void free_gpu_info(const gmx_gpu_info_t *gpu_info)
 {
     if (gpu_info == NULL)
     {
@@ -500,7 +501,7 @@ void free_cuda_gpu_info(const gmx_gpu_info_t *gpu_info)
  * \param[in]   gpu_info    pointer to structure holding GPU information
  * \param[in]   index       an index *directly* into the array of available GPUs
  */
-void get_cuda_gpu_device_info_string(char *s, const gmx_gpu_info_t *gpu_info, int index)
+void get_gpu_device_info_string(char *s, const gmx_gpu_info_t *gpu_info, int index)
 {
     assert(s);
     assert(gpu_info);
@@ -532,7 +533,7 @@ void get_cuda_gpu_device_info_string(char *s, const gmx_gpu_info_t *gpu_info, in
     }
 }
 
-/*! \brief Returns the device ID of the GPU with a given index into the array of used GPUs.
+/*! \brief Returns the device ID of the CUDA GPU with a given index into the array of used GPUs.
  *
  * Getter function which, given an index into the array of GPUs in use
  * (dev_use) -- typically a tMPI/MPI rank --, returns the device ID of the
@@ -554,14 +555,14 @@ int get_cuda_gpu_device_id(const gmx_gpu_info_t *gpu_info,
     return gpu_info->gpu_dev[gpu_opt->dev_use[idx]].id;
 }
 
-/*! \brief Returns the device ID of the GPU currently in use.
+/*! \brief Returns the device ID of the CUDA GPU currently in use.
  *
  * The GPU used is the one that is active at the time of the call in the active context.
  *
  * \param[in]    gpu_info   pointer to structure holding GPU information
  * \returns                 device ID of the GPU in use at the time of the call
  */
-int get_current_gpu_device_id(void)
+int get_current_cuda_gpu_device_id(void)
 {
     int gpuid;
     CU_RET_ERR(cudaGetDevice(&gpuid), "cudaGetDevice failed");
@@ -578,4 +579,21 @@ int get_current_gpu_device_id(void)
 size_t sizeof_cuda_dev_info(void)
 {
     return sizeof(gmx_device_info_t);
+}
+
+/*! \brief Set allocation functions used by the GPU host */
+void gpu_set_host_malloc_and_free(bool               bUseGpuKernels,
+                                  gmx_host_alloc_t **nb_alloc,
+                                  gmx_host_free_t  **nb_free)
+{
+    if (bUseGpuKernels)
+    {
+        *nb_alloc = &pmalloc;
+        *nb_free  = &pfree;
+    }
+    else
+    {
+        *nb_alloc = NULL;
+        *nb_free  = NULL;
+    }
 }

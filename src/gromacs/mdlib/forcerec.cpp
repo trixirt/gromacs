@@ -43,12 +43,12 @@
 #include <string.h>
 
 #include "gromacs/ewald/ewald-util.h"
+#include "gromacs/gmxlib/gpu_utils/gpu_utils.h"
 #include "gromacs/legacyheaders/copyrite.h"
 #include "gromacs/legacyheaders/domdec.h"
 #include "gromacs/legacyheaders/force.h"
 #include "gromacs/legacyheaders/gmx_detect_hardware.h"
 #include "gromacs/legacyheaders/gmx_omp_nthreads.h"
-#include "gromacs/legacyheaders/gpu_utils.h"
 #include "gromacs/legacyheaders/inputrec.h"
 #include "gromacs/legacyheaders/macros.h"
 #include "gromacs/legacyheaders/md_logging.h"
@@ -57,7 +57,6 @@
 #include "gromacs/legacyheaders/network.h"
 #include "gromacs/legacyheaders/nonbonded.h"
 #include "gromacs/legacyheaders/ns.h"
-#include "gromacs/legacyheaders/pmalloc_cuda.h"
 #include "gromacs/legacyheaders/qmmm.h"
 #include "gromacs/legacyheaders/tables.h"
 #include "gromacs/legacyheaders/txtdump.h"
@@ -1810,16 +1809,14 @@ static void pick_nbnxn_resources(const t_commrec     *cr,
         /* Each PP node will use the intra-node id-th device from the
          * list of detected/selected GPUs. */
 
-#ifdef GMX_USE_OPENCL
-        if (!init_ocl_gpu(cr->rank_pp_intranode, gpu_err_str,
-                          &hwinfo->gpu_info, gpu_opt))
-#else
-        if (!init_cuda_gpu(cr->rank_pp_intranode, gpu_err_str,
-                           &hwinfo->gpu_info, gpu_opt))
-#endif
+        if (!init_gpu(cr->rank_pp_intranode, gpu_err_str,
+                      &hwinfo->gpu_info, gpu_opt))
         {
             /* At this point the init should never fail as we made sure that
              * we have all the GPUs we need. If it still does, we'll bail. */
+            /* TODO the decorating of gpu_err_str is nicer if it
+               happens inside init_gpu. Out here, the decorating with
+               the MPI rank makes sense. */
 #ifdef GMX_USE_OPENCL
             gmx_fatal(FARGS, "On rank %d failed to initialize GPU #%s: %s",
                       cr->nodeid,
@@ -2271,21 +2268,8 @@ static void init_nb_verlet(FILE                *fp,
 
     for (i = 0; i < nbv->ngrp; i++)
     {
-        if (nbv->grp[0].kernel_type == nbnxnk8x8x8_CUDA)
-        {
-#if defined(GMX_GPU) && defined(GMX_USE_OPENCL)
-            nb_alloc = &ocl_pmalloc;
-            nb_free  = &ocl_pfree;
-#else
-            nb_alloc = &pmalloc;
-            nb_free  = &pfree;
-#endif
-        }
-        else
-        {
-            nb_alloc = NULL;
-            nb_free  = NULL;
-        }
+        gpu_set_host_malloc_and_free(nbv->grp[0].kernel_type == nbnxnk8x8x8_CUDA,
+                                     &nb_alloc, &nb_free);
 
         nbnxn_init_pairlist_set(&nbv->grp[i].nbl_lists,
                                 nbnxn_kernel_pairlist_simple(nbv->grp[i].kernel_type),
@@ -3356,7 +3340,7 @@ void forcerec_set_excl_load(t_forcerec           *fr,
 
 /* Frees GPU memory and destroys the CUDA context.
  *
- * Note that this function needs to be called even if GPUs are not used
+ * Note that this function needs to be called even if CUDA GPUs are not used
  * in this run because the PME ranks have no knowledge of whether GPUs
  * are used or not, but all ranks need to enter the barrier below.
  */
@@ -3386,11 +3370,11 @@ void free_gpu_resources(const t_forcerec *fr,
         }
 #endif  /* GMX_THREAD_MPI */
 
-        /* uninitialize GPU (by destroying the context) */
-        if (!free_gpu(gpu_err_str))
+        /* uninitialize CUDA GPU (by destroying the context) */
+        if (!free_cuda_gpu(gpu_err_str))
         {
             gmx_warning("On rank %d failed to free GPU #%d: %s",
-                        cr->nodeid, get_current_gpu_device_id(), gpu_err_str);
+                        cr->nodeid, get_current_cuda_gpu_device_id(), gpu_err_str);
         }
     }
 }

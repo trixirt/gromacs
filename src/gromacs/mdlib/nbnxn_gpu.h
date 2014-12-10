@@ -93,7 +93,7 @@ void nbnxn_gpu_wait_for_gpu(gmx_nbnxn_gpu_t *gmx_unused nb,
 
 /*! Selects the Ewald kernel type, analytical or tabulated, single or twin cut-off. */
 GPU_FUNC_QUALIFIER
-int nbnxn_gpu_pick_ewald_kernel_type(bool bTwinCut) GPU_FUNC_TERM
+int nbnxn_gpu_pick_ewald_kernel_type(bool gmx_unused bTwinCut) GPU_FUNC_TERM_WITH_RETURN(-1)
 
 #ifdef __cplusplus
 }
