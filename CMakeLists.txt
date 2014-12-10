@@ -111,7 +111,7 @@ if(CMAKE_HOST_UNIX)
     if(GMX_BUILD_HOSTNAME AND NOT "${GMX_BUILD_HOSTNAME}" STREQUAL "${TMP_HOSTNAME}")
         message(WARNING "
             The CMake cache, probably generated on a different host (${GMX_BUILD_HOSTNAME}),
-            is being reused! This could lead to inconsitencies; therefore, it is
+            is being reused! This could lead to inconsistencies; therefore, it is
             recommended to regenerate the cache!")
     endif()
     set(GMX_BUILD_HOSTNAME "${TMP_HOSTNAME}" CACHE INTERNAL
@@ -199,18 +199,14 @@ if(GMX_CPU_ACCELERATION)
     # TODO remove all references to GMX_CPU_ACCELERATION in master branch
 endif()
 
-if(NOT GMX_TARGET_MIC)
-    include(gmxDetectSimd)
-    gmx_detect_simd(GMX_SUGGESTED_SIMD)
-else()
-    set(GMX_SUGGESTED_SIMD "None")
-endif()
+include(gmxDetectSimd)
+gmx_detect_simd(GMX_SUGGESTED_SIMD)
 
 gmx_option_multichoice(
     GMX_SIMD
     "SIMD instruction set for CPU kernels and compiler optimization"
     "${GMX_SUGGESTED_SIMD}"
-    None SSE2 SSE4.1 AVX_128_FMA AVX_256 AVX2_256 ARM_NEON ARM_NEON_ASIMD IBM_QPX IBM_VMX IBM_VSX Sparc64_HPC_ACE Reference)
+    None SSE2 SSE4.1 AVX_128_FMA AVX_256 AVX2_256 MIC ARM_NEON ARM_NEON_ASIMD IBM_QPX IBM_VMX IBM_VSX Sparc64_HPC_ACE Reference)
 
 gmx_option_multichoice(
     GMX_FFT_LIBRARY
@@ -603,11 +599,16 @@ gmx_test__finite(HAVE__FINITE)
 include(gmxTestCXX11)
 gmx_test_cxx11(GMX_CXX11_SUPPORTED GMX_CXX11_FLAGS)
 include(CMakeDependentOption)
+# clang with some older versions of boost fail to work with C++11
+if(CMAKE_CXX_COMPILER_ID MATCHES Clang AND
+    (Boost_VERSION VERSION_EQUAL 104601 OR Boost_VERSION VERSION_EQUAL 104700))
+    set(CLANG_AND_OLD_EXTERNAL_BOOST TRUE)
+endif()
 # nvcc does not support C++11 flags, so with GPUs we prefer to skip C++11 flags
 # entirely to keep the compilation environment uniform.
 cmake_dependent_option(GMX_CXX11
     "Use C++11 features"
-    ON "GMX_CXX11_SUPPORTED AND NOT GMX_GPU" OFF)
+    ON "GMX_CXX11_SUPPORTED AND NOT GMX_GPU AND NOT CLANG_AND_OLD_EXTERNAL_BOOST" OFF)
 mark_as_advanced(GMX_CXX11)
 if(GMX_CXX11)
     set(EXTRA_CXX_FLAGS "${EXTRA_CXX_FLAGS} ${GMX_CXX11_FLAGS}")

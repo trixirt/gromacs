@@ -245,6 +245,7 @@
 #include "selmethod.h"
 #include "symrec.h"
 
+using gmx::SelectionLocation;
 using gmx::SelectionParserValue;
 using gmx::SelectionParserValueList;
 using gmx::SelectionParserValueListPointer;
@@ -254,6 +255,25 @@ using gmx::SelectionParserParameterListPointer;
 using gmx::SelectionParserValue;
 using gmx::SelectionTreeElement;
 using gmx::SelectionTreeElementPointer;
+
+namespace
+{
+
+/*! \brief
+ * Formats context string for errors.
+ *
+ * The returned string is used as the context for errors reported during
+ * parsing.
+ */
+std::string
+formatCurrentErrorContext(yyscan_t scanner)
+{
+    return gmx::formatString(
+            "While parsing '%s'",
+            _gmx_sel_lexer_get_current_text(scanner).c_str());
+}
+
+} // namespace
 
 void
 _gmx_selparser_error(yyscan_t scanner, const char *fmt, ...)
@@ -269,22 +289,58 @@ _gmx_selparser_error(yyscan_t scanner, const char *fmt, ...)
 }
 
 bool
-_gmx_selparser_handle_exception(yyscan_t scanner, const std::exception &ex)
+_gmx_selparser_handle_exception(yyscan_t scanner, std::exception *ex)
 {
-    if (dynamic_cast<const gmx::UserInputError *>(&ex) != NULL)
+    try
     {
-        // TODO: Consider whether also the non-interactive parser should
-        // postpone the exception such that the whole selection can be added as
-        // context.
+        bool                   canContinue = false;
+        gmx::GromacsException *gromacsException
+            = dynamic_cast<gmx::GromacsException *>(ex);
+        if (gromacsException != NULL)
+        {
+            gromacsException->prependContext(formatCurrentErrorContext(scanner));
+            canContinue = (dynamic_cast<gmx::UserInputError *>(ex) != NULL);
+        }
+        _gmx_sel_lexer_set_exception(scanner, boost::current_exception());
+        return canContinue;
+    }
+    catch (const std::exception &)
+    {
+        _gmx_sel_lexer_set_exception(scanner, boost::current_exception());
+        return false;
+    }
+}
+
+bool
+_gmx_selparser_handle_error(yyscan_t scanner)
+{
+    std::string context(gmx::formatString("In selection '%s'",
+                                          _gmx_sel_lexer_pselstr(scanner)));
+    // The only way to prepend context to the exception is to rethrow it.
+    try
+    {
+        _gmx_sel_lexer_rethrow_exception_if_occurred(scanner);
+    }
+    catch (gmx::UserInputError &ex)
+    {
+        ex.prependContext(context);
         if (_gmx_sel_is_lexer_interactive(scanner))
         {
-            // TODO: Handle exceptions that printing the message may produce.
             gmx::formatExceptionMessageToFile(stderr, ex);
             return true;
         }
+        throw;
     }
-    _gmx_sel_lexer_set_exception(scanner, boost::current_exception());
-    return false;
+    catch (gmx::GromacsException &ex)
+    {
+        ex.prependContext(context);
+        throw;
+    }
+    // Do legacy processing for non-exception cases.
+    // This is only reached if there was no active exception.
+    _gmx_selparser_error(scanner, "Invalid selection '%s'",
+                         _gmx_sel_lexer_pselstr(scanner));
+    return _gmx_sel_is_lexer_interactive(scanner);
 }
 
 namespace gmx
@@ -294,15 +350,16 @@ namespace gmx
  * SelectionParserValue
  */
 
-SelectionParserValue::SelectionParserValue(e_selvalue_t type)
-    : type(type)
+SelectionParserValue::SelectionParserValue(
+        e_selvalue_t type, const SelectionLocation &location)
+    : type(type), location_(location)
 {
     memset(&u, 0, sizeof(u));
 }
 
 SelectionParserValue::SelectionParserValue(
         const SelectionTreeElementPointer &expr)
-    : type(expr->v.type), expr(expr)
+    : type(expr->v.type), expr(expr), location_(expr->location())
 {
     memset(&u, 0, sizeof(u));
 }
@@ -312,9 +369,10 @@ SelectionParserValue::SelectionParserValue(
  */
 
 SelectionParserParameter::SelectionParserParameter(
-        const char                     *name,
-        SelectionParserValueListPointer values)
-    : name_(name != NULL ? name : ""),
+        const char                      *name,
+        SelectionParserValueListPointer  values,
+        const SelectionLocation         &location)
+    : name_(name != NULL ? name : ""), location_(location),
       values_(values ? move(values)
               : SelectionParserValueListPointer(new SelectionParserValueList))
 {
@@ -566,9 +624,11 @@ set_refpos_type(gmx::PositionCalculationCollection *pcc,
 gmx::SelectionTreeElementPointer
 _gmx_sel_init_arithmetic(const gmx::SelectionTreeElementPointer &left,
                          const gmx::SelectionTreeElementPointer &right,
-                         char op, yyscan_t /* scanner */)
+                         char op, yyscan_t scanner)
 {
-    SelectionTreeElementPointer sel(new SelectionTreeElement(SEL_ARITHMETIC));
+    SelectionTreeElementPointer sel(
+            new SelectionTreeElement(
+                    SEL_ARITHMETIC, _gmx_sel_lexer_get_current_location(scanner)));
     sel->v.type        = REAL_VALUE;
     switch (op)
     {
@@ -604,9 +664,11 @@ _gmx_sel_init_comparison(const gmx::SelectionTreeElementPointer &left,
                          const char *cmpop, yyscan_t scanner)
 {
     gmx::MessageStringCollector *errors = _gmx_sel_lexer_error_reporter(scanner);
-    gmx::MessageStringContext    context(errors, "In comparison initialization");
+    gmx::MessageStringContext    context(errors, formatCurrentErrorContext(scanner));
 
-    SelectionTreeElementPointer  sel(new SelectionTreeElement(SEL_EXPRESSION));
+    SelectionTreeElementPointer  sel(
+            new SelectionTreeElement(
+                    SEL_EXPRESSION, _gmx_sel_lexer_get_current_location(scanner)));
     _gmx_selelem_set_method(sel, &sm_compare, scanner);
 
     SelectionParserParameterList params;
@@ -618,9 +680,12 @@ _gmx_sel_init_comparison(const gmx::SelectionTreeElementPointer &left,
     name  = right->v.type == INT_VALUE ? "int2" : "real2";
     params.push_back(SelectionParserParameter::createFromExpression(name, right));
     // Create the parameter for the operator.
+    // TODO: Consider whether a proper location is needed.
+    SelectionLocation location(SelectionLocation::createEmpty());
     params.push_back(
             SelectionParserParameter::create(
-                    "op", SelectionParserValue::createString(cmpop)));
+                    "op", SelectionParserValue::createString(cmpop, location),
+                    location));
     if (!_gmx_sel_parse_params(params, sel->u.expr.method->nparams,
                                sel->u.expr.method->param, sel, scanner))
     {
@@ -653,9 +718,7 @@ init_keyword_internal(gmx_ana_selmethod_t *method,
     gmx_ana_selcollection_t     *sc = _gmx_sel_lexer_selcollection(scanner);
 
     gmx::MessageStringCollector *errors = _gmx_sel_lexer_error_reporter(scanner);
-    char  buf[128];
-    sprintf(buf, "In keyword '%s'", method->name);
-    gmx::MessageStringContext  context(errors, buf);
+    gmx::MessageStringContext    context(errors, formatCurrentErrorContext(scanner));
 
     if (method->nparams > 0)
     {
@@ -664,7 +727,10 @@ init_keyword_internal(gmx_ana_selmethod_t *method,
                           "Keyword initialization called with non-keyword method"));
     }
 
-    SelectionTreeElementPointer root(new SelectionTreeElement(SEL_EXPRESSION));
+    const SelectionLocation    &location = _gmx_sel_lexer_get_current_location(scanner);
+    // TODO: If there are arguments, the location would be better as just the
+    // location of the keyword itself.
+    SelectionTreeElementPointer root(new SelectionTreeElement(SEL_EXPRESSION, location));
     SelectionTreeElementPointer child = root;
     _gmx_selelem_set_method(child, method, scanner);
 
@@ -682,7 +748,7 @@ init_keyword_internal(gmx_ana_selmethod_t *method,
                                   "Unknown type for keyword selection"));
         }
         /* Initialize the selection element */
-        root.reset(new SelectionTreeElement(SEL_EXPRESSION));
+        root.reset(new SelectionTreeElement(SEL_EXPRESSION, location));
         _gmx_selelem_set_method(root, kwmethod, scanner);
         if (method->type == STR_VALUE)
         {
@@ -691,7 +757,8 @@ init_keyword_internal(gmx_ana_selmethod_t *method,
         SelectionParserParameterList params;
         params.push_back(
                 SelectionParserParameter::createFromExpression(NULL, child));
-        params.push_back(SelectionParserParameter::create(NULL, move(args)));
+        params.push_back(
+                SelectionParserParameter::create(NULL, move(args), location));
         if (!_gmx_sel_parse_params(params, root->u.expr.method->nparams,
                                    root->u.expr.method->param, root, scanner))
         {
@@ -748,6 +815,28 @@ _gmx_sel_init_keyword_strmatch(gmx_ana_selmethod_t *method,
 
 /*!
  * \param[in]  method Method to use for initialization.
+ * \param[in]  group  Selection in which the keyword should be evaluated.
+ * \param[in]  rpost  Reference position type to use (NULL = default).
+ * \param[in]  scanner Scanner data structure.
+ * \returns    The created selection element.
+ *
+ * This function handles the creation of a gmx::SelectionTreeElement object for
+ * expressions like "z of ...".
+ */
+SelectionTreeElementPointer
+_gmx_sel_init_keyword_of(gmx_ana_selmethod_t                    *method,
+                         const gmx::SelectionTreeElementPointer &group,
+                         const char *rpost, yyscan_t scanner)
+{
+    gmx::MessageStringCollector *errors = _gmx_sel_lexer_error_reporter(scanner);
+    gmx::MessageStringContext    context(errors, formatCurrentErrorContext(scanner));
+
+    GMX_UNUSED_VALUE(rpost);
+    return _gmx_sel_init_keyword_evaluator(method, group, scanner);
+}
+
+/*!
+ * \param[in]  method Method to use for initialization.
  * \param[in]  params Pointer to the first parameter.
  * \param[in]  rpost  Reference position type to use (NULL = default).
  * \param[in]  scanner Scanner data structure.
@@ -770,9 +859,7 @@ _gmx_sel_init_method(gmx_ana_selmethod_t                      *method,
     int                          rc;
 
     gmx::MessageStringCollector *errors = _gmx_sel_lexer_error_reporter(scanner);
-    char  buf[128];
-    sprintf(buf, "In keyword '%s'", method->name);
-    gmx::MessageStringContext  context(errors, buf);
+    gmx::MessageStringContext    context(errors, formatCurrentErrorContext(scanner));
 
     _gmx_sel_finish_method(scanner);
     /* The "same" keyword needs some custom massaging of the parameters. */
@@ -781,7 +868,9 @@ _gmx_sel_init_method(gmx_ana_selmethod_t                      *method,
     {
         return SelectionTreeElementPointer();
     }
-    SelectionTreeElementPointer root(new SelectionTreeElement(SEL_EXPRESSION));
+    SelectionTreeElementPointer root(
+            new SelectionTreeElement(
+                    SEL_EXPRESSION, _gmx_sel_lexer_get_current_location(scanner)));
     _gmx_selelem_set_method(root, method, scanner);
     /* Process the parameters */
     if (!_gmx_sel_parse_params(*params, root->u.expr.method->nparams,
@@ -811,12 +900,12 @@ _gmx_sel_init_modifier(gmx_ana_selmethod_t                      *method,
                        yyscan_t                                  scanner)
 {
     gmx::MessageStringCollector *errors = _gmx_sel_lexer_error_reporter(scanner);
-    char  buf[128];
-    sprintf(buf, "In keyword '%s'", method->name);
-    gmx::MessageStringContext  context(errors, buf);
+    gmx::MessageStringContext    context(errors, formatCurrentErrorContext(scanner));
 
     _gmx_sel_finish_method(scanner);
-    SelectionTreeElementPointer modifier(new SelectionTreeElement(SEL_MODIFIER));
+    SelectionTreeElementPointer modifier(
+            new SelectionTreeElement(
+                    SEL_MODIFIER, _gmx_sel_lexer_get_current_location(scanner)));
     _gmx_selelem_set_method(modifier, method, scanner);
     SelectionTreeElementPointer root;
     if (method->type == NO_VALUE)
@@ -859,11 +948,11 @@ _gmx_sel_init_position(const gmx::SelectionTreeElementPointer &expr,
                        const char *type, yyscan_t scanner)
 {
     gmx::MessageStringCollector *errors = _gmx_sel_lexer_error_reporter(scanner);
-    char  buf[128];
-    sprintf(buf, "In position evaluation");
-    gmx::MessageStringContext   context(errors, buf);
+    gmx::MessageStringContext    context(errors, formatCurrentErrorContext(scanner));
 
-    SelectionTreeElementPointer root(new SelectionTreeElement(SEL_EXPRESSION));
+    SelectionTreeElementPointer  root(
+            new SelectionTreeElement(
+                    SEL_EXPRESSION, _gmx_sel_lexer_get_current_location(scanner)));
     _gmx_selelem_set_method(root, &sm_keyword_pos, scanner);
     _gmx_selelem_set_kwpos_type(root.get(), type);
     /* Create the parameters for the parameter parser. */
@@ -880,15 +969,18 @@ _gmx_sel_init_position(const gmx::SelectionTreeElementPointer &expr,
 }
 
 /*!
- * \param[in] x,y,z  Coordinates for the position.
+ * \param[in] x,y,z   Coordinates for the position.
+ * \param[in] scanner Scanner data structure.
  * \returns   The creates selection element.
  */
 SelectionTreeElementPointer
-_gmx_sel_init_const_position(real x, real y, real z)
+_gmx_sel_init_const_position(real x, real y, real z, yyscan_t scanner)
 {
     rvec                        pos;
 
-    SelectionTreeElementPointer sel(new SelectionTreeElement(SEL_CONST));
+    SelectionTreeElementPointer sel(
+            new SelectionTreeElement(
+                    SEL_CONST, _gmx_sel_lexer_get_current_location(scanner)));
     _gmx_selelem_set_vtype(sel, POS_VALUE);
     _gmx_selvalue_reserve(&sel->v, 1);
     pos[XX] = x;
@@ -910,7 +1002,9 @@ SelectionTreeElementPointer
 _gmx_sel_init_group_by_name(const char *name, yyscan_t scanner)
 {
 
-    SelectionTreeElementPointer sel(new SelectionTreeElement(SEL_GROUPREF));
+    SelectionTreeElementPointer sel(
+            new SelectionTreeElement(
+                    SEL_GROUPREF, _gmx_sel_lexer_get_current_location(scanner)));
     _gmx_selelem_set_vtype(sel, GROUP_VALUE);
     sel->setName(gmx::formatString("group \"%s\"", name));
     sel->u.gref.name = gmx_strdup(name);
@@ -934,7 +1028,9 @@ _gmx_sel_init_group_by_name(const char *name, yyscan_t scanner)
 SelectionTreeElementPointer
 _gmx_sel_init_group_by_id(int id, yyscan_t scanner)
 {
-    SelectionTreeElementPointer sel(new SelectionTreeElement(SEL_GROUPREF));
+    SelectionTreeElementPointer sel(
+            new SelectionTreeElement(
+                    SEL_GROUPREF, _gmx_sel_lexer_get_current_location(scanner)));
     _gmx_selelem_set_vtype(sel, GROUP_VALUE);
     sel->setName(gmx::formatString("group %d", id));
     sel->u.gref.name = NULL;
@@ -951,14 +1047,16 @@ _gmx_sel_init_group_by_id(int id, yyscan_t scanner)
 }
 
 /*!
- * \param[in,out] sel  Value of the variable.
+ * \param[in,out] sel      Value of the variable.
+ * \param         scanner  Scanner data structure.
  * \returns       The created selection element that references \p sel.
  *
  * The reference count of \p sel is updated, but no other modifications are
  * made.
  */
 SelectionTreeElementPointer
-_gmx_sel_init_variable_ref(const gmx::SelectionTreeElementPointer &sel)
+_gmx_sel_init_variable_ref(const gmx::SelectionTreeElementPointer &sel,
+                           yyscan_t                                scanner)
 {
     SelectionTreeElementPointer ref;
 
@@ -968,7 +1066,8 @@ _gmx_sel_init_variable_ref(const gmx::SelectionTreeElementPointer &sel)
     }
     else
     {
-        ref.reset(new SelectionTreeElement(SEL_SUBEXPRREF));
+        ref.reset(new SelectionTreeElement(
+                          SEL_SUBEXPRREF, _gmx_sel_lexer_get_current_location(scanner)));
         _gmx_selelem_set_vtype(ref, sel->v.type);
         ref->setName(sel->name());
         ref->child = sel;
@@ -998,7 +1097,9 @@ _gmx_sel_init_selection(const char                             *name,
                           "Each selection must evaluate to a position"));
     }
 
-    SelectionTreeElementPointer root(new SelectionTreeElement(SEL_ROOT));
+    SelectionTreeElementPointer root(
+            new SelectionTreeElement(
+                    SEL_ROOT, _gmx_sel_lexer_get_current_location(scanner)));
     root->child = sel;
     if (name)
     {
@@ -1060,11 +1161,12 @@ _gmx_sel_assign_variable(const char                             *name,
     }
     else
     {
+        SelectionLocation location(_gmx_sel_lexer_get_current_location(scanner));
         /* Create the root element */
-        root.reset(new SelectionTreeElement(SEL_ROOT));
+        root.reset(new SelectionTreeElement(SEL_ROOT, location));
         root->setName(name);
         /* Create the subexpression element */
-        root->child.reset(new SelectionTreeElement(SEL_SUBEXPR));
+        root->child.reset(new SelectionTreeElement(SEL_SUBEXPR, location));
         root->child->setName(name);
         _gmx_selelem_set_vtype(root->child, expr->v.type);
         root->child->child  = expr;

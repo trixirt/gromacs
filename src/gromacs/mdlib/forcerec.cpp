@@ -43,10 +43,10 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include "gromacs/ewald/ewald-util.h"
+#include "gromacs/domdec/domdec.h"
+#include "gromacs/ewald/ewald.h"
 #include "gromacs/gmxlib/gpu_utils/gpu_utils.h"
 #include "gromacs/legacyheaders/copyrite.h"
-#include "gromacs/legacyheaders/domdec.h"
 #include "gromacs/legacyheaders/force.h"
 #include "gromacs/legacyheaders/gmx_detect_hardware.h"
 #include "gromacs/legacyheaders/gmx_omp_nthreads.h"
@@ -63,6 +63,7 @@
 #include "gromacs/legacyheaders/txtdump.h"
 #include "gromacs/legacyheaders/typedefs.h"
 #include "gromacs/legacyheaders/types/commrec.h"
+#include "gromacs/math/calculate-ewald-splitting-coefficient.h"
 #include "gromacs/math/units.h"
 #include "gromacs/math/utilities.h"
 #include "gromacs/math/vec.h"
@@ -1775,7 +1776,8 @@ static void pick_nbnxn_kernel(FILE                *fp,
     }
 }
 
-static void pick_nbnxn_resources(const t_commrec     *cr,
+static void pick_nbnxn_resources(FILE                *fp,
+                                 const t_commrec     *cr,
                                  const gmx_hw_info_t *hwinfo,
                                  gmx_bool             bDoNonbonded,
                                  gmx_bool            *bUseGPU,
@@ -1809,8 +1811,7 @@ static void pick_nbnxn_resources(const t_commrec     *cr,
     {
         /* Each PP node will use the intra-node id-th device from the
          * list of detected/selected GPUs. */
-
-        if (!init_gpu(cr->rank_pp_intranode, gpu_err_str,
+        if (!init_gpu(fp, cr->rank_pp_intranode, gpu_err_str,
                       &hwinfo->gpu_info, gpu_opt))
         {
             /* At this point the init should never fail as we made sure that
@@ -2172,7 +2173,7 @@ static void init_nb_verlet(FILE                *fp,
 
     snew(nbv, 1);
 
-    pick_nbnxn_resources(cr, fr->hwinfo,
+    pick_nbnxn_resources(fp, cr, fr->hwinfo,
                          fr->bNonbonded,
                          &nbv->bUseGPU,
                          &bEmulateGPU,
@@ -3345,8 +3346,10 @@ void forcerec_set_excl_load(t_forcerec           *fr,
  * in this run because the PME ranks have no knowledge of whether GPUs
  * are used or not, but all ranks need to enter the barrier below.
  */
-void free_gpu_resources(const t_forcerec *fr,
-                        const t_commrec  *cr)
+void free_gpu_resources(const t_forcerec     *fr,
+                        const t_commrec      *cr,
+                        const gmx_gpu_info_t *gpu_info,
+                        const gmx_gpu_opt_t  *gpu_opt)
 {
     gmx_bool bIsPPrankUsingGPU;
     char     gpu_err_str[STRLEN];
@@ -3371,8 +3374,8 @@ void free_gpu_resources(const t_forcerec *fr,
         }
 #endif  /* GMX_THREAD_MPI */
 
-        /* uninitialize CUDA GPU (by destroying the context) */
-        if (!free_cuda_gpu(gpu_err_str))
+        /* uninitialize GPU (by destroying the context) */
+        if (!free_cuda_gpu(cr->rank_pp_intranode, gpu_err_str, gpu_info, gpu_opt))
         {
             gmx_warning("On rank %d failed to free GPU #%d: %s",
                         cr->nodeid, get_current_cuda_gpu_device_id(), gpu_err_str);

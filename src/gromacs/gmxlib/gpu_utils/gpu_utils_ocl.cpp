@@ -368,9 +368,9 @@ void pick_compatible_gpus(const gmx_gpu_info_t *gpu_info,
         }
     }
 
-    gpu_opt->n_dev_use = ncompat;
-    snew(gpu_opt->dev_use, ncompat);
-    memcpy(gpu_opt->dev_use, compat, ncompat*sizeof(*compat));
+    gpu_opt->n_dev_compatible = ncompat;
+    snew(gpu_opt->dev_compatible, ncompat);
+    memcpy(gpu_opt->dev_compatible, compat, ncompat*sizeof(*compat));
     sfree(compat);
 }
 
@@ -477,7 +477,8 @@ void get_gpu_device_info_string(char gmx_unused *s, const gmx_gpu_info_t gmx_unu
  * \param[in] gpu_opt         Options for using the GPUs in gpu_info
  * \returns                   true if no error occurs during initialization.
  */
-gmx_bool init_gpu(int                              mygpu,
+gmx_bool init_gpu(FILE                            */*fplog*/,
+                  int                              mygpu,
                   char                            *result_str,
                   const gmx_gpu_info_t gmx_unused *gpu_info,
                   const gmx_gpu_opt_t             *gpu_opt

@@ -71,12 +71,14 @@ GPU_FUNC_QUALIFIER
 void free_gpu_info(const struct gmx_gpu_info_t gmx_unused *gpu_info) GPU_FUNC_TERM
 
 GPU_FUNC_QUALIFIER
-gmx_bool init_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
+gmx_bool init_gpu(FILE gmx_unused *fplog, int gmx_unused mygpu, char gmx_unused *result_str,
                   const struct gmx_gpu_info_t gmx_unused *gpu_info,
                   const gmx_gpu_opt_t gmx_unused *gpu_opt) GPU_FUNC_TERM_WITH_RETURN(-1)
 
 CUDA_FUNC_QUALIFIER
-gmx_bool free_cuda_gpu(char gmx_unused *result_str) CUDA_FUNC_TERM_WITH_RETURN(-1)
+gmx_bool free_cuda_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
+                       const gmx_gpu_info_t gmx_unused *gpu_info,
+                       const gmx_gpu_opt_t gmx_unused *gpu_opt) CUDA_FUNC_TERM_WITH_RETURN(-1)
 
 /*! \brief Returns the device ID of the GPU currently in use.*/
 CUDA_FUNC_QUALIFIER
