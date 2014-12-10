@@ -290,7 +290,7 @@ create_ocl_build_options_length(
 static char *
 create_ocl_build_options(
         char *             build_options_string,
-        size_t             build_options_length,
+        size_t gmx_unused  build_options_length,
         ocl_vendor_id_t    build_device_vendor_id,
         const char *       custom_build_options_prepend,
         const char *       custom_build_options_append)
@@ -445,7 +445,7 @@ static char *
 get_ocl_kernel_source_path(
         char *                  ocl_kernel_filename,
         kernel_source_index_t   kernel_src_id,
-        size_t                  kernel_filename_len)
+        size_t gmx_unused       kernel_filename_len)
 {
     char *filepath = NULL;
 
@@ -618,7 +618,7 @@ handle_ocl_build_log(
         const char *log_footer           = "---------------LOG END----------------\n";
         char        status_suffix[10];
         char       *build_info;
-        char       *log_fname;
+        char       *log_fname            = NULL;
 
         build_info = (char*)malloc(32 + strlen(build_options_string) );
         sprintf(build_info, "-- Used build options: %s\n", build_options_string);
@@ -790,11 +790,11 @@ ocl_get_fastgen_define(
 }
 
 bool
-check_ocl_cache(char           *ocl_binary_filename,
-                char           *build_options_string,
-                char           *ocl_source,
-                size_t         *ocl_binary_size,
-                unsigned char **ocl_binary)
+check_ocl_cache(char            *ocl_binary_filename,
+                char gmx_unused *build_options_string,
+                char gmx_unused *ocl_source,
+                size_t          *ocl_binary_size,
+                unsigned char  **ocl_binary)
 {
     FILE *f;
 

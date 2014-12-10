@@ -97,7 +97,7 @@ static unsigned int poll_wait_pattern = (0x7FU << 23);
 /*! Returns the number of blocks to be used for the nonbonded GPU kernel.
     OpenCL equivalent of calc_nb_kernel_nblock from nbnxn_cuda.cu
  */
-static inline int calc_nb_kernel_nblock(int nwork_units, gmx_device_info_t *dinfo)
+static inline int calc_nb_kernel_nblock(int nwork_units, gmx_device_info_t gmx_unused *dinfo)
 {
     int max_grid_x_size;
 
@@ -288,7 +288,7 @@ static void fillin_ocl_structures(cl_nbparam_t        *nbp,
  */
 void wait_ocl_event(cl_event *ocl_event)
 {
-    cl_int cl_error;
+    cl_int gmx_unused cl_error;
 
     /* Blocking wait for the event */
     cl_error = clWaitForEvents(1, ocl_event);
@@ -306,7 +306,7 @@ void wait_ocl_event(cl_event *ocl_event)
  */
 void sync_ocl_event(cl_command_queue stream, cl_event *ocl_event)
 {
-    cl_int cl_error;
+    cl_int gmx_unused cl_error;
 
     /* Enqueue wait */
     cl_error = clEnqueueWaitForEvents(stream, 1, ocl_event);
@@ -328,9 +328,9 @@ void sync_ocl_event(cl_command_queue stream, cl_event *ocl_event)
  */
 double ocl_event_elapsed_ms(cl_event *ocl_event)
 {
-    cl_int   cl_error;
-    cl_ulong start_ns, end_ns;
-    double   elapsed_ms;
+    cl_int gmx_unused cl_error;
+    cl_ulong          start_ns, end_ns;
+    double            elapsed_ms;
 
     elapsed_ms = 0.0;
     assert(NULL != ocl_event);
@@ -624,6 +624,7 @@ void dump_compare_results_cj4(nbnxn_cj4_t* results, int cnt, char* out_file, cha
         for (int index = 0; index < cnt; index++)
         {
             int ref_val;
+            unsigned int u_ref_val;
 
             for (int j = 0; j < 4; j++)
             {
@@ -648,11 +649,11 @@ void dump_compare_results_cj4(nbnxn_cj4_t* results, int cnt, char* out_file, cha
                     diff++;
                 }
 
-                fscanf(pf, "%u", &ref_val);
-                if (ref_val != results[index].imei[j].imask)
+                fscanf(pf, "%u", &u_ref_val);
+                if (u_ref_val != results[index].imei[j].imask)
                 {
                     printf("\nDifference for imei[%d].imask at index %d computed value = %u reference value = %u",
-                           j, index, results[index].imei[j].imask, ref_val);
+                           j, index, results[index].imei[j].imask, u_ref_val);
 
                     diff++;
                 }
@@ -720,9 +721,9 @@ void nbnxn_gpu_launch_cpyback(gmx_nbnxn_ocl_t *nb,
                               int                     flags,
                               int                     aloc)
 {
-    cl_int      cl_error;
-    int         adat_begin, adat_len, adat_end; /* local/nonlocal offset and length used for xq and f */
-    int         iloc = -1;
+    cl_int gmx_unused cl_error;
+    int               adat_begin, adat_len, adat_end; /* local/nonlocal offset and length used for xq and f */
+    int               iloc = -1;
 
     /* determine interaction locality from atom locality */
     if (LOCAL_A(aloc))
@@ -955,7 +956,7 @@ void nbnxn_gpu_wait_for_gpu(gmx_nbnxn_ocl_t *nb,
                             real *e_lj, real *e_el, rvec *fshift)
 {
     /* NOTE:  only implemented for single-precision at this time */
-    cl_int                 cl_error;
+    cl_int gmx_unused      cl_error;
     int                    i, adat_end, iloc = -1;
     volatile unsigned int *poll_word;
 

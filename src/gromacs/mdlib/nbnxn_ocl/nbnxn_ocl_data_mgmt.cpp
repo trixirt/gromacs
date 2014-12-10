@@ -109,7 +109,7 @@ static void md_print_warn(FILE       *fplog,
  */
 void ocl_free_buffered(cl_mem d_ptr, int *n, int *nalloc)
 {
-    cl_int cl_error;
+    cl_int gmx_unused cl_error;
 
     if (d_ptr)
     {
@@ -222,15 +222,18 @@ static void init_ewald_coulomb_force_table(cl_nbparam_t             *nbp,
     coul_tab = nbp->coulomb_tab_climg2d;
     if (coul_tab == NULL)
     {
+        /* Switched from using textures to using buffers */
+        // TODO: decide which alternative is most efficient - textures or buffers.
+        /*
         cl_image_format array_format;
 
         array_format.image_channel_data_type = CL_FLOAT;
         array_format.image_channel_order     = CL_R;
 
-        /* Switched from using textures to using buffers */
-        // TODO: decide which alternative is most efficient - textures or buffers.
-        /*coul_tab = clCreateImage2D(dev_info->context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-            &array_format, tabsize, 1, 0, ftmp, &cl_error);*/
+        coul_tab = clCreateImage2D(dev_info->context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+            &array_format, tabsize, 1, 0, ftmp, &cl_error);
+        */
+
         coul_tab = clCreateBuffer(dev_info->context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, tabsize*sizeof(cl_float), ftmp, &cl_error);
         assert(cl_error == CL_SUCCESS);
         // TODO: handle errors, check clCreateBuffer flags
@@ -347,15 +350,18 @@ static void init_nbparam(cl_nbparam_t              *nbp,
     // The image2d is created here even if eeltype is not eelCuEWALD_TAB or eelCuEWALD_TAB_TWIN because the OpenCL kernels
     // don't accept NULL values for image2D parameters.
     {
+        /* Switched from using textures to using buffers */
+        // TODO: decide which alternative is most efficient - textures or buffers.
+        /*
         cl_image_format array_format;
 
         array_format.image_channel_data_type = CL_FLOAT;
         array_format.image_channel_order     = CL_R;
 
-        /* Switched from using textures to using buffers */
-        // TODO: decide which alternative is most efficient - textures or buffers.
-        /*nbp->coulomb_tab_climg2d = clCreateImage2D(dev_info->context, CL_MEM_READ_WRITE,
-            &array_format, 1, 1, 0, NULL, &cl_error);*/
+        nbp->coulomb_tab_climg2d = clCreateImage2D(dev_info->context, CL_MEM_READ_WRITE,
+            &array_format, 1, 1, 0, NULL, &cl_error);
+        */
+
         nbp->coulomb_tab_climg2d = clCreateBuffer(dev_info->context, CL_MEM_READ_ONLY, sizeof(cl_float), NULL, &cl_error);
         // TODO: handle errors
     }
@@ -364,16 +370,18 @@ static void init_nbparam(cl_nbparam_t              *nbp,
     nnbfp_comb = 2*ntypes;
 
     {
+        /* Switched from using textures to using buffers */
+        // TODO: decide which alternative is most efficient - textures or buffers.
+        /*
         cl_image_format array_format;
 
         array_format.image_channel_data_type = CL_FLOAT;
         array_format.image_channel_order     = CL_R;
 
-        /* Switched from using textures to using buffers */
-        // TODO: decide which alternative is most efficient - textures or buffers.
+        nbp->nbfp_climg2d = clCreateImage2D(dev_info->context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+            &array_format, nnbfp, 1, 0, nbat->nbfp, &cl_error);
+        */
 
-        /*nbp->nbfp_climg2d = clCreateImage2D(dev_info->context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-            &array_format, nnbfp, 1, 0, nbat->nbfp, &cl_error);*/
         nbp->nbfp_climg2d = clCreateBuffer(dev_info->context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, nnbfp*sizeof(cl_float), nbat->nbfp, &cl_error);
         assert(cl_error == CL_SUCCESS);
         // TODO: handle errors
@@ -454,7 +462,7 @@ static void init_plist(cl_plist_t *pl)
 /*! Initializes the timer data structure.
     OpenCL equivalent of init_timers from nbnxn_cuda_data_mgmt.cu
  */
-static void init_timers(cl_timers_t *t, bool bUseTwoStreams)
+static void init_timers(cl_timers_t gmx_unused *t, bool gmx_unused bUseTwoStreams)
 {
     /* Nothing to initialize for OpenCL */
 }
@@ -510,8 +518,8 @@ void nbnxn_init_kernels(gmx_nbnxn_ocl_t *nb)
 /*! Initializes the input nbnxn_ocl_ptr_t data structure.
     OpenCL equivalent of nbnxn_cuda_init
  */
-void nbnxn_gpu_init(FILE                 *fplog,
-                    gmx_nbnxn_ocl_t **p_nb,
+void nbnxn_gpu_init(FILE gmx_unused      *fplog,
+                    gmx_nbnxn_ocl_t     **p_nb,
                     const gmx_gpu_info_t *gpu_info,
                     const gmx_gpu_opt_t  *gpu_opt,
                     int                   my_gpu_index,
@@ -519,8 +527,11 @@ void nbnxn_gpu_init(FILE                 *fplog,
 {
     gmx_nbnxn_ocl_t *nb;
     cl_int                      cl_error;
-    char                        sbuf[STRLEN];
-    bool                        bStreamSync, bNoStreamSync, bTMPIAtomics, bX86, bOldDriver;
+    bool gmx_unused             bStreamSync;
+    bool gmx_unused             bNoStreamSync;
+    bool gmx_unused             bTMPIAtomics;
+    bool gmx_unused             bX86;
+    bool gmx_unused             bOldDriver;
     cl_command_queue_properties queue_properties;
 
     assert(gpu_info);
@@ -644,6 +655,7 @@ void nbnxn_gpu_init(FILE                 *fplog,
 //////            }
 //////            else
 //////            {
+//////                char sbuf[STRLEN];
 //////                /* Tell the user that the ECC+old driver combination can be bad */
 //////                sprintf(sbuf,
 //////                        "NOTE: Using a GPU with ECC enabled and CUDA driver API version <5.0.\n"
@@ -736,7 +748,6 @@ nbnxn_ocl_clear_e_fshift(gmx_nbnxn_ocl_t *nb)
     cl_int               cl_error = CL_SUCCESS;
     cl_atomdata_t *      adat     = nb->atdat;
     cl_command_queue     ls       = nb->stream[eintLocal];
-    gmx_device_info_t *dev_info = nb->dev_info;
 
     size_t               dim_block[3] = {1, 1, 1};
     size_t               dim_grid[3]  = {1, 1, 1};
@@ -770,7 +781,6 @@ static void nbnxn_ocl_clear_f(gmx_nbnxn_ocl_t *nb, int natoms_clear)
     cl_int               cl_error = CL_SUCCESS;
     cl_atomdata_t *      adat     = nb->atdat;
     cl_command_queue     ls       = nb->stream[eintLocal];
-    gmx_device_info_t *dev_info = nb->dev_info;
     cl_float             value    = 0.0f;
 
     size_t               dim_block[3] = {1, 1, 1};
@@ -828,7 +838,6 @@ void nbnxn_gpu_init_pairlist(gmx_nbnxn_ocl_t *nb,
                              int                     iloc)
 {
     char             sbuf[STRLEN];
-    bool             bDoTime    = nb->bDoTime;
     cl_command_queue stream     = nb->stream[iloc];
     cl_plist_t      *d_plist    = nb->plist[iloc];
 
@@ -945,7 +954,7 @@ void nbnxn_gpu_init_atomdata(gmx_nbnxn_ocl_t *nb,
 /*! Releases an OpenCL kernel pointer */
 void free_kernel(cl_kernel *kernel_ptr)
 {
-    cl_int cl_error;
+    cl_int gmx_unused cl_error;
 
     assert(NULL != kernel_ptr);
 
@@ -972,7 +981,7 @@ void free_kernels(cl_kernel *kernels, int count)
 /*! Releases the input OpenCL buffer */
 void free_ocl_buffer(cl_mem *buffer)
 {
-    cl_int cl_error;
+    cl_int gmx_unused cl_error;
 
     assert(NULL != buffer);
 
@@ -987,8 +996,6 @@ void free_ocl_buffer(cl_mem *buffer)
 /*! OpenCL equivalent of nbnxn_cuda_free */
 void nbnxn_gpu_free(gmx_nbnxn_ocl_t *nb)
 {
-    // TODO: Implement this functions for OpenCL
-    cl_int cl_error;
     int    kernel_count;
 
     /* Free kernels */
@@ -1049,12 +1056,7 @@ void nbnxn_gpu_free(gmx_nbnxn_ocl_t *nb)
     nb->nbst.fshift = NULL;
 
     /* Free debug buffer */
-    if (NULL != nb->debug_buffer)
-    {
-        cl_error = clReleaseMemObject(nb->debug_buffer);
-        assert(CL_SUCCESS == cl_error);
-        nb->debug_buffer = NULL;
-    }
+    free_ocl_buffer(&nb->debug_buffer);
 
     /* Free command queues */
     clReleaseCommandQueue(nb->stream[eintLocal]);

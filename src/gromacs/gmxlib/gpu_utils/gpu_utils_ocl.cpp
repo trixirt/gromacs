@@ -313,7 +313,7 @@ void free_gpu_info(const gmx_gpu_info_t gmx_unused *gpu_info)
     {
         for (int i = 0; i < gpu_info->n_dev; i++)
         {
-            cl_int cl_error;
+            cl_int gmx_unused cl_error;
 
             if (gpu_info->gpu_dev[i].context)
             {

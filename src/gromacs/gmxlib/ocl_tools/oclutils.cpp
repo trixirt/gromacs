@@ -58,7 +58,7 @@ static int ocl_copy_H2D_generic(cl_mem d_dest, void* h_src,
     cl_command_queue command_queue,
     cl_event *copy_event)
 {
-    cl_int cl_error;
+    cl_int gmx_unused cl_error;
 
     if (d_dest == NULL || h_src == NULL || bytes == 0)
     {
@@ -122,7 +122,7 @@ int ocl_copy_D2H_generic(void * h_dest, cl_mem d_src,
     cl_command_queue command_queue,
     cl_event *copy_event)
 {
-    cl_int cl_error;
+    cl_int gmx_unused cl_error;
 
     if (h_dest == NULL || d_src == NULL || bytes == 0)
     {
