@@ -99,7 +99,7 @@ static unsigned int poll_wait_pattern = (0x7FU << 23);
  */
 static inline int calc_nb_kernel_nblock(int nwork_units, gmx_device_info_t gmx_unused *dinfo)
 {
-    int max_grid_x_size;
+    //int max_grid_x_size;
 
     assert(dinfo);
 
@@ -490,8 +490,8 @@ void nbnxn_gpu_launch_kernel(gmx_nbnxn_ocl_t *nb,
     {
         fprintf(debug, "GPU launch configuration:\n\tLocal work size: %dx%dx%d\n\t"
                 "Global work size : %dx%d\n\t#Super-clusters/clusters: %d/%d (%d)\n",
-                dim_block[0], dim_block[1], dim_block[2],
-                dim_grid[0], dim_grid[1], plist->nsci*NCL_PER_SUPERCL,
+                (int)(dim_block[0]), (int)(dim_block[1]), (int)(dim_block[2]),
+                (int)(dim_grid[0]), (int)(dim_grid[1]), plist->nsci*NCL_PER_SUPERCL,
                 NCL_PER_SUPERCL, plist->na_c);
     }
 
@@ -618,7 +618,8 @@ void dump_compare_results_cj4(nbnxn_cj4_t* results, int cnt, char* out_file, cha
         c = 0;
         while (c != '\n')
         {
-            fscanf(pf, "%c", &c);
+            if (1 != fscanf(pf, "%c", &c))
+                break;
         }
 
         for (int index = 0; index < cnt; index++)
@@ -628,7 +629,9 @@ void dump_compare_results_cj4(nbnxn_cj4_t* results, int cnt, char* out_file, cha
 
             for (int j = 0; j < 4; j++)
             {
-                fscanf(pf, "%d", &ref_val);
+                if (1 != fscanf(pf, "%d", &ref_val))
+                    break;
+
                 if (ref_val != results[index].cj[j])
                 {
                     printf("\nDifference for cj[%d] at index %d computed value = %d reference value = %d",
@@ -640,7 +643,9 @@ void dump_compare_results_cj4(nbnxn_cj4_t* results, int cnt, char* out_file, cha
 
             for (int j = 0; j < 2; j++)
             {
-                fscanf(pf, "%d", &ref_val);
+                if (1 != fscanf(pf, "%d", &ref_val))
+                    break;
+
                 if (ref_val != results[index].imei[j].excl_ind)
                 {
                     printf("\nDifference for imei[%d].excl_ind at index %d computed value = %d reference value = %d",
@@ -649,7 +654,9 @@ void dump_compare_results_cj4(nbnxn_cj4_t* results, int cnt, char* out_file, cha
                     diff++;
                 }
 
-                fscanf(pf, "%u", &u_ref_val);
+                if (1 != fscanf(pf, "%u", &u_ref_val))
+                    break;
+
                 if (u_ref_val != results[index].imei[j].imask)
                 {
                     printf("\nDifference for imei[%d].imask at index %d computed value = %u reference value = %u",
@@ -695,7 +702,9 @@ void dump_compare_results_f(float* results, int cnt, char* out_file, char* ref_f
         for (int index = 0; index < cnt; index++)
         {
             float ref_val;
-            fscanf(pf, "%f", &ref_val);
+            if (1 != fscanf(pf, "%f", &ref_val))
+                break;
+
             if (((ref_val - results[index]) > cmp_eps) ||
                 ((ref_val - results[index]) < -cmp_eps))
             {

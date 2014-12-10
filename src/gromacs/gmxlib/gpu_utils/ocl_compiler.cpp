@@ -797,6 +797,7 @@ check_ocl_cache(char            *ocl_binary_filename,
                 unsigned char  **ocl_binary)
 {
     FILE *f;
+    size_t read_count;
 
     f = fopen(ocl_binary_filename, "rb");
     if (!f)
@@ -808,8 +809,11 @@ check_ocl_cache(char            *ocl_binary_filename,
     *ocl_binary_size = ftell(f);
     *ocl_binary      = (unsigned char*)malloc(*ocl_binary_size);
     fseek(f, 0, SEEK_SET);
-    fread(*ocl_binary, 1, *ocl_binary_size, f);
+    read_count = fread(*ocl_binary, 1, *ocl_binary_size, f);
     fclose(f);
+
+    if (read_count != (*ocl_binary_size))
+        return false;
 
     // TODO: Compare current build options and code against the builds options
     // and the code corresponding to the cache. If any change is detected this
