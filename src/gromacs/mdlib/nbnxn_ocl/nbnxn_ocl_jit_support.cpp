@@ -39,6 +39,7 @@
 #include "../nbnxn_gpu_jit_support.h"
 
 #include <cassert>
+#include <stdlib.h>
 
 #include "gromacs/gmxlib/gpu_utils/gpu_utils.h"
 #include "gromacs/gmxlib/gpu_utils/ocl_compiler.hpp"

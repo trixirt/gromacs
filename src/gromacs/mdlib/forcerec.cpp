@@ -41,6 +41,7 @@
 #include <assert.h>
 #include <math.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "gromacs/ewald/ewald-util.h"
 #include "gromacs/gmxlib/gpu_utils/gpu_utils.h"
