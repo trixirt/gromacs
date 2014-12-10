@@ -32,81 +32,86 @@
  * To help us fund GROMACS development, we humbly ask that you cite
  * the research papers on the package. Check out http://www.gromacs.org.
  */
-
-/** \file nbnxn_ocl.cpp
- *  \brief OpenCL equivalent of nbnxn_cuda.cu
+/*! \internal \file
+ *  \brief Define OpenCL implementation of nbnxn_gpu.h
+ *
+ *  \author Anca Hamuraru <anca@streamcomputing.eu>
+ *  \ingroup module_mdlib
  */
+#include "gmxpre.h"
 
 #include "config.h"
 
-#include <stdlib.h>
 #include <assert.h>
+#include <stdlib.h>
 
 #if defined(_MSVC)
 #include <limits>
 #endif
 
-#include "gromacs/legacyheaders/types/simple.h"
-#include "gromacs/mdlib/nbnxn_pairlist.h"
-#include "gromacs/mdlib/nb_verlet.h"
+#include "gromacs/gmxlib/ocl_tools/oclutils.h"
 #include "gromacs/legacyheaders/types/force_flags.h"
-#include "gromacs/mdlib/nbnxn_consts.h"
 #include "gromacs/legacyheaders/types/hw_info.h"
+#include "gromacs/legacyheaders/types/simple.h"
+#include "gromacs/mdlib/nb_verlet.h"
+#include "gromacs/mdlib/nbnxn_consts.h"
+#include "gromacs/mdlib/nbnxn_pairlist.h"
 #include "gromacs/timing/gpu_timing.h"
-
-#include "gromacs/mdlib/../gmxlib/ocl_tools/oclutils.h"
 
 #ifdef TMPI_ATOMICS
 #include "thread_mpi/atomic.h"
 #endif
 
-#include "nbnxn_ocl_types.h"
-
-#include "../nbnxn_gpu.h"
+#include "gromacs/mdlib/nbnxn_gpu.h"
 #include "gromacs/mdlib/nbnxn_gpu_data_mgmt.h"
-
 #include "gromacs/pbcutil/ishift.h"
 #include "gromacs/utility/cstringutil.h"
 #include "gromacs/utility/fatalerror.h"
+
+#include "nbnxn_ocl_types.h"
 
 #if defined TEXOBJ_SUPPORTED && __CUDA_ARCH__ >= 300
 #define USE_TEXOBJ
 #endif
 
-/* Convenience defines */
+/*! \brief Convenience defines */
+//@{
 #define NCL_PER_SUPERCL         (NBNXN_GPU_NCLUSTER_PER_SUPERCLUSTER)
 #define CL_SIZE                 (NBNXN_GPU_CLUSTER_SIZE)
+//@}
 
-/* XXX always/never run the energy/pruning kernels -- only for benchmarking purposes */
+/*! \brief Always/never run the energy/pruning kernels -- only for benchmarking purposes */
+//@{
 static bool always_ener  = (getenv("GMX_GPU_ALWAYS_ENER") != NULL);
 static bool never_ener   = (getenv("GMX_GPU_NEVER_ENER") != NULL);
 static bool always_prune = (getenv("GMX_GPU_ALWAYS_PRUNE") != NULL);
+//@}
 
 /* Uncomment this define to enable kernel debugging */
 //#define DEBUG_OCL
 
-/* Specifies which kernel run to debug */
+/*! \brief Specifies which kernel run to debug */
 #define DEBUG_RUN_STEP 2
 
-/* Bit-pattern used for polling-based GPU synchronization. It is used as a float
- * and corresponds to having the exponent set to the maximum (127 -- single
- * precision) and the mantissa to 0.
+/*! \brief Bit-pattern used for polling-based GPU synchronization.
+ *
+ * It is used as a float and corresponds to having the exponent set to
+ * the maximum (127 -- single precision) and the mantissa to 0.
  */
 static unsigned int poll_wait_pattern = (0x7FU << 23);
 
-/*! Returns the number of blocks to be used for the nonbonded GPU kernel.
-    OpenCL equivalent of calc_nb_kernel_nblock from nbnxn_cuda.cu
+/*! \brief Returns the number of blocks to be used for the nonbonded GPU kernel.
  */
 static inline int calc_nb_kernel_nblock(int nwork_units, gmx_device_info_t gmx_unused *dinfo)
 {
-    int max_grid_x_size;
+    //int max_grid_x_size;
 
     assert(dinfo);
 
     // TODO: fix for OpenCL implementation
     //max_grid_x_size = dinfo->prop.maxGridSize[0];
 
-    ///* do we exceed the grid x dimension limit? */
+    // /* do we exceed the grid x dimension limit? */
     //if (nwork_units > max_grid_x_size)
     //{
     //    gmx_fatal(FARGS, "Watch out, the input system is too large to simulate!\n"
@@ -125,7 +130,7 @@ static inline int calc_nb_kernel_nblock(int nwork_units, gmx_device_info_t gmx_u
  *  defined in nbnxn_cuda_types.h.
  */
 
-/*! Force-only kernel function names. */
+/*! \brief Force-only kernel function names. */
 static const char* nb_kfunc_noener_noprune_ptr[eelOclNR][evdwOclNR] =
 {
     { "nbnxn_kernel_ElecCut_VdwLJ_F_opencl",            "nbnxn_kernel_ElecCut_VdwLJFsw_F_opencl",            "nbnxn_kernel_ElecCut_VdwLJPsw_F_opencl",            "nbnxn_kernel_ElecCut_VdwLJEwCombGeom_F_opencl",            "nbnxn_kernel_ElecCut_VdwLJEwCombLB_F_opencl"            },
@@ -136,7 +141,7 @@ static const char* nb_kfunc_noener_noprune_ptr[eelOclNR][evdwOclNR] =
     { "nbnxn_kernel_ElecEwTwinCut_VdwLJ_F_opencl",      "nbnxn_kernel_ElecEwTwinCut_VdwLJFsw_F_opencl",      "nbnxn_kernel_ElecEwTwinCut_VdwLJPsw_F_opencl",      "nbnxn_kernel_ElecEwTwinCut_VdwLJEwCombGeom_F_opencl",      "nbnxn_kernel_ElecEwTwinCut_VdwLJEwCombLB_F_opencl"      }
 };
 
-/*! Force + energy kernel function pointers. */
+/*! \brief Force + energy kernel function pointers. */
 static const char* nb_kfunc_ener_noprune_ptr[eelOclNR][evdwOclNR] =
 {
     { "nbnxn_kernel_ElecCut_VdwLJ_VF_opencl",            "nbnxn_kernel_ElecCut_VdwLJFsw_VF_opencl",            "nbnxn_kernel_ElecCut_VdwLJPsw_VF_opencl",            "nbnxn_kernel_ElecCut_VdwLJEwCombGeom_VF_opencl",            "nbnxn_kernel_ElecCut_VdwLJEwCombLB_VF_opencl"              },
@@ -147,7 +152,7 @@ static const char* nb_kfunc_ener_noprune_ptr[eelOclNR][evdwOclNR] =
     { "nbnxn_kernel_ElecEwTwinCut_VdwLJ_VF_opencl",      "nbnxn_kernel_ElecEwTwinCut_VdwLJFsw_VF_opencl",      "nbnxn_kernel_ElecEwTwinCut_VdwLJPsw_VF_opencl",      "nbnxn_kernel_ElecEwTwinCut_VdwLJEwCombGeom_VF_opencl",      "nbnxn_kernel_ElecEwTwinCut_VdwLJEwCombLB_VF_opencl"        }
 };
 
-/*! Force + pruning kernel function pointers. */
+/*! \brief Force + pruning kernel function pointers. */
 static const char* nb_kfunc_noener_prune_ptr[eelOclNR][evdwOclNR] =
 {
     { "nbnxn_kernel_ElecCut_VdwLJ_F_prune_opencl",             "nbnxn_kernel_ElecCut_VdwLJFsw_F_prune_opencl",            "nbnxn_kernel_ElecCut_VdwLJPsw_F_prune_opencl",            "nbnxn_kernel_ElecCut_VdwLJEwCombGeom_F_prune_opencl",            "nbnxn_kernel_ElecCut_VdwLJEwCombLB_F_prune_opencl"            },
@@ -158,7 +163,7 @@ static const char* nb_kfunc_noener_prune_ptr[eelOclNR][evdwOclNR] =
     { "nbnxn_kernel_ElecEwTwinCut_VdwLJ_F_prune_opencl",       "nbnxn_kernel_ElecEwTwinCut_VdwLJFsw_F_prune_opencl",      "nbnxn_kernel_ElecEwTwinCut_VdwLJPsw_F_prune_opencl",      "nbnxn_kernel_ElecEwTwinCut_VdwLJEwCombGeom_F_prune_opencl",      "nbnxn_kernel_ElecEwTwinCut_VdwLJEwCombLB_F_prune_opencl"      }
 };
 
-/*! Force + energy + pruning kernel function pointers. */
+/*! \brief Force + energy + pruning kernel function pointers. */
 static const char* nb_kfunc_ener_prune_ptr[eelOclNR][evdwOclNR] =
 {
     { "nbnxn_kernel_ElecCut_VdwLJ_VF_prune_opencl",            "nbnxn_kernel_ElecCut_VdwLJFsw_VF_prune_opencl",            "nbnxn_kernel_ElecCut_VdwLJPsw_VF_prune_opencl",            "nbnxn_kernel_ElecCut_VdwLJEwCombGeom_VF_prune_opencl",            "nbnxn_kernel_ElecCut_VdwLJEwCombLB_VF_prune_opencl"            },
@@ -169,13 +174,11 @@ static const char* nb_kfunc_ener_prune_ptr[eelOclNR][evdwOclNR] =
     { "nbnxn_kernel_ElecEwTwinCut_VdwLJ_VF_prune_opencl",      "nbnxn_kernel_ElecEwTwinCut_VdwLJFsw_VF_prune_opencl",      "nbnxn_kernel_ElecEwTwinCut_VdwLJPsw_VF_prune_opencl",      "nbnxn_kernel_ElecEwTwinCut_VdwLJEwCombGeom_VF_prune_opencl",      "nbnxn_kernel_ElecEwTwinCut_VdwLJEwCombLB_VF_prune_opencl"      }
 };
 
-/*! Return a pointer to the kernel version to be executed at the current step.
+/*! \brief Return a pointer to the kernel version to be executed at the current step.
  *  OpenCL kernel objects are cached in nb. If the requested kernel is not
  *  found in the cache, it will be created and the cache will be updated.
- *
- *  OpenCL equivalent of nbnxn_cu_kfunc_ptr_t.
  */
-static inline cl_kernel select_nbnxn_kernel(gmx_nbnxn_ocl_t *nb,
+static inline cl_kernel select_nbnxn_kernel(gmx_nbnxn_ocl_t   *nb,
                                             int                eeltype,
                                             int                evdwtype,
                                             bool               bDoEne,
@@ -228,8 +231,7 @@ static inline cl_kernel select_nbnxn_kernel(gmx_nbnxn_ocl_t *nb,
     return *kernel_ptr;
 }
 
-/*! Calculates the amount of shared memory required by the OpenCL kernel in use.
- *  OpenCL equivalent of calc_shmem_required from nbnxn_cuda.cu
+/*! \brief Calculates the amount of shared memory required by the OpenCL kernel in use.
  */
 static inline int calc_shmem_required()
 {
@@ -254,7 +256,8 @@ static inline int calc_shmem_required()
     return shmem;
 }
 
-/*! Initializes data structures that are going to be sent to the OpenCL device.
+/*! \brief Initializes data structures that are going to be sent to the OpenCL device.
+ *
  *  The device can't use the same data structures as the host for two main reasons:
  *  - OpenCL restrictions (pointers are not accepted inside data structures)
  *  - some host side fields are not needed for the OpenCL kernels.
@@ -282,7 +285,7 @@ static void fillin_ocl_structures(cl_nbparam_t        *nbp,
     nbparams_params->vdw_switch        = nbp->vdw_switch;
 }
 
-/* Waits for the commands associated with the input event to finish.
+/*! \brief Waits for the commands associated with the input event to finish.
  * Then it releases the event and sets it to 0.
  * Don't use this function when more than one wait will be issued for the event.
  */
@@ -300,10 +303,11 @@ void wait_ocl_event(cl_event *ocl_event)
     *ocl_event = 0;
 }
 
-/* Equivalent to Cuda Stream Sync. Enqueues a wait for event completion.
+/*! \brief Enqueues a wait for event completion.
+ *
  * Then it releases the event and sets it to 0.
  * Don't use this function when more than one wait will be issued for the event.
- */
+ * Equivalent to Cuda Stream Sync. */
 void sync_ocl_event(cl_command_queue stream, cl_event *ocl_event)
 {
     cl_int gmx_unused cl_error;
@@ -319,7 +323,8 @@ void sync_ocl_event(cl_command_queue stream, cl_event *ocl_event)
     *ocl_event = 0;
 }
 
-/* Returns the duration in miliseconds for the command associated with the event.
+/*! \brief Returns the duration in miliseconds for the command associated with the event.
+ *
  * It then releases the event and sets it to 0.
  * Before calling this function, make sure the command has finished either by
  * calling clFinish or clWaitForEvents.
@@ -354,7 +359,9 @@ double ocl_event_elapsed_ms(cl_event *ocl_event)
     return elapsed_ms;
 }
 
-/*! As we execute nonbonded workload in separate queues, before launching
+/*! \brief Launch GPU kernel
+
+   As we execute nonbonded workload in separate queues, before launching
    the kernel we need to make sure that he following operations have completed:
    - atomdata allocation and related H2D transfers (every nstlist step);
    - pair list H2D transfer (every nstlist step);
@@ -369,13 +376,11 @@ double ocl_event_elapsed_ms(cl_event *ocl_event)
    However, for the sake of having a future-proof implementation, we use the
    misc_ops_done event to record the point in time when the above  operations
    are finished and synchronize with this event in the non-local stream.
-
-   OpenCL equivalent of nbnxn_cuda_launch_kernel
  */
-void nbnxn_gpu_launch_kernel(gmx_nbnxn_ocl_t *nb,
+void nbnxn_gpu_launch_kernel(gmx_nbnxn_ocl_t               *nb,
                              const struct nbnxn_atomdata_t *nbatom,
-                             int                     flags,
-                             int                     iloc)
+                             int                            flags,
+                             int                            iloc)
 {
     cl_int               cl_error;
     int                  adat_begin, adat_len; /* local/nonlocal offset and length used for xq and f */
@@ -490,8 +495,8 @@ void nbnxn_gpu_launch_kernel(gmx_nbnxn_ocl_t *nb,
     {
         fprintf(debug, "GPU launch configuration:\n\tLocal work size: %dx%dx%d\n\t"
                 "Global work size : %dx%d\n\t#Super-clusters/clusters: %d/%d (%d)\n",
-                dim_block[0], dim_block[1], dim_block[2],
-                dim_grid[0], dim_grid[1], plist->nsci*NCL_PER_SUPERCL,
+                (int)(dim_block[0]), (int)(dim_block[1]), (int)(dim_block[2]),
+                (int)(dim_grid[0]), (int)(dim_grid[1]), plist->nsci*NCL_PER_SUPERCL,
                 NCL_PER_SUPERCL, plist->na_c);
     }
 
@@ -583,6 +588,7 @@ void nbnxn_gpu_launch_kernel(gmx_nbnxn_ocl_t *nb,
 #endif
 }
 
+/*! \brief Debugging helper function */
 void dump_compare_results_cj4(nbnxn_cj4_t* results, int cnt, char* out_file, char* ref_file)
 {
     FILE *pf;
@@ -618,17 +624,20 @@ void dump_compare_results_cj4(nbnxn_cj4_t* results, int cnt, char* out_file, cha
         c = 0;
         while (c != '\n')
         {
-            fscanf(pf, "%c", &c);
+            if (1 != fscanf(pf, "%c", &c))
+                break;
         }
 
         for (int index = 0; index < cnt; index++)
         {
-            int ref_val;
+            int          ref_val;
             unsigned int u_ref_val;
 
             for (int j = 0; j < 4; j++)
             {
-                fscanf(pf, "%d", &ref_val);
+                if (1 != fscanf(pf, "%d", &ref_val))
+                    break;
+
                 if (ref_val != results[index].cj[j])
                 {
                     printf("\nDifference for cj[%d] at index %d computed value = %d reference value = %d",
@@ -640,7 +649,9 @@ void dump_compare_results_cj4(nbnxn_cj4_t* results, int cnt, char* out_file, cha
 
             for (int j = 0; j < 2; j++)
             {
-                fscanf(pf, "%d", &ref_val);
+                if (1 != fscanf(pf, "%d", &ref_val))
+                    break;
+
                 if (ref_val != results[index].imei[j].excl_ind)
                 {
                     printf("\nDifference for imei[%d].excl_ind at index %d computed value = %d reference value = %d",
@@ -649,7 +660,9 @@ void dump_compare_results_cj4(nbnxn_cj4_t* results, int cnt, char* out_file, cha
                     diff++;
                 }
 
-                fscanf(pf, "%u", &u_ref_val);
+                if (1 != fscanf(pf, "%u", &u_ref_val))
+                    break;
+
                 if (u_ref_val != results[index].imei[j].imask)
                 {
                     printf("\nDifference for imei[%d].imask at index %d computed value = %u reference value = %u",
@@ -670,6 +683,7 @@ void dump_compare_results_cj4(nbnxn_cj4_t* results, int cnt, char* out_file, cha
     }
 }
 
+/*! \brief Debugging helper function */
 void dump_compare_results_f(float* results, int cnt, char* out_file, char* ref_file)
 {
     FILE *pf;
@@ -695,7 +709,9 @@ void dump_compare_results_f(float* results, int cnt, char* out_file, char* ref_f
         for (int index = 0; index < cnt; index++)
         {
             float ref_val;
-            fscanf(pf, "%f", &ref_val);
+            if (1 != fscanf(pf, "%f", &ref_val))
+                break;
+
             if (((ref_val - results[index]) > cmp_eps) ||
                 ((ref_val - results[index]) < -cmp_eps))
             {
@@ -715,11 +731,14 @@ void dump_compare_results_f(float* results, int cnt, char* out_file, char* ref_f
     }
 }
 
-/*! OpenCL equivalent of nbnxn_cuda_launch_cpyback */
-void nbnxn_gpu_launch_cpyback(gmx_nbnxn_ocl_t *nb,
+/*! \brief
+ * Launch asynchronously the download of nonbonded forces from the GPU
+ * (and energies/shift forces if required).
+ */
+void nbnxn_gpu_launch_cpyback(gmx_nbnxn_ocl_t               *nb,
                               const struct nbnxn_atomdata_t *nbatom,
-                              int                     flags,
-                              int                     aloc)
+                              int                            flags,
+                              int                            aloc)
 {
     cl_int gmx_unused cl_error;
     int               adat_begin, adat_len, adat_end; /* local/nonlocal offset and length used for xq and f */
@@ -930,10 +949,9 @@ void nbnxn_gpu_launch_cpyback(gmx_nbnxn_ocl_t *nb,
 #endif
 }
 
-/* Atomic compare-exchange operation on unsigned values. It is used in
- * polling wait for the GPU.
+/*! \brief Atomic compare-exchange operation on unsigned values.
  *
- * Copy of atomic_cas from nbnxn_cuda.cu
+ * It is used in polling wait for the GPU.
  */
 static inline bool atomic_cas(volatile unsigned int *ptr,
                               unsigned int           oldval,
@@ -949,7 +967,10 @@ static inline bool atomic_cas(volatile unsigned int *ptr,
 #endif
 }
 
-/*! OpenCL equivalent of nbnxn_cuda_wait_gpu */
+/*! \brief
+ * Wait for the asynchronously launched nonbonded calculations and data
+ * transfers to finish.
+ */
 void nbnxn_gpu_wait_for_gpu(gmx_nbnxn_ocl_t *nb,
                             const nbnxn_atomdata_t *nbatom,
                             int flags, int aloc,
@@ -977,13 +998,13 @@ void nbnxn_gpu_wait_for_gpu(gmx_nbnxn_ocl_t *nb,
         gmx_incons(stmp);
     }
 
-    cl_plist_t      *plist    = nb->plist[iloc];
-    cl_timers_t     *timers   = nb->timers;
+    cl_plist_t                 *plist    = nb->plist[iloc];
+    cl_timers_t                *timers   = nb->timers;
     struct gmx_wallclock_gpu_t *timings  = nb->timings;
-    cl_nb_staging    nbst     = nb->nbst;
+    cl_nb_staging               nbst     = nb->nbst;
 
-    bool             bCalcEner   = flags & GMX_FORCE_VIRIAL;
-    bool             bCalcFshift = flags & GMX_FORCE_VIRIAL;
+    bool                        bCalcEner   = flags & GMX_FORCE_VIRIAL;
+    bool                        bCalcFshift = flags & GMX_FORCE_VIRIAL;
 
     /* turn energy calculation always on/off (for debugging/testing only) */
     bCalcEner = (bCalcEner || always_ener) && !never_ener;
@@ -1094,6 +1115,7 @@ void nbnxn_gpu_wait_for_gpu(gmx_nbnxn_ocl_t *nb,
 
 }
 
+/*! \brief Selects the Ewald kernel type, analytical or tabulated, single or twin cut-off. */
 int nbnxn_gpu_pick_ewald_kernel_type(bool bTwinCut)
 {
     bool bUseAnalyticalEwald, bForceAnalyticalEwald, bForceTabulatedEwald;

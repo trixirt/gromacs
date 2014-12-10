@@ -32,6 +32,15 @@
  * To help us fund GROMACS development, we humbly ask that you cite
  * the research papers on the package. Check out http://www.gromacs.org.
  */
+/*! \file
+ *  \brief Declare infrastructure for OpenCL JIT compilation for Gromacs
+ *
+ *  \author Anca Hamuraru <anca@streamcomputing.eu>
+ *
+ * TODO Currently this file handles compilation of NBNXN kernels,
+ * but e.g. organizing the defines for various physics models
+ * is leaking in here a bit.
+ */
 
 #ifndef OCL_COMPILER_H
 #define OCL_COMPILER_H

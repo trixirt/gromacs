@@ -32,14 +32,20 @@
  * To help us fund GROMACS development, we humbly ask that you cite
  * the research papers on the package. Check out http://www.gromacs.org.
  */
+/*! \file
+ *  \brief Define CUDA implementation of nbnxn_gpu.h
+ *
+ *  \author Szilard Pall <pall.szilard@gmail.com>
+ *  \ingroup module_mdlib
+ */
 #include "gmxpre.h"
-
-#include "../nbnxn_gpu.h"
 
 #include "config.h"
 
 #include <assert.h>
 #include <stdlib.h>
+
+#include "gromacs/mdlib/nbnxn_gpu.h"
 
 #if defined(_MSVC)
 #include <limits>
@@ -56,11 +62,11 @@
 #include "gromacs/legacyheaders/types/simple.h"
 #include "gromacs/mdlib/nb_verlet.h"
 #include "gromacs/mdlib/nbnxn_consts.h"
-#include "gromacs/mdlib/nbnxn_pairlist.h"
 #include "gromacs/mdlib/nbnxn_gpu_data_mgmt.h"
+#include "gromacs/mdlib/nbnxn_pairlist.h"
 #include "gromacs/pbcutil/ishift.h"
-#include "gromacs/utility/cstringutil.h"
 #include "gromacs/timing/gpu_timing.h"
+#include "gromacs/utility/cstringutil.h"
 
 #include "nbnxn_cuda_types.h"
 
@@ -317,10 +323,10 @@ static inline int calc_shmem_required(const int num_threads_z)
    misc_ops_done event to record the point in time when the above  operations
    are finished and synchronize with this event in the non-local stream.
  */
-void nbnxn_gpu_launch_kernel(gmx_nbnxn_cuda_t *nb,
-                              const nbnxn_atomdata_t *nbatom,
-                              int                     flags,
-                              int                     iloc)
+void nbnxn_gpu_launch_kernel(gmx_nbnxn_cuda_t       *nb,
+                             const nbnxn_atomdata_t *nbatom,
+                             int                     flags,
+                             int                     iloc)
 {
     cudaError_t          stat;
     int                  adat_begin, adat_len; /* local/nonlocal offset and length used for xq and f */
@@ -571,10 +577,10 @@ void dump_results_f(float* results, int cnt, char* out_file)
     printf("\nWrote results to %s", out_file);
 }
 
-void nbnxn_gpu_launch_cpyback(gmx_nbnxn_cuda_t *nb,
-                               const nbnxn_atomdata_t *nbatom,
-                               int                     flags,
-                               int                     aloc)
+void nbnxn_gpu_launch_cpyback(gmx_nbnxn_cuda_t       *nb,
+                              const nbnxn_atomdata_t *nbatom,
+                              int                     flags,
+                              int                     aloc)
 {
     cudaError_t stat;
     int         adat_begin, adat_len, adat_end; /* local/nonlocal offset and length used for xq and f */
@@ -828,13 +834,13 @@ void nbnxn_gpu_wait_for_gpu(gmx_nbnxn_cuda_t *nb,
         gmx_incons(stmp);
     }
 
-    cu_plist_t      *plist    = nb->plist[iloc];
-    cu_timers_t     *timers   = nb->timers;
+    cu_plist_t                 *plist    = nb->plist[iloc];
+    cu_timers_t                *timers   = nb->timers;
     struct gmx_wallclock_gpu_t *timings  = nb->timings;
-    nb_staging       nbst     = nb->nbst;
+    nb_staging                  nbst     = nb->nbst;
 
-    bool             bCalcEner   = flags & GMX_FORCE_VIRIAL;
-    bool             bCalcFshift = flags & GMX_FORCE_VIRIAL;
+    bool                        bCalcEner   = flags & GMX_FORCE_VIRIAL;
+    bool                        bCalcFshift = flags & GMX_FORCE_VIRIAL;
 
     /* turn energy calculation always on/off (for debugging/testing only) */
     bCalcEner = (bCalcEner || always_ener) && !never_ener;

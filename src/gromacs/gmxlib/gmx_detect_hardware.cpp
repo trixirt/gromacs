@@ -205,7 +205,7 @@ makeGpuUsageReport(const gmx_gpu_info_t *gpu_info,
                    const gmx_gpu_opt_t  *gpu_opt,
                    size_t                numPpRanks)
 {
-    int ngpu_use = gpu_opt->n_dev_use;
+    int ngpu_use  = gpu_opt->n_dev_use;
     int ngpu_comp = gpu_info->n_dev_compatible;
 
     /* Issue a note if GPUs are available but not used */
@@ -534,7 +534,7 @@ int gmx_count_gpu_dev_shared(const gmx_gpu_opt_t *gpu_opt)
         {
             for (j = i + 1; j < ngpu; j++)
             {
-                same_count += 
+                same_count +=
                     (gpu_opt->dev_use[i] == gpu_opt->dev_use[j]);
             }
         }
@@ -803,8 +803,8 @@ void gmx_parse_gpu_ids(gmx_gpu_opt_t *gpu_opt)
          * digits corresponding to GPU IDs; the order will indicate
          * the process/tMPI thread - GPU assignment. */
         parse_digits_from_plain_string(env,
-            &gpu_opt->n_dev_use,
-            &gpu_opt->dev_use);
+                                       &gpu_opt->n_dev_use,
+                                       &gpu_opt->dev_use);
 
         if (gpu_opt->n_dev_use == 0)
         {

@@ -32,9 +32,12 @@
  * To help us fund GROMACS development, we humbly ask that you cite
  * the research papers on the package. Check out http://www.gromacs.org.
  */
+/*! \file
+ *  \brief Define CUDA implementation of nbnxn_gpu_data_mgmt.h
+ *
+ *  \author Szilard Pall <pall.szilard@gmail.com>
+ */
 #include "gmxpre.h"
-
-#include "../nbnxn_gpu_data_mgmt.h"
 
 #include "config.h"
 
@@ -57,12 +60,13 @@
 #include "gromacs/legacyheaders/types/interaction_const.h"
 #include "gromacs/mdlib/nb_verlet.h"
 #include "gromacs/mdlib/nbnxn_consts.h"
+#include "gromacs/mdlib/nbnxn_gpu_data_mgmt.h"
 #include "gromacs/pbcutil/ishift.h"
+#include "gromacs/timing/gpu_timing.h"
 #include "gromacs/utility/basedefinitions.h"
 #include "gromacs/utility/cstringutil.h"
 #include "gromacs/utility/fatalerror.h"
 #include "gromacs/utility/smalloc.h"
-#include "gromacs/timing/gpu_timing.h"
 
 #include "nbnxn_cuda_types.h"
 
@@ -116,7 +120,7 @@ static void nbnxn_cuda_clear_e_fshift(gmx_nbnxn_cuda_t *nb);
     and the table GPU array. If called with an already allocated table,
     it just re-uploads the table.
  */
-static void init_ewald_coulomb_force_table(cu_nbparam_t          *nbp,
+static void init_ewald_coulomb_force_table(cu_nbparam_t            *nbp,
                                            const gmx_device_info_t *dev_info)
 {
     float       *ftmp, *coul_tab;
@@ -213,7 +217,7 @@ static void init_atomdata_first(cu_atomdata_t *ad, int ntypes)
 
 /*! Selects the Ewald kernel type, analytical on SM 3.0 and later, tabulated on
     earlier GPUs, single or twin cut-off. */
-static int pick_ewald_kernel_type(bool                   bTwinCut,
+static int pick_ewald_kernel_type(bool                     bTwinCut,
                                   const gmx_device_info_t *dev_info)
 {
     bool bUseAnalyticalEwald, bForceAnalyticalEwald, bForceTabulatedEwald;
@@ -438,7 +442,7 @@ void nbnxn_gpu_pme_loadbal_update_param(const nonbonded_verlet_t    *nbv,
         return;
     }
     gmx_nbnxn_cuda_t *nb    = nbv->gpu_nbv;
-    cu_nbparam_t    *nbp   = nb->nbparam;
+    cu_nbparam_t     *nbp   = nb->nbparam;
 
     set_cutoff_parameters(nbp, ic);
 
@@ -526,7 +530,7 @@ static void init_timings(gmx_wallclock_gpu_t *t)
 }
 
 void nbnxn_gpu_init(FILE                 *fplog,
-                    gmx_nbnxn_cuda_t **p_nb,
+                    gmx_nbnxn_cuda_t    **p_nb,
                     const gmx_gpu_info_t *gpu_info,
                     const gmx_gpu_opt_t  *gpu_opt,
                     int                   my_gpu_index,
@@ -736,7 +740,7 @@ void nbnxn_gpu_init(FILE                 *fplog,
     }
 }
 
-void nbnxn_gpu_init_const(gmx_nbnxn_cuda_t *nb,
+void nbnxn_gpu_init_const(gmx_nbnxn_cuda_t               *nb,
                           const interaction_const_t      *ic,
                           const nonbonded_verlet_group_t *nbv_group)
 {
@@ -747,7 +751,7 @@ void nbnxn_gpu_init_const(gmx_nbnxn_cuda_t *nb,
     nbnxn_cuda_clear_e_fshift(nb);
 }
 
-void nbnxn_gpu_init_pairlist(gmx_nbnxn_cuda_t *nb,
+void nbnxn_gpu_init_pairlist(gmx_nbnxn_cuda_t       *nb,
                              const nbnxn_pairlist_t *h_plist,
                              int                     iloc)
 {
@@ -802,7 +806,7 @@ void nbnxn_gpu_init_pairlist(gmx_nbnxn_cuda_t *nb,
     d_plist->bDoPrune = true;
 }
 
-void nbnxn_gpu_upload_shiftvec(gmx_nbnxn_cuda_t *nb,
+void nbnxn_gpu_upload_shiftvec(gmx_nbnxn_cuda_t       *nb,
                                const nbnxn_atomdata_t *nbatom)
 {
     cu_atomdata_t *adat  = nb->atdat;
@@ -854,7 +858,7 @@ void nbnxn_gpu_clear_outputs(gmx_nbnxn_cuda_t *nb, int flags)
     }
 }
 
-void nbnxn_gpu_init_atomdata(gmx_nbnxn_cuda_t *nb,
+void nbnxn_gpu_init_atomdata(gmx_nbnxn_cuda_t              *nb,
                              const struct nbnxn_atomdata_t *nbat)
 {
     cudaError_t    stat;

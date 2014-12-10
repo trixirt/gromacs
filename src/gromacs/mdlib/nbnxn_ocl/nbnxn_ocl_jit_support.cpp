@@ -32,24 +32,31 @@
  * To help us fund GROMACS development, we humbly ask that you cite
  * the research papers on the package. Check out http://www.gromacs.org.
  */
+/*! \internal \file
+ *  \brief Defines functions that support JIT compilation (e.g. for OpenCL)
+ *
+ *  \author Anca Hamuraru <anca@streamcomputing.eu>
+ *  \author Mark Abraham <mark.j.abraham@gmail.com>
+ *  \ingroup module_mdlib
+ */
 #include "gmxpre.h"
 
-#include "config.h"
-
-#include "../nbnxn_gpu_jit_support.h"
+#include <stdlib.h>
 
 #include <cassert>
-#include <stdlib.h>
 
 #include "gromacs/gmxlib/gpu_utils/gpu_utils.h"
 #include "gromacs/gmxlib/gpu_utils/ocl_compiler.hpp"
 #include "gromacs/legacyheaders/types/enums.h"
 #include "gromacs/legacyheaders/types/interaction_const.h"
-#include "gromacs/mdlib/nbnxn_ocl/nbnxn_ocl_types.h"
 #include "gromacs/mdlib/nbnxn_gpu.h"
+#include "gromacs/mdlib/nbnxn_gpu_jit_support.h"
 #include "gromacs/utility/cstringutil.h"
 #include "gromacs/utility/fatalerror.h"
 
+#include "nbnxn_ocl_types.h"
+
+//! This function is documented in the header file
 void
 nbnxn_ocl_map_interaction_types_to_gpu_kernel_flavors(const interaction_const_t *ic,
                                                       int                       *gpu_eeltype,
@@ -117,6 +124,7 @@ nbnxn_ocl_map_interaction_types_to_gpu_kernel_flavors(const interaction_const_t 
  *                            during the initialization (if there was any).
  * \param[in] gpu_info        GPU info of all detected devices in the system.
  * \param[in] gpu_opt         Options for using the GPUs in gpu_info
+ * \param[in] ic              Interaction constants used to determine which kernels will be used
  * \param[in] bOclDoFastGen   If true, only the requested kernels are compiled, significantly reducing
  * the total compilatin time. If false, all OpenCL kernels are compiled.
  * \returns                   true if no error occurs during initialization.
@@ -142,6 +150,8 @@ nbnxn_ocl_compile_kernels_inner(int                        mygpu,
     nbnxn_ocl_map_interaction_types_to_gpu_kernel_flavors(ic,
                                                           &gmx_algo_family.eeltype,
                                                           &gmx_algo_family.vdwtype);
+    assert(gmx_algo_family.eeltype < eelOclNR);
+    assert(gmx_algo_family.vdwtype < evdwOclNR);
 
     assert(gpu_info);
     assert(result_str);
@@ -198,10 +208,9 @@ nbnxn_ocl_compile_kernels_inner(int                        mygpu,
  *
  * \param[in]  mygpu          The intra-node PP rank, which is the index into the list of GPUs to use
  * \param[in]  rank           MPI rank (for error reporting)
- * \param[out] result_str     The message related to the error that occurred
- *                            during the initialization (if there was any).
  * \param[in] gpu_info        GPU info of all detected devices in the system.
  * \param[in] gpu_opt         Options for using the GPUs in gpu_info
+ * \param[in] ic              Interaction constants used to determine which kernels will be used
  */
 void
 nbnxn_gpu_compile_kernels(int                        mygpu,

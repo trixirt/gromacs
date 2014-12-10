@@ -32,23 +32,25 @@
  * To help us fund GROMACS development, we humbly ask that you cite
  * the research papers on the package. Check out http://www.gromacs.org.
  */
-
-/** \file ocl_compiler.cpp
- *  \brief OpenCL JIT compilation for Gromacs
+/*! \internal \file
+ *  \brief Define infrastructure for OpenCL JIT compilation for Gromacs
+ *
+ *  \author Anca Hamuraru <anca@streamcomputing.eu>
+ *
+ * TODO Currently this file handles compilation of NBNXN kernels,
+ * but e.g. organizing the defines for various physics models
+ * is leaking in here a bit.
  */
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <assert.h>
-#include <string.h>
+#include "gmxpre.h"
 
 #include "config.h"
 
-#include "ocl_compiler.hpp"
+#include <assert.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
-#include "gromacs/mdlib/nbnxn_gpu_types.h"
-#include "gromacs/mdlib/nbnxn_ocl/nbnxn_ocl_types.h"
-#include "gromacs/mdlib/nbnxn_gpu_jit_support.h"
+#include "gromacs/gmxlib/gpu_utils/ocl_compiler.hpp"
 
 /* This path is defined by CMake and it depends on the install prefix option.
    The opencl kernels are installed in bin/opencl.*/
@@ -64,8 +66,7 @@
 #define SSEPARATOR "\\"
 #endif
 
-/**
- * \brief Compiler options index
+/*! \brief Compiler options index
  */
 typedef enum {
     _invalid_option_          = 0,
@@ -82,29 +83,29 @@ typedef enum {
     _num_build_options_
 } build_options_index_t;
 
-/**
- * \brief List of available OpenCL compiler options
+/*! \brief List of available OpenCL compiler options
  */
 static const char* build_options_list[] = {
     "",
-    "-x clc++",                        /**< AMD C++ extension */
-    "-cl-nv-verbose",                  /**< Nvidia verbose build log */
-    "-cl-std=CL1.1",                   /**< Force CL 1.1  */
-    "-cl-std=CL1.2",                   /**< Force CL 1.2  */
-    "-cl-fast-relaxed-math",           /**< Fast math */
-    "-cl-opt-disable",                 /**< Disable optimisations */
-    "-g",                              /**< Debug symbols */
-    "-save-temps",                     /**< AMD option to dump intermediate temporary
-                                            files such as IL or ISA code */
-    "-I""\""OCL_INSTALL_FULL_PATH"\""  /**< Include path to kernel sources */
+    "-x clc++",                         /**< AMD C++ extension */
+    "-cl-nv-verbose",                   /**< Nvidia verbose build log */
+    "-cl-std=CL1.1",                    /**< Force CL 1.1  */
+    "-cl-std=CL1.2",                    /**< Force CL 1.2  */
+    "-cl-fast-relaxed-math",            /**< Fast math */
+    "-cl-opt-disable",                  /**< Disable optimisations */
+    "-g",                               /**< Debug symbols */
+    "-save-temps",                      /**< AMD option to dump intermediate temporary
+                                             files such as IL or ISA code */
+    "-I" "\""OCL_INSTALL_FULL_PATH "\"" /**< Include path to kernel sources */
     /*,
        "-I../../src/gromacs/gmxlib/ocl_tools           -I../../src/gromacs/mdlib/nbnxn_ocl            -I../../src/gromacs/pbcutil            -I../../src/gromacs/mdlib"
        -I../../../gromacs/src/gromacs/gmxlib/ocl_tools -I../../../gromacs/src/gromacs/mdlib/nbnxn_ocl -I../../../gromacs/src/gromacs/pbcutil -I../../../gromacs/src/gromacs/mdlib" */
 };
-/* Include paths when using the GMX_OCL_FILE_PATH to point to the gromacs source tree */
+
+/*! \brief Include paths when using the GMX_OCL_FILE_PATH to point to the gromacs source tree */
 #define INCLUDE_PATH_COUNT 4
-/**
- * \brief List of include paths relative to the path defined by \ref{GMX_OCL_FILE_PATH}
+
+/*! \brief List of include paths relative to the path defined by \p GMX_OCL_FILE_PATH
  */
 static const char* include_path_list[] =
 {
@@ -114,13 +115,11 @@ static const char* include_path_list[] =
     "gromacs" SSEPARATOR "mdlib"
 };
 
-/**
- * \brief Available sources
+/*! \brief Available sources
  */
 static const char * kernel_filenames[] = {"nbnxn_ocl_kernels.cl"};
 
-/**
- * \brief Defines to enable specific kernels based on vendor
+/*! \brief Defines to enable specific kernels based on vendor
  */
 static const char * kernel_vendor_spec_definitions[] = {
     "-D_WARPLESS_SOURCE_",     /**< nbnxn_ocl_kernel_nowarp.clh  */
@@ -128,13 +127,7 @@ static const char * kernel_vendor_spec_definitions[] = {
     "-D_AMD_SOURCE_"           /**< nbnxn_ocl_kernel_amd.clh     */
 };
 
-/**
- * \brief Enumerator type for electrostatic flavour
- */
-typedef enum eelOcl  eelOcl_t;
-
-/**
- * \brief Array of the defines needed to generate a specific eel flavour
+/*! \brief Array of the defines needed to generate a specific eel flavour
  */
 static const char * kernel_electrostatic_family_definitions[] =
 {
@@ -146,13 +139,7 @@ static const char * kernel_electrostatic_family_definitions[] =
     "-DEL_EWALD_ANA -DLJ_CUTOFF_CHECK -D_EELNAME=_ElecEwTwinCut"
 };
 
-/**
- * \brief Enumerator type for vdw flavour
- */
-typedef enum evdwOcl evdwOcl_t;
-
-/**
- * \brief Array of the defines needed to generate a specific vdw flavour
+/*! \brief Array of the defines needed to generate a specific vdw flavour
  */
 static const char * kernel_VdW_family_definitions[] =
 {
@@ -164,8 +151,7 @@ static const char * kernel_VdW_family_definitions[] =
 };
 
 
-/**
- * \brief Get the string of a build option of the specific id
+/*! \brief Get the string of a build option of the specific id
  * \param  build_option_id  The option id as defines in the header
  * \return String containing the actual build option string for the compiler
  */
@@ -181,8 +167,7 @@ static const char* get_ocl_build_option(build_options_index_t build_option_id)
     }
 }
 
-/**
- * \brief Get the size of the string (without null termination) required
+/*! \brief Get the size of the string (without null termination) required
  *  for the build option of the specific id
  * \param  build_option_id  The option id as defines in the header
  * \return size_t containing the size in bytes of the build option string
@@ -200,8 +185,7 @@ static size_t get_ocl_build_option_length(build_options_index_t build_option_id)
     }
 }
 
-/**
- * \brief Get the size of final composed build options literal
+/*! \brief Get the size of final composed build options literal
  *
  * \param build_device_vendor_id  Device vendor id. Used to
  *          automatically enable some vendor specific options
@@ -275,8 +259,7 @@ create_ocl_build_options_length(
     return build_options_length+1;
 }
 
-/**
- * \brief Get the size of final composed build options literal
+/*! \brief Get the size of final composed build options literal
  *
  * \param build_options_string The string where to save the
  *                                  resulting build options in
@@ -393,8 +376,7 @@ create_ocl_build_options(
     return build_options_string;
 }
 
-/**
- * \brief Get the size of the full kernel source file path and name
+/*! \brief Get the size of the full kernel source file path and name
  *
  * If GMX_OCL_FILE_PATH is defined in the environment the following full path size is returned:
  *  strlen($GMX_OCL_FILE_PATH) + strlen(kernel_id.cl) + separator + null term
@@ -422,13 +404,12 @@ get_ocl_kernel_source_file_info(kernel_source_index_t kernel_src_id)
     {
         /* Kernel source are located in the installation folder of Gromacs */
         return( strlen(kernel_filenames[kernel_src_id])     /* Kernel source filename     */
-                + strlen(OCL_INSTALL_FULL_PATH)              /* Full path to kernel source */
+                + strlen(OCL_INSTALL_FULL_PATH)             /* Full path to kernel source */
                 + 2);                                       /* separator and null char    */
     }
 }
 
-/**
- * \brief Compose and the full path and name of the kernel src to be used
+/*! \brief Compose and the full path and name of the kernel src to be used
  *
  * If GMX_OCL_FILE_PATH is defined in the environment the following full path size is composed:
  *  $GMX_OCL_FILE_PATH/kernel_id.cl
@@ -517,8 +498,7 @@ get_ocl_kernel_source_path(
 #undef SEPARATOR
 #endif
 
-/**
- * \brief Loads the src inside the file filename onto a string in memory
+/*! \brief Loads the src inside the file filename onto a string in memory
  *
  * \param filename The name of the file to be read
  * \param p_source_length Pointer to the size of the source in bytes
@@ -559,8 +539,7 @@ load_ocl_source(const char* filename, size_t* p_source_length)
     return ocl_source;
 }
 
-/**
- * \brief Handles the dumping of the OpenCL JIT compilation log
+/*! \brief Handles the dumping of the OpenCL JIT compilation log
  *
  * In a debug build:
  *  -Success: Save to file kernel_id.SUCCEEDED in the run folder.
@@ -677,8 +656,7 @@ handle_ocl_build_log(
     }
 }
 
-/**
- *  \brief Get the warp size reported by device
+/*!  \brief Get the warp size reported by device
  *
  *  This is platform implementation dependant and seems to only work on the Nvidia and Amd platforms!
  *  Nvidia reports 32, Amd for GPU 64. Ignore the rest
@@ -714,10 +692,9 @@ ocl_get_warp_size(cl_context context, cl_device_id device_id)
 
 }
 
-/**
- * \brief Automatically select vendor-specific kernel from vendor id
+/*! \brief Automatically select vendor-specific kernel from vendor id
  *
- * \param ocl_vendor_id_t Vendor id enumerator (amd,nvidia,intel,unknown)
+ * \param vendor_id Vendor id enumerator (amd,nvidia,intel,unknown)
  * \return Vendor-specific kernel version
  */
 static kernel_vendor_spec_t
@@ -743,8 +720,7 @@ ocl_autoselect_kernel_from_vendor(ocl_vendor_id_t vendor_id)
     return kernel_vendor;
 }
 
-/**
- * \brief Returns the compiler define string needed to activate vendor-specific kernels
+/*! \brief Returns the compiler define string needed to activate vendor-specific kernels
  *
  * \param kernel_spec Kernel vendor specification
  * \return String with the define for the spec
@@ -757,8 +733,7 @@ ocl_get_vendor_specific_define(kernel_vendor_spec_t kernel_spec)
     return kernel_vendor_spec_definitions[kernel_spec];
 }
 
-/**
- * \brief Populates algo_defines with the compiler defines required to avoid all flavour generation
+/*! \brief Populates algo_defines with the compiler defines required to avoid all flavour generation
  *
  * For example if flavour eelOclRF with evdwOclFSWITCH, the output will be such that the corresponding
  * kernel flavour is generated:
@@ -770,7 +745,7 @@ ocl_get_vendor_specific_define(kernel_vendor_spec_t kernel_spec)
  * prune/energy are still generated as originally. It is only the the flavour-level that has changed, so that
  * only the required flavour for the simulation is compiled.
  *
- * \param p_kernel_algo_family Pointer to algo_family structure (eel,vdw)
+ * \param p_gmx_algo_family    Pointer to algo_family structure (eel,vdw)
  * \param p_algo_defines       String to populate with the defines
  */
 static void
@@ -778,9 +753,6 @@ ocl_get_fastgen_define(
         gmx_algo_family_t * p_gmx_algo_family,
         char *              p_algo_defines)
 {
-    assert(p_gmx_algo_family->eeltype < eelOclNR);
-    assert(p_gmx_algo_family->vdwtype < evdwOclNR);
-
     printf("Setting up kernel fastgen definitions: ");
     sprintf(p_algo_defines, "-D_OCL_FASTGEN_ %s %s ",
             kernel_electrostatic_family_definitions[p_gmx_algo_family->eeltype],
@@ -789,6 +761,7 @@ ocl_get_fastgen_define(
     printf(" %s \n", p_algo_defines);
 }
 
+/*! \brief TODO */
 bool
 check_ocl_cache(char            *ocl_binary_filename,
                 char gmx_unused *build_options_string,
@@ -797,6 +770,7 @@ check_ocl_cache(char            *ocl_binary_filename,
                 unsigned char  **ocl_binary)
 {
     FILE *f;
+    size_t read_count;
 
     f = fopen(ocl_binary_filename, "rb");
     if (!f)
@@ -808,8 +782,11 @@ check_ocl_cache(char            *ocl_binary_filename,
     *ocl_binary_size = ftell(f);
     *ocl_binary      = (unsigned char*)malloc(*ocl_binary_size);
     fseek(f, 0, SEEK_SET);
-    fread(*ocl_binary, 1, *ocl_binary_size, f);
+    read_count = fread(*ocl_binary, 1, *ocl_binary_size, f);
     fclose(f);
+
+    if (read_count != (*ocl_binary_size))
+        return false;
 
     // TODO: Compare current build options and code against the builds options
     // and the code corresponding to the cache. If any change is detected this
@@ -817,6 +794,7 @@ check_ocl_cache(char            *ocl_binary_filename,
     return true;
 }
 
+/*! \brief TODO */
 char*
 ocl_get_build_options_string(cl_context           context,
                              cl_device_id         device_id,
@@ -914,6 +892,7 @@ ocl_get_build_options_string(cl_context           context,
     return build_options_string;
 }
 
+/*! \brief TODO */
 void
 print_ocl_binaries_to_file(cl_program program, char* file_name)
 {
@@ -933,8 +912,7 @@ print_ocl_binaries_to_file(cl_program program, char* file_name)
     free(ocl_binary);
 }
 
-/**
- * \brief Compile the kernels as described by kernel src id and vendor spec
+/*! \brief Compile the kernels as described by kernel src id and vendor spec
  *
  * \param kernel_source_file Index of the kernel src to be used (default)
  * \param kernel_vendor_spec Vendor specific compilation (auto,nvidia,amd,nowarp)

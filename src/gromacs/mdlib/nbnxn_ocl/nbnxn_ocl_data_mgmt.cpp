@@ -32,52 +32,55 @@
  * To help us fund GROMACS development, we humbly ask that you cite
  * the research papers on the package. Check out http://www.gromacs.org.
  */
-
-/** \file nbnxn_ocl_data_mgmt.cpp
- *  \brief OpenCL equivalent of nbnxn_cuda_data_mgmt.cu and cudautils.cu
+/*! \internal \file
+ *  \brief Define OpenCL implementation of nbnxn_gpu_data_mgmt.h
+ *
+ *  \author Anca Hamuraru <anca@streamcomputing.eu>
  */
+#include "gmxpre.h"
 
 #include "config.h"
 
 #include <assert.h>
-#include <stdarg.h>
-#include <stdlib.h>
-#include <stdio.h>
 #include <math.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "gromacs/gmxlib/gpu_utils/gpu_utils.h"
 #include "gromacs/gmxlib/gpu_utils/ocl_compiler.hpp"
+#include "gromacs/gmxlib/ocl_tools/oclutils.h"
+#include "gromacs/legacyheaders/gmx_detect_hardware.h"
 #include "gromacs/legacyheaders/tables.h"
 #include "gromacs/legacyheaders/typedefs.h"
 #include "gromacs/legacyheaders/types/enums.h"
-#include "gromacs/mdlib/nb_verlet.h"
-#include "gromacs/legacyheaders/types/interaction_const.h"
 #include "gromacs/legacyheaders/types/force_flags.h"
+#include "gromacs/legacyheaders/types/interaction_const.h"
+#include "gromacs/mdlib/nb_verlet.h"
 #include "gromacs/mdlib/nbnxn_consts.h"
-#include "gromacs/legacyheaders/gmx_detect_hardware.h"
-
-#include "gromacs/gmxlib/ocl_tools/oclutils.h"
 #include "gromacs/mdlib/nbnxn_gpu.h"
 #include "gromacs/mdlib/nbnxn_gpu_data_mgmt.h"
 #include "gromacs/mdlib/nbnxn_gpu_jit_support.h"
-#include "gromacs/mdlib/nbnxn_ocl/nbnxn_ocl_types.h"
-
 #include "gromacs/pbcutil/ishift.h"
+#include "gromacs/timing/gpu_timing.h"
 #include "gromacs/utility/cstringutil.h"
 #include "gromacs/utility/fatalerror.h"
 #include "gromacs/utility/smalloc.h"
-#include "gromacs/timing/gpu_timing.h"
+
+#include "nbnxn_ocl_types.h"
 
 
-/* This is a heuristically determined parameter for the Fermi architecture for
+/*! \brief This is a heuristically determined parameter for the Fermi architecture for
  * the minimum size of ci lists by multiplying this constant with the # of
  * multiprocessors on the current device.
  */
 static unsigned int gpu_min_ci_balanced_factor = 40;
 
-/* We should actually be using md_print_warn in md_logging.c,
- * but we can't include mpi.h in CUDA code.
+/*! \brief Helper function for warning output
+ *
+ * We should actually be using md_print_warn in md_logging.c,
+ * but we can't include mpi.h in OpenCL code.
  */
 static void md_print_warn(FILE       *fplog,
                           const char *fmt, ...)
@@ -103,9 +106,9 @@ static void md_print_warn(FILE       *fplog,
     }
 }
 
-/*!
+/*! \brief Free device buffers
+ *
  * If the pointers to the size variables are NULL no resetting happens.
- *  OpenCL equivalent of cu_free_buffered
  */
 void ocl_free_buffered(cl_mem d_ptr, int *n, int *nalloc)
 {
@@ -129,7 +132,8 @@ void ocl_free_buffered(cl_mem d_ptr, int *n, int *nalloc)
     }
 }
 
-/*!
+/*! \brief Reallocation device buffers
+ *
  *  Reallocation of the memory pointed by d_ptr and copying of the data from
  *  the location pointed by h_src host-side pointer is done. Allocation is
  *  buffered and therefore freeing is only needed if the previously allocated
@@ -191,14 +195,14 @@ void ocl_realloc_buffered(cl_mem *d_dest, void *h_src,
     }
 }
 
-/*! Tabulates the Ewald Coulomb force and initializes the size/scale
-    and the table GPU array. If called with an already allocated table,
-    it just re-uploads the table.
-
-    OpenCL equivalent of init_ewald_coulomb_force_table from nbnxn_cuda_data_mgmt.cu
+/*! \brief Tabulates the Ewald Coulomb force and initializes the size/scale
+ * and the table GPU array.
+ *
+ * If called with an already allocated table, it just re-uploads the
+ * table.
  */
 static void init_ewald_coulomb_force_table(cl_nbparam_t             *nbp,
-                                           const gmx_device_info_t *dev_info)
+                                           const gmx_device_info_t  *dev_info)
 {
     float       *ftmp;
     cl_mem       coul_tab;
@@ -225,14 +229,14 @@ static void init_ewald_coulomb_force_table(cl_nbparam_t             *nbp,
         /* Switched from using textures to using buffers */
         // TODO: decide which alternative is most efficient - textures or buffers.
         /*
-        cl_image_format array_format;
+           cl_image_format array_format;
 
-        array_format.image_channel_data_type = CL_FLOAT;
-        array_format.image_channel_order     = CL_R;
+           array_format.image_channel_data_type = CL_FLOAT;
+           array_format.image_channel_order     = CL_R;
 
-        coul_tab = clCreateImage2D(dev_info->context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+           coul_tab = clCreateImage2D(dev_info->context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
             &array_format, tabsize, 1, 0, ftmp, &cl_error);
-        */
+         */
 
         coul_tab = clCreateBuffer(dev_info->context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, tabsize*sizeof(cl_float), ftmp, &cl_error);
         assert(cl_error == CL_SUCCESS);
@@ -247,9 +251,8 @@ static void init_ewald_coulomb_force_table(cl_nbparam_t             *nbp,
 }
 
 
-/*! Initializes the atomdata structure first time, it only gets filled at
+/*! \brief Initializes the atomdata structure first time, it only gets filled at
     pair-search.
-    OpenCL equivalent of init_atomdata_first from nbnxn_cuda_data_mgmt.cu
  */
 static void init_atomdata_first(cl_atomdata_t *ad, int ntypes, gmx_device_info_t *dev_info)
 {
@@ -284,8 +287,7 @@ static void init_atomdata_first(cl_atomdata_t *ad, int ntypes, gmx_device_info_t
     ad->nalloc = -1;
 }
 
-/*! Copies all parameters related to the cut-off from ic to nbp
-    OpenCL equivalent of set_cutoff_parameters from nbnxn_cuda_data_mgmt.cu
+/*! \brief Copies all parameters related to the cut-off from ic to nbp
  */
 static void set_cutoff_parameters(cl_nbparam_t              *nbp,
                                   const interaction_const_t *ic)
@@ -308,8 +310,7 @@ static void set_cutoff_parameters(cl_nbparam_t              *nbp,
     nbp->vdw_switch       = ic->vdw_switch;
 }
 
-/*! Initializes the nonbonded parameter data structure.
-    OpenCL equivalent of init_nbparam from nbnxn_cuda_data_mgmt.cu
+/*! \brief Initializes the nonbonded parameter data structure.
  */
 static void init_nbparam(cl_nbparam_t              *nbp,
                          const interaction_const_t *ic,
@@ -353,14 +354,14 @@ static void init_nbparam(cl_nbparam_t              *nbp,
         /* Switched from using textures to using buffers */
         // TODO: decide which alternative is most efficient - textures or buffers.
         /*
-        cl_image_format array_format;
+           cl_image_format array_format;
 
-        array_format.image_channel_data_type = CL_FLOAT;
-        array_format.image_channel_order     = CL_R;
+           array_format.image_channel_data_type = CL_FLOAT;
+           array_format.image_channel_order     = CL_R;
 
-        nbp->coulomb_tab_climg2d = clCreateImage2D(dev_info->context, CL_MEM_READ_WRITE,
+           nbp->coulomb_tab_climg2d = clCreateImage2D(dev_info->context, CL_MEM_READ_WRITE,
             &array_format, 1, 1, 0, NULL, &cl_error);
-        */
+         */
 
         nbp->coulomb_tab_climg2d = clCreateBuffer(dev_info->context, CL_MEM_READ_ONLY, sizeof(cl_float), NULL, &cl_error);
         // TODO: handle errors
@@ -373,14 +374,14 @@ static void init_nbparam(cl_nbparam_t              *nbp,
         /* Switched from using textures to using buffers */
         // TODO: decide which alternative is most efficient - textures or buffers.
         /*
-        cl_image_format array_format;
+           cl_image_format array_format;
 
-        array_format.image_channel_data_type = CL_FLOAT;
-        array_format.image_channel_order     = CL_R;
+           array_format.image_channel_data_type = CL_FLOAT;
+           array_format.image_channel_order     = CL_R;
 
-        nbp->nbfp_climg2d = clCreateImage2D(dev_info->context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+           nbp->nbfp_climg2d = clCreateImage2D(dev_info->context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
             &array_format, nnbfp, 1, 0, nbat->nbfp, &cl_error);
-        */
+         */
 
         nbp->nbfp_climg2d = clCreateBuffer(dev_info->context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, nnbfp*sizeof(cl_float), nbat->nbfp, &cl_error);
         assert(cl_error == CL_SUCCESS);
@@ -416,10 +417,7 @@ static void init_nbparam(cl_nbparam_t              *nbp,
     }
 }
 
-/*! Re-generate the GPU Ewald force table, resets rlist, and update the
- *  electrostatic type switching to twin cut-off (or back) if needed.
- *  OpenCL equivalent of nbnxn_cuda_pme_loadbal_update_param
- */
+//! This function is documented in the header file
 void nbnxn_gpu_pme_loadbal_update_param(const nonbonded_verlet_t    *nbv,
                                         const interaction_const_t   *ic)
 {
@@ -427,7 +425,7 @@ void nbnxn_gpu_pme_loadbal_update_param(const nonbonded_verlet_t    *nbv,
     {
         return;
     }
-    gmx_nbnxn_ocl_t *nb  = nbv->gpu_nbv;
+    gmx_nbnxn_ocl_t    *nb  = nbv->gpu_nbv;
     cl_nbparam_t       *nbp = nb->nbparam;
 
     set_cutoff_parameters(nbp, ic);
@@ -437,8 +435,7 @@ void nbnxn_gpu_pme_loadbal_update_param(const nonbonded_verlet_t    *nbv,
     init_ewald_coulomb_force_table(nb->nbparam, nb->dev_info);
 }
 
-/*! Initializes the pair list data structure.
- *  OpenCL equivalent of init_plist from nbnxn_cuda_data_mgmt.cu
+/*! \brief Initializes the pair list data structure.
  */
 static void init_plist(cl_plist_t *pl)
 {
@@ -459,16 +456,14 @@ static void init_plist(cl_plist_t *pl)
     pl->bDoPrune    = false;
 }
 
-/*! Initializes the timer data structure.
-    OpenCL equivalent of init_timers from nbnxn_cuda_data_mgmt.cu
+/*! \brief Initializes the timer data structure.
  */
 static void init_timers(cl_timers_t gmx_unused *t, bool gmx_unused bUseTwoStreams)
 {
     /* Nothing to initialize for OpenCL */
 }
 
-/*! Initializes the timings data structure.
-    OpenCL equivalent of init_timings from nbnxn_cuda_data_mgmt.cu
+/*! \brief Initializes the timings data structure.
  */
 static void init_timings(gmx_wallclock_gpu_t *t)
 {
@@ -489,7 +484,7 @@ static void init_timings(gmx_wallclock_gpu_t *t)
     }
 }
 
-/*! Initializes the OpenCL kernel pointers of the nbnxn_ocl_ptr_t input data structure. */
+/*! \brief Initializes the OpenCL kernel pointers of the nbnxn_ocl_ptr_t input data structure. */
 void nbnxn_init_kernels(gmx_nbnxn_ocl_t *nb)
 {
     cl_int cl_error;
@@ -515,9 +510,7 @@ void nbnxn_init_kernels(gmx_nbnxn_ocl_t *nb)
     assert(cl_error == CL_SUCCESS);
 }
 
-/*! Initializes the input nbnxn_ocl_ptr_t data structure.
-    OpenCL equivalent of nbnxn_cuda_init
- */
+//! This function is documented in the header file
 void nbnxn_gpu_init(FILE gmx_unused      *fplog,
                     gmx_nbnxn_ocl_t     **p_nb,
                     const gmx_gpu_info_t *gpu_info,
@@ -525,7 +518,7 @@ void nbnxn_gpu_init(FILE gmx_unused      *fplog,
                     int                   my_gpu_index,
                     gmx_bool              bLocalAndNonlocal)
 {
-    gmx_nbnxn_ocl_t *nb;
+    gmx_nbnxn_ocl_t            *nb;
     cl_int                      cl_error;
     bool gmx_unused             bStreamSync;
     bool gmx_unused             bNoStreamSync;
@@ -738,8 +731,7 @@ void nbnxn_gpu_init(FILE gmx_unused      *fplog,
     }
 }
 
-/*! Clears nonbonded shift force output array and energy outputs on the GPU.
-    OpenCL equivalent of nbnxn_cuda_clear_e_fshift
+/*! \brief Clears nonbonded shift force output array and energy outputs on the GPU.
  */
 static void
 nbnxn_ocl_clear_e_fshift(gmx_nbnxn_ocl_t *nb)
@@ -772,8 +764,7 @@ nbnxn_ocl_clear_e_fshift(gmx_nbnxn_ocl_t *nb)
 
 }
 
-/*! Clears the first natoms_clear elements of the GPU nonbonded force output array.
-    OpenCL equivalent of nbnxn_cuda_clear_f
+/*! \brief Clears the first natoms_clear elements of the GPU nonbonded force output array.
  */
 static void nbnxn_ocl_clear_f(gmx_nbnxn_ocl_t *nb, int natoms_clear)
 {
@@ -805,9 +796,9 @@ static void nbnxn_ocl_clear_f(gmx_nbnxn_ocl_t *nb, int natoms_clear)
     assert(cl_error == CL_SUCCESS);
 }
 
-/*! OpenCL equivalent of nbnxn_cuda_clear_outputs */
+//! This function is documented in the header file
 void
-nbnxn_gpu_clear_outputs(gmx_nbnxn_ocl_t *nb,
+nbnxn_gpu_clear_outputs(gmx_nbnxn_ocl_t   *nb,
                         int                flags)
 {
     nbnxn_ocl_clear_f(nb, nb->atdat->natoms);
@@ -819,8 +810,8 @@ nbnxn_gpu_clear_outputs(gmx_nbnxn_ocl_t *nb,
     }
 }
 
-/*! OpenCL equivalent of nbnxn_cuda_init_const */
-void nbnxn_gpu_init_const(gmx_nbnxn_ocl_t *nb,
+//! This function is documented in the header file
+void nbnxn_gpu_init_const(gmx_nbnxn_ocl_t                *nb,
                           const interaction_const_t      *ic,
                           const nonbonded_verlet_group_t *nbv_group)
 {
@@ -832,8 +823,8 @@ void nbnxn_gpu_init_const(gmx_nbnxn_ocl_t *nb,
     nbnxn_ocl_clear_e_fshift(nb);
 }
 
-/*! OpenCL equivalent of nbnxn_cuda_init_pairlist */
-void nbnxn_gpu_init_pairlist(gmx_nbnxn_ocl_t *nb,
+//! This function is documented in the header file
+void nbnxn_gpu_init_pairlist(gmx_nbnxn_ocl_t        *nb,
                              const nbnxn_pairlist_t *h_plist,
                              int                     iloc)
 {
@@ -877,8 +868,8 @@ void nbnxn_gpu_init_pairlist(gmx_nbnxn_ocl_t *nb,
     d_plist->bDoPrune = true;
 }
 
-/*! OpenCL equivalent of nbnxn_cuda_upload_shiftvec */
-void nbnxn_gpu_upload_shiftvec(gmx_nbnxn_ocl_t *nb,
+//! This function is documented in the header file
+void nbnxn_gpu_upload_shiftvec(gmx_nbnxn_ocl_t        *nb,
                                const nbnxn_atomdata_t *nbatom)
 {
     cl_atomdata_t   *adat  = nb->atdat;
@@ -893,8 +884,8 @@ void nbnxn_gpu_upload_shiftvec(gmx_nbnxn_ocl_t *nb,
     }
 }
 
-/*! Initialize atomdata */
-void nbnxn_gpu_init_atomdata(gmx_nbnxn_ocl_t *nb,
+//! This function is documented in the header file
+void nbnxn_gpu_init_atomdata(gmx_nbnxn_ocl_t               *nb,
                              const struct nbnxn_atomdata_t *nbat)
 {
     cl_int           cl_error;
@@ -951,7 +942,7 @@ void nbnxn_gpu_init_atomdata(gmx_nbnxn_ocl_t *nb,
                        natoms*sizeof(int), ls, bDoTime ? &(timers->atdat) : NULL);
 }
 
-/*! Releases an OpenCL kernel pointer */
+/*! \brief Releases an OpenCL kernel pointer */
 void free_kernel(cl_kernel *kernel_ptr)
 {
     cl_int gmx_unused cl_error;
@@ -967,7 +958,7 @@ void free_kernel(cl_kernel *kernel_ptr)
     }
 }
 
-/*! Releases a list of OpenCL kernel pointers */
+/*! \brief Releases a list of OpenCL kernel pointers */
 void free_kernels(cl_kernel *kernels, int count)
 {
     int i;
@@ -978,7 +969,7 @@ void free_kernels(cl_kernel *kernels, int count)
     }
 }
 
-/*! Releases the input OpenCL buffer */
+/*! \brief Releases the input OpenCL buffer */
 void free_ocl_buffer(cl_mem *buffer)
 {
     cl_int gmx_unused cl_error;
@@ -993,7 +984,7 @@ void free_ocl_buffer(cl_mem *buffer)
     }
 }
 
-/*! OpenCL equivalent of nbnxn_cuda_free */
+//! This function is documented in the header file
 void nbnxn_gpu_free(gmx_nbnxn_ocl_t *nb)
 {
     int    kernel_count;
@@ -1089,13 +1080,13 @@ void nbnxn_gpu_free(gmx_nbnxn_ocl_t *nb)
     }
 }
 
-/*! OpenCL equivalent of nbnxn_cuda_get_timings */
+//! This function is documented in the header file
 gmx_wallclock_gpu_t * nbnxn_gpu_get_timings(gmx_nbnxn_ocl_t *nb)
 {
     return (nb != NULL && nb->bDoTime) ? nb->timings : NULL;
 }
 
-/*! OpenCL equivalent of nbnxn_cuda_reset_timings */
+//! This function is documented in the header file
 void nbnxn_gpu_reset_timings(nonbonded_verlet_t* nbv)
 {
     if (nbv->gpu_nbv && nbv->gpu_nbv->bDoTime)
@@ -1104,14 +1095,14 @@ void nbnxn_gpu_reset_timings(nonbonded_verlet_t* nbv)
     }
 }
 
-/*! OpenCL equivalent of nbnxn_cuda_min_ci_balanced */
+//! This function is documented in the header file
 int nbnxn_gpu_min_ci_balanced(gmx_nbnxn_ocl_t *nb)
 {
     return nb != NULL ?
            gpu_min_ci_balanced_factor * nb->dev_info->compute_units : 0;
 }
 
-/*! OpenCL equivalent of nbnxn_cuda_is_kernel_ewald_analytical */
+//! This function is documented in the header file
 gmx_bool nbnxn_gpu_is_kernel_ewald_analytical(const gmx_nbnxn_ocl_t *nb)
 {
     return ((nb->nbparam->eeltype == eelOclEWALD_ANA) ||
