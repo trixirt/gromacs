@@ -32,32 +32,31 @@
  * To help us fund GROMACS development, we humbly ask that you cite
  * the research papers on the package. Check out http://www.gromacs.org.
  */
-
-/** \file
- *  \brief Detection and initialization for OpenCL devices.
+/*! \internal \file
+ *  \brief Define functions for detection and initialization for OpenCL devices.
+ *
+ *  \author Anca Hamuraru <anca@streamcomputing.eu>
  */
 
 #include "gmxpre.h"
 
-#include "gpu_utils.h"
-
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
-#include <memory.h>
 #include <string.h>
 
-#include "gromacs/legacyheaders/types/hw_info.h"
+#include <memory.h>
 
+#include "gromacs/gmxlib/gpu_utils/gpu_utils.h"
+#include "gromacs/gmxlib/gpu_utils/ocl_compiler.hpp"
 #include "gromacs/gmxlib/ocl_tools/oclutils.h"
-
 #include "gromacs/legacyheaders/types/enums.h"
-#include "gromacs/utility/smalloc.h"
+#include "gromacs/legacyheaders/types/hw_info.h"
 #include "gromacs/utility/cstringutil.h"
 #include "gromacs/utility/fatalerror.h"
+#include "gromacs/utility/smalloc.h"
 
-#include "ocl_compiler.hpp"
-
+/*! \brief Helper macro for error handling */
 #define CALLOCLFUNC_LOGERROR(func, err_str, retval) { \
         cl_int opencl_ret = func; \
         if (CL_SUCCESS != opencl_ret) \
@@ -126,19 +125,7 @@ ocl_vendor_id_t get_vendor_id(char *vendor_name)
 }
 
 
-/*! \brief Detect all OpenCL GPUs in the system.
- *
- *  Will detect all OpenCL GPUs supported by the device driver in use. Also
- *  check for the compatibility of each and fill the gpu_info->ocl_dev array
- *  with the required information on each the device.
- *  If GMX_OCL_FORCE_CPU environment variable is defined, OpenCL CPU devices will also be detected.
- *
- *  \param[in] gpu_info    Pointer to structure holding GPU information.
- *  \param[out] err_str    The error message of any CUDA API error that caused
- *                         the detection to fail (if there was any). The memory
- *                         the pointer points to should be managed externally.
- *  \returns               non-zero if the detection encountered a failure, zero otherwise.
- */
+//! This function is documented in the header file
 int detect_gpus(gmx_gpu_info_t *gpu_info, char *err_str)
 {
     int             retval;
@@ -303,10 +290,7 @@ int detect_gpus(gmx_gpu_info_t *gpu_info, char *err_str)
     return retval;
 }
 
-/*! \brief Frees the ocl_dev array of \gpu_info.
- *
- * \param[in]    gpu_info    pointer to structure holding GPU information
- */
+//! This function is documented in the header file
 void free_gpu_info(const gmx_gpu_info_t gmx_unused *gpu_info)
 {
     if (gpu_info)
@@ -334,19 +318,7 @@ void free_gpu_info(const gmx_gpu_info_t gmx_unused *gpu_info)
     }
 }
 
-/*! \brief Select the OpenCL GPUs compatible with the native GROMACS acceleration.
- *
- * This function selects the compatible gpus and initializes
- * gpu_info->dev_use and gpu_info->n_dev_use.
- *
- * Given the list of OpenCL GPUs available in the system check each device in
- * gpu_info->ocl_dev and place the indices of the compatible GPUs into
- * dev_use with this marking the respective GPUs as "available for use."
- * Note that \detect_gpus must have been called before.
- *
- * \param[in]     gpu_info    Pointer to structure holding GPU information
- * \param[in,out] gpu_opt     Pointer to structure holding GPU options
- */
+//! This function is documented in the header file
 void pick_compatible_gpus(const gmx_gpu_info_t *gpu_info,
                           gmx_gpu_opt_t        *gpu_opt)
 {
@@ -354,8 +326,8 @@ void pick_compatible_gpus(const gmx_gpu_info_t *gpu_info,
     int *compat;
 
     assert(gpu_info);
-    /* ocl_dev/nocl_dev have to be either NULL/0 or not (NULL/0) */
-    assert((gpu_info->n_dev != 0 ? 0 : 1) ^ (gpu_info->n_dev == NULL ? 0 : 1));
+    /* gpu_dev/n_dev have to be either NULL/0 or not (NULL/0) */
+    assert((gpu_info->n_dev != 0 ? 0 : 1) ^ (gpu_info->gpu_dev == NULL ? 0 : 1));
 
     snew(compat, gpu_info->n_dev);
     ncompat = 0;
@@ -368,24 +340,13 @@ void pick_compatible_gpus(const gmx_gpu_info_t *gpu_info,
         }
     }
 
-    gpu_opt->n_dev_use = ncompat;
-    snew(gpu_opt->dev_use, ncompat);
-    memcpy(gpu_opt->dev_use, compat, ncompat*sizeof(*compat));
+    gpu_opt->n_dev_compatible = ncompat;
+    snew(gpu_opt->dev_compatible, ncompat);
+    memcpy(gpu_opt->dev_compatible, compat, ncompat*sizeof(*compat));
     sfree(compat);
 }
 
-/*! \brief Check the existence/compatibility of a set of OpnCL GPUs specified by their device IDs.
- *
- * Given the a list of gpu->n_dev_use GPU device IDs stored in
- * gpu_opt->dev_use check the existence and compatibility
- * of the respective GPUs. Also provide the caller with an array containing
- * the result of checks in \checkres.
- *
- * \param[out]  checkres    Check result for each ID passed in \requested_devs
- * \param[in]   gpu_info    Pointer to structure holding GPU information
- * \param[out]  gpu_opt     Pointer to structure holding GPU options
- * \returns                 TRUE if each of the requested GPUs are compatible
- */
+//! This function is documented in the header file
 gmx_bool check_selected_gpus(int                  *checkres,
                              const gmx_gpu_info_t *gpu_info,
                              gmx_gpu_opt_t        *gpu_opt)
@@ -412,7 +373,7 @@ gmx_bool check_selected_gpus(int                  *checkres,
     {
         id = gpu_opt->dev_use[i];
 
-        /* devices are stored in increasing order of IDs in ocl_dev */
+        /* devices are stored in increasing order of IDs in gpu_dev */
         gpu_opt->dev_use[i] = id;
 
         checkres[i] = (id >= gpu_info->n_dev) ?
@@ -424,16 +385,7 @@ gmx_bool check_selected_gpus(int                  *checkres,
     return bAllOk;
 }
 
-/*! \brief Formats and returns a device information string for a given OpenCL GPU.
- *
- * Given an index *directly* into the array of available GPUs (ocl_dev)
- * returns a formatted info string for the respective GPU which includes
- * name, vendor, device version, number of compute units and detection status.
- *
- * \param[out]  s           Pointer to output string (has to be allocated externally)
- * \param[in]   gpu_info    Pointer to structure holding GPU information
- * \param[in]   index       An index *directly* into the array of available GPUs
- */
+//! This function is documented in the header file
 void get_gpu_device_info_string(char gmx_unused *s, const gmx_gpu_info_t gmx_unused *gpu_info, int gmx_unused index)
 {
     assert(s);
@@ -446,7 +398,7 @@ void get_gpu_device_info_string(char gmx_unused *s, const gmx_gpu_info_t gmx_unu
 
     gmx_device_info_t  *dinfo = &gpu_info->gpu_dev[index];
 
-    bool             bGpuExists =
+    bool                bGpuExists =
         dinfo->stat == egpuCompatible ||
         dinfo->stat == egpuIncompatible;
 
@@ -465,19 +417,9 @@ void get_gpu_device_info_string(char gmx_unused *s, const gmx_gpu_info_t gmx_unu
     }
 }
 
-/*! \brief Initializes the OpenCL GPU given by \p mygpu.
- *
- * Initializes the OpenCL context for the OpenCL GPU with the given index and also
- * compiles the OpenCL kernels.
- *
- * \param[in]  mygpu          Index of the GPU to initialize
- * \param[out] result_str     The message related to the error that occurred
- *                            during the initialization (if there was any).
- * \param[in] gpu_info        GPU info of all detected devices in the system.
- * \param[in] gpu_opt         Options for using the GPUs in gpu_info
- * \returns                   true if no error occurs during initialization.
- */
-gmx_bool init_gpu(int                              mygpu,
+//! This function is documented in the header file
+gmx_bool init_gpu(FILE                             */*fplog*/,
+                  int                              mygpu,
                   char                            *result_str,
                   const gmx_gpu_info_t gmx_unused *gpu_info,
                   const gmx_gpu_opt_t             *gpu_opt
@@ -509,6 +451,8 @@ gmx_bool init_gpu(int                              mygpu,
  * \param[in]    gpu_opt    Pointer to structure holding GPU options
  * \param[in]    idx        Index into the array of used GPUs
  * \returns                 ocl_gpu_id_t data structure identifying the requested OpenCL GPU
+ *
+ * TODO This function is unused, decide status
  */
 ocl_gpu_id_t get_gpu_device_id(const gmx_gpu_info_t *gpu_info,
                                const gmx_gpu_opt_t  *gpu_opt,
@@ -521,17 +465,7 @@ ocl_gpu_id_t get_gpu_device_id(const gmx_gpu_info_t *gpu_info,
     return gpu_info->gpu_dev[gpu_opt->dev_use[idx]].ocl_gpu_id;
 }
 
-/*! \brief Returns the name for the OpenCL GPU with a given index into the array of used GPUs.
- *
- * Getter function which, given an index into the array of GPUs in use
- * (dev_use) -- typically a tMPI/MPI rank --, returns the device name for the
- * respective OpenCL GPU.
- *
- * \param[in]    gpu_info   Pointer to structure holding GPU information
- * \param[in]    gpu_opt    Pointer to structure holding GPU options
- * \param[in]    idx        Index into the array of used GPUs
- * \returns                 A string with the name of the requested OpenCL GPU
- */
+//! This function is documented in the header file
 char* get_ocl_gpu_device_name(const gmx_gpu_info_t *gpu_info,
                               const gmx_gpu_opt_t  *gpu_opt,
                               int                   idx)
@@ -543,9 +477,7 @@ char* get_ocl_gpu_device_name(const gmx_gpu_info_t *gpu_info,
     return gpu_info->gpu_dev[gpu_opt->dev_use[idx]].device_name;
 }
 
-/*! \brief Returns the size of the ocl_gpu_info_t struct.
- * \returns                 size in bytes of ocl_gpu_info_t
- */
+//! This function is documented in the header file
 size_t sizeof_gpu_dev_info(void)
 {
     return sizeof(gmx_device_info_t);
@@ -595,7 +527,6 @@ cl_int dbg_ocl_kernel_name_address(void* kernel)
     return cl_error;
 }
 
-/*! \brief Set allocation functions used by the GPU host */
 void gpu_set_host_malloc_and_free(bool               bUseGpuKernels,
                                   gmx_host_alloc_t **nb_alloc,
                                   gmx_host_free_t  **nb_free)

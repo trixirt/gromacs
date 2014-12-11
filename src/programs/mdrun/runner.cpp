@@ -46,8 +46,8 @@
 
 #include <algorithm>
 
+#include "gromacs/domdec/domdec.h"
 #include "gromacs/essentialdynamics/edsam.h"
-#include "gromacs/ewald/ewald-util.h"
 #include "gromacs/ewald/pme.h"
 #include "gromacs/fileio/tpxio.h"
 #include "gromacs/gmxlib/gpu_utils/gpu_utils.h"
@@ -55,7 +55,6 @@
 #include "gromacs/legacyheaders/checkpoint.h"
 #include "gromacs/legacyheaders/constr.h"
 #include "gromacs/legacyheaders/disre.h"
-#include "gromacs/legacyheaders/domdec.h"
 #include "gromacs/legacyheaders/force.h"
 #include "gromacs/legacyheaders/gmx_detect_hardware.h"
 #include "gromacs/legacyheaders/gmx_omp_nthreads.h"
@@ -74,6 +73,7 @@
 #include "gromacs/legacyheaders/sighandler.h"
 #include "gromacs/legacyheaders/txtdump.h"
 #include "gromacs/legacyheaders/typedefs.h"
+#include "gromacs/math/calculate-ewald-splitting-coefficient.h"
 #include "gromacs/math/vec.h"
 #include "gromacs/mdlib/nbnxn_consts.h"
 #include "gromacs/mdlib/nbnxn_search.h"
@@ -1748,7 +1748,7 @@ int mdrunner(gmx_hw_opt_t *hw_opt,
 
 
     /* Free GPU memory and context */
-    free_gpu_resources(fr, cr);
+    free_gpu_resources(fr, cr, &hwinfo->gpu_info, fr ? fr->gpu_opt : NULL);
 
     if (opt2bSet("-membed", nfile, fnm))
     {

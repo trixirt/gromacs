@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2012, by the GROMACS development team, led by
+ * Copyright (c) 2012,2014, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -32,6 +32,13 @@
  * To help us fund GROMACS development, we humbly ask that you cite
  * the research papers on the package. Check out http://www.gromacs.org.
  */
+/*! \libinternal \file
+ *  \brief Declares data types for GPU timing
+ *
+ *  \author Szilard Pall <pall.szilard@gmail.com>
+ *  \author Mark Abraham <mark.j.abraham@gmail.com>
+ *  \inlibraryapi
+ */
 
 #ifndef GMX_TIMING_GPU_TIMING_H
 #define GMX_TIMING_GPU_TIMING_H
@@ -40,14 +47,14 @@
 extern "C" {
 #endif
 
-/*! \brief Nonbonded kernel time and call count. */
+/*! \internal \brief Nonbonded kernel time and call count. */
 struct gmx_nbnxn_kernel_timing_data_t
 {
-    double  t;
-    int     c;
+    double  t; /**< Accumulated lapsed time */
+    int     c; /**< Number of calls corresponding to the elapsed time */
 };
 
-/*! \brief GPU timings for kernels and H2d/D2H transfers. */
+/*! \internal \brief GPU timings for kernels and H2d/D2H transfers. */
 struct gmx_wallclock_gpu_t
 {
     struct gmx_nbnxn_kernel_timing_data_t ktime[2][2]; /**< table containing the timings of the four

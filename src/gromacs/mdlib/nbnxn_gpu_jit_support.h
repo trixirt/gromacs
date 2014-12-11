@@ -32,14 +32,20 @@
  * To help us fund GROMACS development, we humbly ask that you cite
  * the research papers on the package. Check out http://www.gromacs.org.
  */
+/*! \internal \file
+ *  \brief Declares functions that support JIT compilation (e.g. for OpenCL)
+ *
+ *  \author Anca Hamuraru <anca@streamcomputing.eu>
+ *  \author Mark Abraham <mark.j.abraham@gmail.com>
+ */
+
 #ifndef GMX_MDLIB_NBNXN_OCL_JIT_SUPPORT_H
 #define GMX_MDLIB_NBNXN_OCL_JIT_SUPPORT_H
 
-#include "config.h"
-
 #include "gromacs/gmxlib/gpu_utils/gpu_macros.h"
-#include "gromacs/legacyheaders/types/interaction_const.h"
 #include "gromacs/legacyheaders/types/hw_info.h"
+#include "gromacs/legacyheaders/types/interaction_const.h"
+#include "gromacs/legacyheaders/types/simple.h"
 
 /*! \brief Returns the kinds of electrostatics and Vdw OpenCL
  *  kernels that will be used.
@@ -47,20 +53,18 @@
  * Respectively, these values are from enum eelOcl and enum
  * evdwOcl. */
 GPU_FUNC_QUALIFIER void
-nbnxn_ocl_map_interaction_types_to_gpu_kernel_flavors(const interaction_const_t *ic,
-                                                      int                       *gpu_eeltype,
-                                                      int                       *gpu_vdwtype) GPU_FUNC_TERM
+    nbnxn_ocl_map_interaction_types_to_gpu_kernel_flavors(const interaction_const_t gmx_unused *ic,
+                                                          int                       gmx_unused *gpu_eeltype,
+                                                          int                       gmx_unused *gpu_vdwtype) GPU_FUNC_TERM
 
-#include "gromacs/legacyheaders/types/simple.h"
 struct gmx_gpu_info_t;
 
-/*! \brief Handles any JIT compilation of nbnxn kernels (e.g. for
-    OpenCL) for the GPU given by \p mygpu */
+/*! \brief Handles any JIT compilation of nbnxn kernels for the GPU given by \p mygpu */
 GPU_FUNC_QUALIFIER void
-nbnxn_gpu_compile_kernels(int                        mygpu,
-                          int                        rank,
-                          const gmx_gpu_info_t      *gpu_info,
-                          const gmx_gpu_opt_t       *gpu_opt,
-                          const interaction_const_t *ic) GPU_FUNC_TERM
+nbnxn_gpu_compile_kernels(int                       gmx_unused  mygpu,
+                          int                       gmx_unused  rank,
+                          const gmx_gpu_info_t      gmx_unused *gpu_info,
+                          const gmx_gpu_opt_t       gmx_unused *gpu_opt,
+                          const interaction_const_t gmx_unused *ic) GPU_FUNC_TERM
 
 #endif

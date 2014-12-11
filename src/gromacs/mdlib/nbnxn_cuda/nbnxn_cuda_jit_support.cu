@@ -32,9 +32,15 @@
  * To help us fund GROMACS development, we humbly ask that you cite
  * the research papers on the package. Check out http://www.gromacs.org.
  */
-#include "../nbnxn_gpu_jit_support.h"
+/*! \file
+ *  \brief Define CUDA implementation of nbnxn_gpu_git_support.h
+ *
+ *  \author Mark Abraham <mark.j.abraham@gmail.com>
+ */
+#include "gmxpre.h"
 
-#include "gromacs/mdlib/nbnxn_gpu.h"
+#include "gromacs/legacyheaders/types/interaction_const.h"
+#include "gromacs/mdlib/nbnxn_gpu_jit_support.h"
 
 void
 nbnxn_gpu_compile_kernels(int                        /*mygpu*/,
@@ -43,6 +49,8 @@ nbnxn_gpu_compile_kernels(int                        /*mygpu*/,
                           const gmx_gpu_opt_t       */*gpu_opt*/,
                           const interaction_const_t */*ic*/)
 {
-    /* CUDA support does not use JIT (yet). It would be nice if this
-     * function inlined away to nothing, but it's only used during setup. */
+    /* CUDA support does not use JIT (yet).
+     *
+     * It would be nice if this function inlined away to nothing, but
+     * it's only used during setup. */
 }

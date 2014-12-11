@@ -36,8 +36,8 @@
 #ifndef NB_VERLET_H
 #define NB_VERLET_H
 
-#include "gromacs/mdlib/nbnxn_pairlist.h"
 #include "gromacs/mdlib/nbnxn_gpu_types.h"
+#include "gromacs/mdlib/nbnxn_pairlist.h"
 
 #ifdef __cplusplus
 extern "C" {
