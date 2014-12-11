@@ -33,8 +33,12 @@
  * the research papers on the package. Check out http://www.gromacs.org.
  */
 
-/** \file nbnxn_ocl_types.h
- *  \brief OpenCL equivalent of nbnxn_cuda_types.h
+/*! \internal \file
+ *  \brief
+ *  Data types used internally in the nbnxn_ocl module.
+ *
+ *  \author Anca Hamuraru <anca@streamcomputing.eu>
+ *  \ingroup module_mdlib
  */
 
 #ifndef NBNXN_OPENCL_TYPES_H
@@ -42,25 +46,21 @@
 
 #include <CL/opencl.h>
 
-/* kernel does #include "gromacs/math/utilities.h" */
-/* Move the actual useful stuff here: */
-#define M_FLOAT_1_SQRTPI 0.564189583547756f
+#include "gromacs/legacyheaders/types/interaction_const.h"
+#include "gromacs/mdlib/nbnxn_pairlist.h"
 #include "gromacs/utility/real.h"
 
-#include "gromacs/legacyheaders/types/interaction_const.h"
+/* kernel does #include "gromacs/math/utilities.h" */
+/* Move the actual useful stuff here: */
 
-/* Fixing headers: Mixed host/device structure.. Header had to be modified to avoid irrelevant types in
- * device code, as tMPI_atomic_t.*/
-//#include "nbnxn_pairlist.h"
-#include "gromacs/mdlib/nbnxn_pairlist.h"
+//! Define 1/sqrt(pi)
+#define M_FLOAT_1_SQRTPI 0.564189583547756f
 
-/* Fixing headers: Only dependency is WARP_SIZE. The rest are host api code.. In OpenCL warp size can
-    differ anyway!. For now it is define in upper-level (kernel-utils.h) */
-/* #include "gromacs/mdlib/../gmxlib/cuda_tools/cudautils.cuh" */
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
 /*! \brief Electrostatic OpenCL kernel flavors.
  *
  *  Types of electrostatics implementations available in the OpenCL non-bonded
@@ -92,7 +92,7 @@ enum evdwOcl {
     evdwOclCUT, evdwOclFSWITCH, evdwOclPSWITCH, evdwOclEWALDGEOM, evdwOclEWALDLB, evdwOclNR
 };
 
-/** \internal
+/*! \internal
  * \brief Staging area for temporary data downloaded from the GPU.
  *
  *  The energies/shift forces get downloaded here first, before getting added
@@ -106,7 +106,7 @@ typedef struct cl_nb_staging
     // TODO: review fshift data type and how its size is computed
 } cl_nb_staging_t;
 
-/** \internal
+/*! \internal
  * \brief Nonbonded atom data - both inputs and outputs.
  */
 typedef struct cl_atomdata
@@ -130,7 +130,7 @@ typedef struct cl_atomdata
     cl_bool     bShiftVecUploaded; /**< true if the shift vector has been uploaded  */
 } cl_atomdata_t;
 
-/** \internal
+/*! \internal
  * \brief Parameters required for the OpenCL nonbonded calculations.
  */
 typedef struct cl_nbparam
@@ -167,9 +167,11 @@ typedef struct cl_nbparam
     cl_mem                 coulomb_tab_climg2d; /**< pointer to the table in the device memory  */
 } cl_nbparam_t;
 
-// Data structure shared between the OpenCL device code and OpenCL host code
-// Must not contain OpenCL objects (buffers)
-// TODO: review, improve
+/*! \internal
+ * \brief Data structure shared between the OpenCL device code and OpenCL host code
+ *
+ * Must not contain OpenCL objects (buffers)
+ * TODO: review, improve */
 typedef struct cl_nbparam_params
 {
 
@@ -200,7 +202,7 @@ typedef struct cl_nbparam_params
 } cl_nbparam_params_t;
 
 
-/** \internal
+/*! \internal
  * \brief Pair list data.
  */
 typedef struct cl_plist
@@ -227,7 +229,7 @@ typedef struct cl_plist
 }cl_plist_t;
 
 
-/** \internal
+/*! \internal
  * \brief OpenCL events used for timing GPU kernels and H2D/D2H transfers.
  *
  * The two-sized arrays hold the local and non-local values and should always
@@ -251,25 +253,29 @@ typedef struct cl_timers
     cl_event nb_k[2];           /**< event for non-bonded kernels (l/nl, every step)              */
 } cl_timers_t;
 
-/** \internal
+/*! \internal
  * \brief Main data structure for OpenCL nonbonded force calculations.
  */
 struct gmx_nbnxn_ocl_t
 {
     struct gmx_device_info_t *dev_info;        /**< OpenCL device information                                  */
 
-    /** non-bonded kernels */
-    /** organized similar with nb_kfunc_xxx arrays in nbnxn_ocl.cpp */
+    /**< Pointers to non-bonded kernel functions
+     * organized similar with nb_kfunc_xxx arrays in nbnxn_ocl.cpp */
+    ///@{
     cl_kernel           kernel_noener_noprune_ptr[eelOclNR][evdwOclNR];
     cl_kernel           kernel_ener_noprune_ptr[eelOclNR][evdwOclNR];
     cl_kernel           kernel_noener_prune_ptr[eelOclNR][evdwOclNR];
     cl_kernel           kernel_ener_prune_ptr[eelOclNR][evdwOclNR];
+    ///@}
 
-    /** auxiliary kernels implementing memset like functions         */
+    /**< auxiliary kernels implementing memset-like functions */
+    ///@{
     cl_kernel           kernel_memset_f;
     cl_kernel           kernel_memset_f2;
     cl_kernel           kernel_memset_f3;
     cl_kernel           kernel_zero_e_fshift;
+    ///@}
 
     cl_bool             bUseTwoStreams; /**< true if doing both local/non-local NB work on GPU          */
     cl_bool             bUseStreamSync; /**< true if the standard synchronization is used
@@ -279,9 +285,9 @@ struct gmx_nbnxn_ocl_t
     cl_plist_t         *plist[2];       /**< pair-list data structures (local and non-local)            */
     cl_nb_staging_t     nbst;           /**< staging area where fshift/energies get downloaded          */
 
-    cl_mem              debug_buffer;
+    cl_mem              debug_buffer;   /**< debug buffer */
 
-    cl_command_queue    stream[2];   /**< local and non-local GPU queues                             */
+    cl_command_queue    stream[2];      /**< local and non-local GPU queues                             */
 
     /** events used for synchronization */
     cl_event    nonlocal_done;    /**< event triggered when the non-local non-bonded kernel
@@ -293,9 +299,9 @@ struct gmx_nbnxn_ocl_t
      * concurrent streams, so we won't time if both l/nl work is done on GPUs.
      * Timer init/uninit is still done even with timing off so only the condition
      * setting bDoTime needs to be change if this CUDA "feature" gets fixed. */
-    cl_bool          bDoTime;       /**< True if event-based timing is enabled.                     */
-    cl_timers_t     *timers;        /**< OpenCL event-based timers.                                 */
-    struct gmx_wallclock_gpu_t *timings;       /**< Timing data.                                               */
+    cl_bool                     bDoTime; /**< True if event-based timing is enabled.                     */
+    cl_timers_t                *timers;  /**< OpenCL event-based timers.                                 */
+    struct gmx_wallclock_gpu_t *timings; /**< Timing data.                                               */
 };
 
 #ifdef __cplusplus

@@ -32,10 +32,12 @@
  * To help us fund GROMACS development, we humbly ask that you cite
  * the research papers on the package. Check out http://www.gromacs.org.
  */
-
-/** \file oclutils.cpp
- *  \brief OpenCL equivalent of cudautils.cu
+/*! \internal \file
+ *  \brief Define utility routines for OpenCL
+ *
+ *  \author Anca Hamuraru <anca@streamcomputing.eu>
  */
+#include "gmxpre.h"
 
 #include "oclutils.h"
 
@@ -44,19 +46,17 @@
 
 #include "gromacs/utility/fatalerror.h"
 
-/*! Launches synchronous or asynchronous host to device memory copy.
-*
-*  If copy_event is not NULL, on return it will contain an event object
-*  identifying this particular host to device operation. The event can further
-*  be used to queue a wait for this operation or to query profiling information.
-*
-*  OpenCL equivalent of cu_copy_H2D_generic.
-*/
+/*! \brief Launches synchronous or asynchronous host to device memory copy.
+ *
+ *  If copy_event is not NULL, on return it will contain an event object
+ *  identifying this particular host to device operation. The event can further
+ *  be used to queue a wait for this operation or to query profiling information.
+ */
 static int ocl_copy_H2D_generic(cl_mem d_dest, void* h_src,
-    size_t offset, size_t bytes,
-    bool bAsync /* = false*/,
-    cl_command_queue command_queue,
-    cl_event *copy_event)
+                                size_t offset, size_t bytes,
+                                bool bAsync /* = false*/,
+                                cl_command_queue command_queue,
+                                cl_event *copy_event)
 {
     cl_int gmx_unused cl_error;
 
@@ -81,46 +81,40 @@ static int ocl_copy_H2D_generic(cl_mem d_dest, void* h_src,
     return 0;
 }
 
-/*! Launches asynchronous host to device memory copy.
-*
-*  If copy_event is not NULL, on return it will contain an event object
-*  identifying this particular host to device operation. The event can further
-*  be used to queue a wait for this operation or to query profiling information.
-*
-*  OpenCL equivalent of cu_copy_H2D_async.
-*/
+/*! \brief Launches asynchronous host to device memory copy.
+ *
+ *  If copy_event is not NULL, on return it will contain an event object
+ *  identifying this particular host to device operation. The event can further
+ *  be used to queue a wait for this operation or to query profiling information.
+ */
 int ocl_copy_H2D_async(cl_mem d_dest, void * h_src,
-    size_t offset, size_t bytes,
-    cl_command_queue command_queue,
-    cl_event *copy_event)
+                       size_t offset, size_t bytes,
+                       cl_command_queue command_queue,
+                       cl_event *copy_event)
 {
     return ocl_copy_H2D_generic(d_dest, h_src, offset, bytes, true, command_queue, copy_event);
 }
 
-/*! Launches synchronous host to device memory copy.
-*
-*  OpenCL equivalent of cu_copy_H2D.
-*/
+/*! \brief Launches synchronous host to device memory copy.
+ */
 int ocl_copy_H2D(cl_mem d_dest, void * h_src,
-    size_t offset, size_t bytes,
-    cl_command_queue command_queue)
+                 size_t offset, size_t bytes,
+                 cl_command_queue command_queue)
 {
     return ocl_copy_H2D_generic(d_dest, h_src, offset, bytes, false, command_queue, NULL);
 }
 
-/*! Launches synchronous or asynchronous device to host memory copy.
-*
-*  If copy_event is not NULL, on return it will contain an event object
-*  identifying this particular device to host operation. The event can further
-*  be used to queue a wait for this operation or to query profiling information.
-*
-*  OpenCL equivalent of cu_copy_D2H_generic.
-*/
+/*! \brief Launches synchronous or asynchronous device to host memory copy.
+ *
+ *  If copy_event is not NULL, on return it will contain an event object
+ *  identifying this particular device to host operation. The event can further
+ *  be used to queue a wait for this operation or to query profiling information.
+ */
 int ocl_copy_D2H_generic(void * h_dest, cl_mem d_src,
-    size_t offset, size_t bytes,
-    bool bAsync,
-    cl_command_queue command_queue,
-    cl_event *copy_event)
+                         size_t offset, size_t bytes,
+                         bool bAsync,
+                         cl_command_queue command_queue,
+                         cl_event *copy_event)
 {
     cl_int gmx_unused cl_error;
 
@@ -145,23 +139,21 @@ int ocl_copy_D2H_generic(void * h_dest, cl_mem d_src,
     return 0;
 }
 
-/*! Launches asynchronous device to host memory copy.
-*
-*  If copy_event is not NULL, on return it will contain an event object
-*  identifying this particular host to device operation. The event can further
-*  be used to queue a wait for this operation or to query profiling information.
-*
-*  OpenCL equivalent of cu_copy_D2H_async.
-*/
+/*! \brief Launches asynchronous device to host memory copy.
+ *
+ *  If copy_event is not NULL, on return it will contain an event object
+ *  identifying this particular host to device operation. The event can further
+ *  be used to queue a wait for this operation or to query profiling information.
+ */
 int ocl_copy_D2H_async(void * h_dest, cl_mem d_src,
-    size_t offset, size_t bytes,
-    cl_command_queue command_queue,
-    cl_event *copy_event)
+                       size_t offset, size_t bytes,
+                       cl_command_queue command_queue,
+                       cl_event *copy_event)
 {
     return ocl_copy_D2H_generic(h_dest, d_src, offset, bytes, true, command_queue, copy_event);
 }
 
-/*! \brief Allocates nbytes of host memory. Use ocl_free to free memory allocated with this function.
+/*! \brief \brief Allocates nbytes of host memory. Use ocl_free to free memory allocated with this function.
  *
  *  \todo
  *  This function should allocate page-locked memory to help reduce D2H and H2D

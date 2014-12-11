@@ -34,20 +34,21 @@
  * To help us fund GROMACS development, we humbly ask that you cite
  * the research papers on the package. Check out http://www.gromacs.org.
  */
+/*! \libinternal \file
+ *  \brief Declare functions for detection and initialization for GPU devices.
+ *
+ *  \author Szilard Pall <pall.szilard@gmail.com>
+ *  \author Mark Abraham <mark.j.abraham@gmail.com>
+ *
+ *  \inlibraryapi
+ */
 
 #ifndef GMX_GMXLIB_GPU_UTILS_GPU_UTILS_H
 #define GMX_GMXLIB_GPU_UTILS_GPU_UTILS_H
 
-#include "config.h"
-
 #include "gromacs/gmxlib/gpu_utils/gpu_macros.h"
 #include "gromacs/legacyheaders/types/hw_info.h"
 #include "gromacs/legacyheaders/types/simple.h"
-
-#ifndef GMX_GPU
-typedef int ocl_gpu_id_t;
-typedef int ocl_vendor_id_t;
-#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -55,48 +56,160 @@ extern "C" {
 
 struct gmx_gpu_info_t;
 
+/*! \brief Detect all GPUs in the system.
+ *
+ *  Will detect every GPU supported by the device driver in use. Also
+ *  check for the compatibility of each and fill the gpu_info->gpu_dev array
+ *  with the required information on each the device: ID, device properties,
+ *  status.
+ *
+ *  \param[in] gpu_info    pointer to structure holding GPU information.
+ *  \param[out] err_str    The error message of any GPU API error that caused
+ *                         the detection to fail (if there was any). The memory
+ *                         the pointer points to should be managed externally.
+ *  \returns               non-zero if the detection encountered a failure, zero otherwise.
+ */
 GPU_FUNC_QUALIFIER
 int detect_gpus(struct gmx_gpu_info_t gmx_unused *gpu_info, char gmx_unused *err_str) GPU_FUNC_TERM_WITH_RETURN(-1)
 
+/*! \brief Select the compatible GPUs
+ *
+ * This function selects the compatible gpus and initializes
+ * gpu_info->dev_use and gpu_info->n_dev_use.
+ *
+ * Given the list of GPUs available in the system check each device in
+ * gpu_info->gpu_dev and place the indices of the compatible GPUs into
+ * dev_use with this marking the respective GPUs as "available for use."
+ * Note that \p detect_gpus must have been called before.
+ *
+ * \param[in]     gpu_info    pointer to structure holding GPU information
+ * \param[in,out] gpu_opt     pointer to structure holding GPU options
+ */
 GPU_FUNC_QUALIFIER
 void pick_compatible_gpus(const struct gmx_gpu_info_t gmx_unused *gpu_info,
                           gmx_gpu_opt_t gmx_unused        *gpu_opt) GPU_FUNC_TERM
 
+/*! \brief Check the existence/compatibility of a set of GPUs specified by their device IDs.
+ *
+ * Given the a list of gpu_opt->n_dev_use GPU device IDs stored in
+ * gpu_opt->dev_use check the existence and compatibility
+ * of the respective GPUs. Also provide the caller with an array containing
+ * the result of checks in \p checkres.
+ *
+ * \param[out]  checkres    check result for each ID passed in requested_devs
+ * \param[in]   gpu_info    pointer to structure holding GPU information
+ * \param[out]  gpu_opt     pointer to structure holding GPU options
+ * \returns                 TRUE if every the requested GPUs are compatible
+ */
 GPU_FUNC_QUALIFIER
 gmx_bool check_selected_gpus(int gmx_unused                  *checkres,
                              const struct gmx_gpu_info_t gmx_unused *gpu_info,
                              gmx_gpu_opt_t gmx_unused        *gpu_opt) GPU_FUNC_TERM_WITH_RETURN(-1)
 
+/*! \brief Frees the gpu_dev and dev_use array fields of \p gpu_info.
+ *
+ * \param[in]    gpu_info    pointer to structure holding GPU information
+ */
 GPU_FUNC_QUALIFIER
 void free_gpu_info(const struct gmx_gpu_info_t gmx_unused *gpu_info) GPU_FUNC_TERM
 
+/*! \brief Initializes the GPU with the given index.
+ *
+ * The varible \p mygpu is the index of the GPU to initialize in the
+ * gpu_info.gpu_dev array.
+ *
+ * \param[out] fplog        log file to write to
+ * \param[in]  mygpu        index of the GPU to initialize
+ * \param[out] result_str   the message related to the error that occurred
+ *                          during the initialization (if there was any).
+ * \param[in] gpu_info      GPU info of all detected devices in the system.
+ * \param[in] gpu_opt       options for using the GPUs in gpu_info
+ * \returns                 true if no error occurs during initialization.
+ */
 GPU_FUNC_QUALIFIER
-gmx_bool init_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
+gmx_bool init_gpu(FILE gmx_unused *fplog, int gmx_unused mygpu, char gmx_unused *result_str,
                   const struct gmx_gpu_info_t gmx_unused *gpu_info,
                   const gmx_gpu_opt_t gmx_unused *gpu_opt) GPU_FUNC_TERM_WITH_RETURN(-1)
 
+/*! \brief Frees up the CUDA GPU used by the active context at the time of calling.
+ *
+ * The context is explicitly destroyed and therefore all data uploaded to the GPU
+ * is lost. This should only be called when none of this data is required anymore.
+ *
+ * \param[in]  mygpu        index of the GPU clean up for
+ * \param[out] result_str   the message related to the error that occurred
+ *                          during the initialization (if there was any).
+ * \param[in] gpu_info      GPU info of all detected devices in the system.
+ * \param[in] gpu_opt       options for using the GPUs in gpu_info
+ * \returns                 true if no error occurs during the freeing.
+ */
 CUDA_FUNC_QUALIFIER
-gmx_bool free_cuda_gpu(char gmx_unused *result_str) CUDA_FUNC_TERM_WITH_RETURN(-1)
+gmx_bool free_cuda_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
+                       const gmx_gpu_info_t gmx_unused *gpu_info,
+                       const gmx_gpu_opt_t gmx_unused *gpu_opt) CUDA_FUNC_TERM_WITH_RETURN(-1)
 
-/*! \brief Returns the device ID of the GPU currently in use.*/
+/*! \brief Returns the device ID of the CUDA GPU currently in use.
+ *
+ * The GPU used is the one that is active at the time of the call in the active context.
+ *
+ * \returns                 device ID of the GPU in use at the time of the call
+ */
 CUDA_FUNC_QUALIFIER
 int get_current_cuda_gpu_device_id(void) CUDA_FUNC_TERM_WITH_RETURN(-1)
 
+/*! \brief Returns the device ID of the CUDA GPU with a given index into the array of used GPUs.
+ *
+ * Getter function which, given an index into the array of GPUs in use
+ * (dev_use) -- typically a tMPI/MPI rank --, returns the device ID of the
+ * respective CUDA GPU.
+ *
+ * \param[in]    gpu_info   pointer to structure holding GPU information
+ * \param[in]    gpu_opt    pointer to structure holding GPU options
+ * \param[in]    index      index into the array of used GPUs
+ * \returns                 device ID of the requested GPU
+ */
 CUDA_FUNC_QUALIFIER
 int get_cuda_gpu_device_id(const struct gmx_gpu_info_t gmx_unused *gpu_info,
                            const gmx_gpu_opt_t gmx_unused  *gpu_opt,
                            int gmx_unused                   index) CUDA_FUNC_TERM_WITH_RETURN(-1)
 
+/*! \brief Returns the name for the OpenCL GPU with a given index into the array of used GPUs.
+ *
+ * Getter function which, given an index into the array of GPUs in use
+ * (dev_use) -- typically a tMPI/MPI rank --, returns the device name for the
+ * respective OpenCL GPU.
+ *
+ * \param[in]    gpu_info   Pointer to structure holding GPU information
+ * \param[in]    gpu_opt    Pointer to structure holding GPU options
+ * \param[in]    idx        Index into the array of used GPUs
+ * \returns                 A string with the name of the requested OpenCL GPU
+ */
 OPENCL_FUNC_QUALIFIER
 char* get_ocl_gpu_device_name(const gmx_gpu_info_t gmx_unused *gpu_info,
-                              const gmx_gpu_opt_t gmx_unused *gpu_opt,
-                              int gmx_unused                  idx) OPENCL_FUNC_TERM_WITH_RETURN(NULL)
+                              const gmx_gpu_opt_t gmx_unused  *gpu_opt,
+                              int gmx_unused                   idx) OPENCL_FUNC_TERM_WITH_RETURN(NULL)
 
+/*! \brief Formats and returns a device information string for a given GPU.
+ *
+ * Given an index *directly* into the array of available GPUs (gpu_dev)
+ * returns a formatted info string for the respective GPU which includes
+ * ID, name, compute capability, and detection status.
+ *
+ * \param[out]  s           pointer to output string (has to be allocated externally)
+ * \param[in]   gpu_info    pointer to structure holding GPU information
+ * \param[in]   index       an index *directly* into the array of available GPUs
+ */
 GPU_FUNC_QUALIFIER
 void get_gpu_device_info_string(char gmx_unused *s,
                                 const struct gmx_gpu_info_t gmx_unused *gpu_info,
                                 int gmx_unused index) GPU_FUNC_TERM
 
+/*! \brief Returns the size of the gpu_dev_info struct.
+ *
+ * The size of gpu_dev_info can be used for allocation and communication.
+ *
+ * \returns                 size in bytes of gpu_dev_info
+ */
 GPU_FUNC_QUALIFIER
 size_t sizeof_gpu_dev_info(void) GPU_FUNC_TERM_WITH_RETURN(0)
 

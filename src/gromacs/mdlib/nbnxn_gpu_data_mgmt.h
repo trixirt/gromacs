@@ -32,10 +32,16 @@
  * To help us fund GROMACS development, we humbly ask that you cite
  * the research papers on the package. Check out http://www.gromacs.org.
  */
+/*! \libinternal \file
+ *  \brief Declare interface for GPU data transfer for NBNXN module
+ *
+ *  \author Mark Abraham <mark.j.abraham@gmail.com>
+ *  \ingroup module_mdlib
+ *  \inlibraryapi
+ */
+
 #ifndef NBNXN_GPU_DATA_MGMT_H
 #define NBNXN_GPU_DATA_MGMT_H
-
-#include "config.h"
 
 #include "gromacs/gmxlib/gpu_utils/gpu_macros.h"
 #include "gromacs/legacyheaders/types/hw_info.h"
@@ -55,39 +61,41 @@ struct gmx_gpu_info_t;
 
 /** Initializes the data structures related to GPU nonbonded calculations. */
 GPU_FUNC_QUALIFIER
-void nbnxn_gpu_init(FILE gmx_unused                 *fplog,
-                    gmx_nbnxn_gpu_t gmx_unused **p_nb,
+void nbnxn_gpu_init(FILE gmx_unused                        *fplog,
+                    gmx_nbnxn_gpu_t gmx_unused            **p_nb,
                     const struct gmx_gpu_info_t gmx_unused *gpu_info,
-                    const gmx_gpu_opt_t gmx_unused  *gpu_opt,
-                    int gmx_unused                   my_gpu_index,
+                    const gmx_gpu_opt_t gmx_unused         *gpu_opt,
+                    int gmx_unused                          my_gpu_index,
                     /* true of both local and non-local are don on GPU */
-                    gmx_bool gmx_unused              bLocalAndNonlocal) GPU_FUNC_TERM
+                    gmx_bool gmx_unused                     bLocalAndNonlocal) GPU_FUNC_TERM
 
 /** Initializes simulation constant data. */
 GPU_FUNC_QUALIFIER
-void nbnxn_gpu_init_const(gmx_nbnxn_gpu_t gmx_unused *nb,
+void nbnxn_gpu_init_const(gmx_nbnxn_gpu_t gmx_unused                       *nb,
                           const interaction_const_t      gmx_unused        *ic,
                           const struct nonbonded_verlet_group_t gmx_unused *nbv_group) GPU_FUNC_TERM
 
 /** Initializes pair-list data for GPU, called at every pair search step. */
 GPU_FUNC_QUALIFIER
-void nbnxn_gpu_init_pairlist(gmx_nbnxn_gpu_t gmx_unused *nb,
+void nbnxn_gpu_init_pairlist(gmx_nbnxn_gpu_t gmx_unused               *nb,
                              const struct nbnxn_pairlist_t gmx_unused *h_nblist,
                              int                    gmx_unused         iloc) GPU_FUNC_TERM
 
 /** Initializes atom-data on the GPU, called at every pair search step. */
 GPU_FUNC_QUALIFIER
-void nbnxn_gpu_init_atomdata(gmx_nbnxn_gpu_t gmx_unused *nb,
+void nbnxn_gpu_init_atomdata(gmx_nbnxn_gpu_t gmx_unused               *nb,
                              const struct nbnxn_atomdata_t gmx_unused *nbat) GPU_FUNC_TERM
 
-/*! \brief Update parameters during PP-PME load balancing. */
+/*! \brief Re-generate the GPU Ewald force table, resets rlist, and update the
+ *  electrostatic type switching to twin cut-off (or back) if needed.
+ */
 GPU_FUNC_QUALIFIER
 void nbnxn_gpu_pme_loadbal_update_param(const struct nonbonded_verlet_t gmx_unused *nbv,
                                         const interaction_const_t gmx_unused       *ic) GPU_FUNC_TERM
 
 /** Uploads shift vector to the GPU if the box is dynamic (otherwise just returns). */
 GPU_FUNC_QUALIFIER
-void nbnxn_gpu_upload_shiftvec(gmx_nbnxn_gpu_t gmx_unused *nb,
+void nbnxn_gpu_upload_shiftvec(gmx_nbnxn_gpu_t gmx_unused               *nb,
                                const struct nbnxn_atomdata_t gmx_unused *nbatom) GPU_FUNC_TERM
 
 /** Clears GPU outputs: nonbonded force, shift force and energy. */

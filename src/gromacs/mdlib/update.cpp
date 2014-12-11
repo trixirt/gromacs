@@ -1499,6 +1499,10 @@ static void combine_forces(gmx_update_t upd,
                 {
                     xp[i][d] = state->x[i][d] + fac*f_lr[i][d]*md->invmass[i];
                 }
+                else
+                {
+                    xp[i][d] = state->x[i][d];
+                }
             }
         }
         constrain(NULL, FALSE, FALSE, constr, idef, ir, NULL, cr, step, 0, 1.0, md,
@@ -1753,9 +1757,10 @@ void update_constraints(FILE             *fplog,
         }
         else
         {
+#ifndef __clang_analyzer__
             // cppcheck-suppress unreadVariable
             nth = gmx_omp_nthreads_get(emntUpdate);
-
+#endif
 #pragma omp parallel for num_threads(nth) schedule(static)
             for (i = start; i < nrend; i++)
             {
