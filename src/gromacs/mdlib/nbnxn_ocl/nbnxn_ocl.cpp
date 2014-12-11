@@ -36,6 +36,8 @@
  *  \brief Define OpenCL implementation of nbnxn_gpu.h
  *
  *  \author Anca Hamuraru <anca@streamcomputing.eu>
+ *  \author Teemu Virolainen <teemu@streamcomputing.eu> 
+ *  \author Dimitrios Karkoulis <dimitris.karkoulis@gmail.com> 
  *  \ingroup module_mdlib
  */
 #include "gmxpre.h"

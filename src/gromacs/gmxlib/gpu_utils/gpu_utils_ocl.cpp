@@ -36,6 +36,8 @@
  *  \brief Define functions for detection and initialization for OpenCL devices.
  *
  *  \author Anca Hamuraru <anca@streamcomputing.eu>
+ *  \author Dimitrios Karkoulis <dimitris.karkoulis@gmail.com>
+ *  \author Teemu Virolainen <teemu@streamcomputing.eu>
  */
 
 #include "gmxpre.h"

@@ -35,7 +35,7 @@
 /*! \internal \file
  *  \brief Defines functions that support JIT compilation (e.g. for OpenCL)
  *
- *  \author Anca Hamuraru <anca@streamcomputing.eu>
+ *  \author Dimitrios Karkoulis <dimitris.karkoulis@gmail.com>
  *  \author Mark Abraham <mark.j.abraham@gmail.com>
  *  \ingroup module_mdlib
  */

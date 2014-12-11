@@ -35,7 +35,9 @@
 /*! \file
  *  \brief Declare infrastructure for OpenCL JIT compilation for Gromacs
  *
+ *  \author Dimitrios Karkoulis <dimitris.karkoulis@gmail.com>
  *  \author Anca Hamuraru <anca@streamcomputing.eu>
+ *  \author Teemu Virolainen <teemu@streamcomputing.eu>
  *
  * TODO Currently this file handles compilation of NBNXN kernels,
  * but e.g. organizing the defines for various physics models
