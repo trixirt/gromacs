@@ -157,7 +157,7 @@ contexts.
 
 To make it possible to use other accelerators, Gromacs also includes
 OpenCL support. The current version works with NVIDIA GPUs and
-GCN based AMD GPUs.
+GCN based AMD GPUs. The minimum OpenCL version required is 1.1
 
 ### MPI support ###
 
