@@ -46,7 +46,7 @@
 #include <cassert>
 
 #include "gromacs/gmxlib/gpu_utils/gpu_utils.h"
-#include "gromacs/gmxlib/gpu_utils/ocl_compiler.hpp"
+#include "gromacs/gmxlib/gpu_utils/ocl_compiler.h"
 #include "gromacs/legacyheaders/types/enums.h"
 #include "gromacs/legacyheaders/types/interaction_const.h"
 #include "gromacs/mdlib/nbnxn_gpu.h"

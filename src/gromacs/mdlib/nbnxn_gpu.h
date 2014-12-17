@@ -64,7 +64,7 @@ struct nbnxn_atomdata_t;
  *  separate streams.
  */
 GPU_FUNC_QUALIFIER
-void nbnxn_gpu_launch_kernel(gmx_nbnxn_gpu_t *gmx_unused               nb,
+void nbnxn_gpu_launch_kernel(gmx_nbnxn_gpu_t gmx_unused               *nb,
                              const struct nbnxn_atomdata_t gmx_unused *nbdata,
                              int                    gmx_unused         flags,
                              int                    gmx_unused         iloc) GPU_FUNC_TERM
@@ -74,7 +74,7 @@ void nbnxn_gpu_launch_kernel(gmx_nbnxn_gpu_t *gmx_unused               nb,
  * (and energies/shift forces if required).
  */
 GPU_FUNC_QUALIFIER
-void nbnxn_gpu_launch_cpyback(gmx_nbnxn_gpu_t *gmx_unused               nb,
+void nbnxn_gpu_launch_cpyback(gmx_nbnxn_gpu_t  gmx_unused              *nb,
                               const struct nbnxn_atomdata_t gmx_unused *nbatom,
                               int                    gmx_unused         flags,
                               int                    gmx_unused         aloc) GPU_FUNC_TERM
@@ -84,7 +84,7 @@ void nbnxn_gpu_launch_cpyback(gmx_nbnxn_gpu_t *gmx_unused               nb,
  * transfers to finish.
  */
 GPU_FUNC_QUALIFIER
-void nbnxn_gpu_wait_for_gpu(gmx_nbnxn_gpu_t *gmx_unused               nb,
+void nbnxn_gpu_wait_for_gpu(gmx_nbnxn_gpu_t gmx_unused               *nb,
                             const struct nbnxn_atomdata_t gmx_unused *nbatom,
                             int                    gmx_unused         flags,
                             int                    gmx_unused         aloc,

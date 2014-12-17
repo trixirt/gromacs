@@ -47,7 +47,7 @@ find_package(OpenCL REQUIRED)
 #But if it was not required consider handling the cases where:
 #1) nothing was found (mark something as off and jump out)
 #2) OpenCL library was found, but not the headers. Ask the use to install an SDK/Opencl dev package
-  
+
 message(STATUS "OPENCL_INCLUDE_DIRS: " "${OPENCL_INCLUDE_DIRS} ")
 message(STATUS "OPENCL_LIBRARIES: " "${OPENCL_LIBRARIES} ")
 # detect OpenCL devices in the build host machine
@@ -56,10 +56,10 @@ message(STATUS "OPENCL_LIBRARIES: " "${OPENCL_LIBRARIES} ")
 #if (NOT GMX_OPENCL_DETECTION_DONE)
 #	include(gmxDetectGpu)
 #	if (WIN32 OR UNIX)
-#		gmx_find_OpenCL()		
-#	else()		
+#		gmx_find_OpenCL()
+#	else()
 #		gmx_detect_OpenCL()
-#	endif()    
+#	endif()
 #endif()
 
 #Now configure options
@@ -72,16 +72,16 @@ message(STATUS "Setting OpenCL specific options")
 
 if(GMX_OPENCL_FORCE_CL11_API)
     set(OPENCL_DEFINITIONS "-DCL_USE_DEPRECATED_OPENCL_1_1_APIS")
-endif(GMX_OPENCL_FORCE_CL11_API) 
-    
+endif(GMX_OPENCL_FORCE_CL11_API)
+
 if(UNIX AND GMX_OPENCL_HIDE_COMMENT_WARNING)
     set(OPENCL_DEFINITIONS ${OPENCL_DEFINITIONS} " -Wno-comment")
 endif()
 
 add_definitions(${OPENCL_DEFINITIONS})
-include_directories(${OPENCL_INCLUDE_DIRS})    
-    
-message(STATUS "OpenCL lib: " ${OPENCL_LIBRARIES} ", PATH: " ${OPENCL_INCLUDE_DIRS} ", DEFINITIONS: " ${OPENCL_DEFINITIONS})            
+include_directories(${OPENCL_INCLUDE_DIRS})
+
+message(STATUS "OpenCL lib: " ${OPENCL_LIBRARIES} ", PATH: " ${OPENCL_INCLUDE_DIRS} ", DEFINITIONS: " ${OPENCL_DEFINITIONS})
 
 macro(gmx_gpu_setup)
     # no OpenMP is no good!

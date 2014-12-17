@@ -182,15 +182,8 @@ else()
         include(gmxManageOpenCL)
     else(GMX_GPU)
         message(FATAL_ERROR "OpenCL requested but GPU option is not enabled (try -DGMX_GPU=on) ")
-    endif(GMX_GPU)    
+    endif(GMX_GPU)
 endif()
-
-# Detect the architecture the compiler is targetting, detect
-# SIMD instructions possibilities on that hardware, suggest SIMD instruction set
-# to use if none is specified, and populate the cache option for CPU
-# SIMD.
-include(gmxDetectTargetArchitecture)
-gmx_detect_target_architecture()
 
 if(GMX_CPU_ACCELERATION)
     # Stay compatible with old Jenkins command line options for specific SIMD acceleration

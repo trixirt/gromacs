@@ -39,8 +39,8 @@
  *  \author Mark Abraham <mark.j.abraham@gmail.com>
  */
 
-#ifndef GMX_MDLIB_NBNXN_OCL_JIT_SUPPORT_H
-#define GMX_MDLIB_NBNXN_OCL_JIT_SUPPORT_H
+#ifndef GMX_MDLIB_NBNXN_GPU_JIT_SUPPORT_H
+#define GMX_MDLIB_NBNXN_GPU_JIT_SUPPORT_H
 
 #include "gromacs/gmxlib/gpu_utils/gpu_macros.h"
 #include "gromacs/legacyheaders/types/hw_info.h"

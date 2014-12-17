@@ -637,6 +637,7 @@ const char *Program(void)
     GMX_CATCH_ALL_AND_EXIT_WITH_FATAL_ERROR;
 }
 
+
 extern void gmx_print_version_info_cuda_gpu(FILE *fp);
 
 static void gmx_print_version_info(FILE *fp)

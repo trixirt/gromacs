@@ -45,6 +45,8 @@
  */
 #include "gmxpre.h"
 
+#include "ocl_compiler.h"
+
 #include "config.h"
 
 #include <assert.h>
@@ -52,7 +54,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "gromacs/gmxlib/gpu_utils/ocl_compiler.hpp"
+#include <string>
+
+#include "gromacs/utility/stringutil.h"
 
 /* This path is defined by CMake and it depends on the install prefix option.
    The opencl kernels are installed in bin/opencl.*/
@@ -565,15 +569,12 @@ handle_ocl_build_log(
         cl_int                build_status,
         kernel_source_index_t kernel_src_id)
 {
-    bool dumpFile   = false;
     bool dumpStdErr = false;
+    bool dumpFile;
 #ifdef NDEBUG
-    if (build_status != CL_SUCCESS)
-    {
-        dumpFile = true;
-    }
+    dumpFile   = (build_status != CL_SUCCESS);
 #else
-    dumpFile = true;
+    dumpFile   = true;
     if (build_status != CL_SUCCESS)
     {
         dumpStdErr = true;
@@ -597,23 +598,17 @@ handle_ocl_build_log(
         const char *success_header       = "Compilation of source file was successful! \n";
         const char *log_header           = "--------------LOG START---------------\n";
         const char *log_footer           = "---------------LOG END----------------\n";
-        char        status_suffix[10];
         char       *build_info;
-        char       *log_fname            = NULL;
+        std::string log_fname;
 
         build_info = (char*)malloc(32 + strlen(build_options_string) );
         sprintf(build_info, "-- Used build options: %s\n", build_options_string);
 
         if (dumpFile)
         {
-            strncpy(status_suffix, (build_status == CL_SUCCESS) ? "SUCCEEDED" : "FAILED", 10);
-
-            log_fname = (char*)malloc(strlen(kernel_filenames[kernel_src_id])
-                                      + strlen(status_suffix) + 2
-                                      );
-
-            sprintf(log_fname, "%s.%s", kernel_filenames[kernel_src_id], status_suffix);
-            build_log_file = fopen(log_fname, "w");
+            log_fname = gmx::formatString("%s.%s", kernel_filenames[kernel_src_id],
+                                          (build_status == CL_SUCCESS) ? "SUCCEEDED" : "FAILED");
+            build_log_file = fopen(log_fname.c_str(), "w");
         }
 
         size_t complete_message_size = 0;
@@ -638,13 +633,10 @@ handle_ocl_build_log(
             if (build_log_file)
             {
                 fprintf(build_log_file, "%s", complete_message);
+                fclose(build_log_file);
             }
 
-            fclose(build_log_file);
-
-            printf("The OpenCL compilation log has been saved in \"%s\"\n", log_fname);
-
-            free(log_fname);
+            printf("The OpenCL compilation log has been saved in \"%s\"\n", log_fname.c_str());
         }
         if (dumpStdErr)
         {
@@ -771,7 +763,7 @@ check_ocl_cache(char            *ocl_binary_filename,
                 size_t          *ocl_binary_size,
                 unsigned char  **ocl_binary)
 {
-    FILE *f;
+    FILE  *f;
     size_t read_count;
 
     f = fopen(ocl_binary_filename, "rb");
@@ -788,7 +780,9 @@ check_ocl_cache(char            *ocl_binary_filename,
     fclose(f);
 
     if (read_count != (*ocl_binary_size))
+    {
         return false;
+    }
 
     // TODO: Compare current build options and code against the builds options
     // and the code corresponding to the cache. If any change is detected this

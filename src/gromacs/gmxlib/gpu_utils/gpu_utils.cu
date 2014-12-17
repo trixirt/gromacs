@@ -408,7 +408,7 @@ static gmx_bool reset_gpu_application_clocks(const gmx_device_info_t gmx_unused 
 #endif /*HAVE_NVML*/
 }
 
-
+//! This function is documented in the header file
 gmx_bool init_gpu(FILE gmx_unused *fplog, int mygpu, char *result_str,
                   const gmx_gpu_info_t *gpu_info,
                   const gmx_gpu_opt_t *gpu_opt)
@@ -446,6 +446,7 @@ gmx_bool init_gpu(FILE gmx_unused *fplog, int mygpu, char *result_str,
     return (stat == cudaSuccess);
 }
 
+//! This function is documented in the header file
 gmx_bool free_cuda_gpu(
         int gmx_unused mygpu, char *result_str,
         const gmx_gpu_info_t gmx_unused *gpu_info,
@@ -551,6 +552,7 @@ static int is_gmx_supported_gpu_id(int dev_id, cudaDeviceProp *dev_prop)
 }
 
 
+//! This function is documented in the header file
 int detect_gpus(gmx_gpu_info_t *gpu_info, char *err_str)
 {
     int                i, ndev, checkres, retval;
@@ -604,6 +606,7 @@ int detect_gpus(gmx_gpu_info_t *gpu_info, char *err_str)
     return retval;
 }
 
+//! This function is documented in the header file
 void pick_compatible_gpus(const gmx_gpu_info_t *gpu_info,
                           gmx_gpu_opt_t        *gpu_opt)
 {
@@ -631,6 +634,7 @@ void pick_compatible_gpus(const gmx_gpu_info_t *gpu_info,
     sfree(compat);
 }
 
+//! This function is documented in the header file
 gmx_bool check_selected_gpus(int                  *checkres,
                              const gmx_gpu_info_t *gpu_info,
                              gmx_gpu_opt_t        *gpu_opt)
@@ -669,6 +673,7 @@ gmx_bool check_selected_gpus(int                  *checkres,
     return bAllOk;
 }
 
+//! This function is documented in the header file
 void free_gpu_info(const gmx_gpu_info_t *gpu_info)
 {
     if (gpu_info == NULL)
@@ -679,6 +684,7 @@ void free_gpu_info(const gmx_gpu_info_t *gpu_info)
     sfree(gpu_info->gpu_dev);
 }
 
+//! This function is documented in the header file
 void get_gpu_device_info_string(char *s, const gmx_gpu_info_t *gpu_info, int index)
 {
     assert(s);
@@ -711,6 +717,7 @@ void get_gpu_device_info_string(char *s, const gmx_gpu_info_t *gpu_info, int ind
     }
 }
 
+//! This function is documented in the header file
 int get_cuda_gpu_device_id(const gmx_gpu_info_t *gpu_info,
                            const gmx_gpu_opt_t  *gpu_opt,
                            int                   idx)
@@ -722,6 +729,7 @@ int get_cuda_gpu_device_id(const gmx_gpu_info_t *gpu_info,
     return gpu_info->gpu_dev[gpu_opt->dev_use[idx]].id;
 }
 
+//! This function is documented in the header file
 int get_current_cuda_gpu_device_id(void)
 {
     int gpuid;
@@ -730,11 +738,13 @@ int get_current_cuda_gpu_device_id(void)
     return gpuid;
 }
 
+//! This function is documented in the header file
 size_t sizeof_gpu_dev_info(void)
 {
     return sizeof(gmx_device_info_t);
 }
 
+//! This function is documented in the header file
 void gpu_set_host_malloc_and_free(bool               bUseGpuKernels,
                                   gmx_host_alloc_t **nb_alloc,
                                   gmx_host_free_t  **nb_free)

@@ -50,7 +50,7 @@
 #include <memory.h>
 
 #include "gromacs/gmxlib/gpu_utils/gpu_utils.h"
-#include "gromacs/gmxlib/gpu_utils/ocl_compiler.hpp"
+#include "gromacs/gmxlib/gpu_utils/ocl_compiler.h"
 #include "gromacs/gmxlib/ocl_tools/oclutils.h"
 #include "gromacs/legacyheaders/types/enums.h"
 #include "gromacs/legacyheaders/types/hw_info.h"
@@ -492,7 +492,7 @@ size_t sizeof_gpu_dev_info(void)
  */
 cl_int dbg_ocl_kernel_name(const cl_kernel kernel)
 {
-    cl_int cl_error = CL_SUCCESS;
+    cl_int cl_error;
     char   kernel_name[256];
     cl_error = clGetKernelInfo(kernel, CL_KERNEL_FUNCTION_NAME,
                                sizeof(kernel_name), &kernel_name, NULL);
@@ -514,7 +514,7 @@ cl_int dbg_ocl_kernel_name(const cl_kernel kernel)
  */
 cl_int dbg_ocl_kernel_name_address(void* kernel)
 {
-    cl_int cl_error = CL_SUCCESS;
+    cl_int cl_error;
     char   kernel_name[256];
     cl_error = clGetKernelInfo((cl_kernel)kernel, CL_KERNEL_FUNCTION_NAME,
                                sizeof(kernel_name), &kernel_name, NULL);

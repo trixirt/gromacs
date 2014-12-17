@@ -39,7 +39,7 @@
 /* !Cannot inline!
  * AMD OpenCL compiler will fail with exotic message
  * "Error: Undeclared function index 1024" if make_float4
- * is inlined (nbnxnx_ocl_kernel_nvidia.clh call in line 375). 
+ * is inlined (nbnxnx_ocl_kernel_nvidia.clh call in line 375).
  */
 
 #define _VECTYPE_OPS_INLINE_
@@ -47,7 +47,7 @@
 #if defined(_VECTYPE_OPS_INLINE_)
 #define _INLINE_ inline
 #else
-#define _INLINE_ 
+#define _INLINE_
 #endif
 
 /**** float3 ****/
@@ -87,7 +87,7 @@ _INLINE_ void atomicAdd_l_f(volatile __local float *addr, float val)
 	current.f32    = *addr;
     do{
   	    expected.f32 = current.f32;
-        next.f32     = expected.f32 + val;		
+        next.f32     = expected.f32 + val;
 		current.u32  = atomic_cmpxchg( (volatile __local unsigned int *)addr, expected.u32, next.u32);
     } while( current.u32 != expected.u32 );
 }
@@ -106,7 +106,7 @@ _INLINE_ void atomicAdd_g_f(volatile __global float *addr, float val)
 	current.f32    = *addr;
     do{
 	    expected.f32 = current.f32;
-        next.f32     = expected.f32 + val;		
+        next.f32     = expected.f32 + val;
 		current.u32  = atomic_cmpxchg( (volatile __global unsigned int *)addr, expected.u32, next.u32);
     } while( current.u32 != expected.u32 );
 }

@@ -465,7 +465,7 @@ static void do_nb_verlet(t_forcerec *fr,
 {
     int                        enr_nbnxn_kernel_ljc, enr_nbnxn_kernel_lj;
     nonbonded_verlet_group_t  *nbvg;
-    gmx_bool                   bCUDA;
+    gmx_bool                   bUsingGpuKernels;
 
     if (!(flags & GMX_FORCE_NONBONDED))
     {
@@ -475,15 +475,15 @@ static void do_nb_verlet(t_forcerec *fr,
 
     nbvg = &fr->nbv->grp[ilocality];
 
-    /* CUDA kernel launch overhead is already timed separately */
+    /* GPU kernel launch overhead is already timed separately */
     if (fr->cutoff_scheme != ecutsVERLET)
     {
         gmx_incons("Invalid cut-off scheme passed!");
     }
 
-    bCUDA = (nbvg->kernel_type == nbnxnk8x8x8_CUDA);
+    bUsingGpuKernels = (nbvg->kernel_type == nbnxnk8x8x8_GPU);
 
-    if (!bCUDA)
+    if (!bUsingGpuKernels)
     {
         wallcycle_sub_start(wcycle, ewcsNONBONDED);
     }
@@ -529,7 +529,7 @@ static void do_nb_verlet(t_forcerec *fr,
                                    enerd->grpp.ener[egLJSR]);
             break;
 
-        case nbnxnk8x8x8_CUDA:
+        case nbnxnk8x8x8_GPU:
             nbnxn_gpu_launch_kernel(fr->nbv->gpu_nbv, nbvg->nbat, flags, ilocality);
             break;
 
@@ -551,7 +551,7 @@ static void do_nb_verlet(t_forcerec *fr,
             gmx_incons("Invalid nonbonded kernel type passed!");
 
     }
-    if (!bCUDA)
+    if (!bUsingGpuKernels)
     {
         wallcycle_sub_stop(wcycle, ewcsNONBONDED);
     }
@@ -560,13 +560,8 @@ static void do_nb_verlet(t_forcerec *fr,
     {
         enr_nbnxn_kernel_ljc = eNR_NBNXN_LJ_RF;
     }
-#if defined(GMX_GPU) && defined(GMX_USE_OPENCL)
-    else if ((!bCUDA && nbvg->ewald_excl == ewaldexclAnalytical) ||
-             (bCUDA && nbnxn_gpu_is_kernel_ewald_analytical(fr->nbv->gpu_nbv)))
-#else
-    else if ((!bCUDA && nbvg->ewald_excl == ewaldexclAnalytical) ||
-             (bCUDA && nbnxn_gpu_is_kernel_ewald_analytical(fr->nbv->gpu_nbv)))
-#endif
+    else if ((!bUsingGpuKernels && nbvg->ewald_excl == ewaldexclAnalytical) ||
+             (bUsingGpuKernels && nbnxn_gpu_is_kernel_ewald_analytical(fr->nbv->gpu_nbv)))
     {
         enr_nbnxn_kernel_ljc = eNR_NBNXN_LJ_EWALD;
     }
@@ -1016,7 +1011,7 @@ void do_force_cutsVERLET(FILE *fplog, t_commrec *cr,
 
             wallcycle_sub_stop(wcycle, ewcsNBS_SEARCH_NONLOCAL);
 
-            if (nbv->grp[eintNonlocal].kernel_type == nbnxnk8x8x8_CUDA)
+            if (nbv->grp[eintNonlocal].kernel_type == nbnxnk8x8x8_GPU)
             {
                 /* initialize non-local pair-list on the GPU */
                 nbnxn_gpu_init_pairlist(nbv->gpu_nbv,
@@ -1388,12 +1383,8 @@ void do_force_cutsVERLET(FILE *fplog, t_commrec *cr,
             cycles_force    += cycles_wait_est;
             cycles_wait_gpu += cycles_wait_est;
 
-            /* now clear the GPU outputs while we finish the step on the CPU */
-
-            wallcycle_start_nocount(wcycle, ewcLAUNCH_GPU_NB);
-            nbnxn_gpu_clear_outputs(nbv->gpu_nbv, flags);
-            wallcycle_stop(wcycle, ewcLAUNCH_GPU_NB);
 #elif defined(GMX_GPU) && defined(GMX_USE_OPENCL)
+
             wallcycle_start(wcycle, ewcWAIT_GPU_NB_L);
             nbnxn_gpu_wait_for_gpu(nbv->gpu_nbv,
                                    nbv->grp[eintLocal].nbat,
@@ -1401,12 +1392,12 @@ void do_force_cutsVERLET(FILE *fplog, t_commrec *cr,
                                    enerd->grpp.ener[egLJSR], enerd->grpp.ener[egCOULSR],
                                    fr->fshift);
             cycles_wait_gpu += wallcycle_stop(wcycle, ewcWAIT_GPU_NB_L);
+#endif
 
             /* now clear the GPU outputs while we finish the step on the CPU */
             wallcycle_start_nocount(wcycle, ewcLAUNCH_GPU_NB);
             nbnxn_gpu_clear_outputs(nbv->gpu_nbv, flags);
             wallcycle_stop(wcycle, ewcLAUNCH_GPU_NB);
-#endif
         }
         else
         {

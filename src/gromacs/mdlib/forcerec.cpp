@@ -1702,7 +1702,7 @@ const char *lookup_nbnxn_kernel_name(int kernel_type)
             returnvalue = "not available";
 #endif /* GMX_NBNXN_SIMD */
             break;
-        case nbnxnk8x8x8_CUDA: returnvalue   = "CUDA"; break;
+        case nbnxnk8x8x8_GPU: returnvalue    = "GPU"; break;
         case nbnxnk8x8x8_PlainC: returnvalue = "plain C"; break;
 
         case nbnxnkNR:
@@ -1740,7 +1740,7 @@ static void pick_nbnxn_kernel(FILE                *fp,
     }
     else if (bUseGPU)
     {
-        *kernel_type = nbnxnk8x8x8_CUDA;
+        *kernel_type = nbnxnk8x8x8_GPU;
     }
 
     if (*kernel_type == nbnxnkNotSet)
@@ -1971,17 +1971,16 @@ static void potential_switch_constants(real rsw, real rc,
     sc->c5 =  -6*pow(rc - rsw, -5);
 }
 
-/*! \brief Do first stage of construction of interaction constants
+/*! \brief Construct interaction constants
  *
- * In particular, implementing JIT kernel compilation is more
- * convenient if this stage is complete. This is useful because with
- * OpenCL that compilation has to happen before they can be
- * transferred in nbnxn_gpu_init().
+ * This data is used (particularly) by search and force code for
+ * short-range interactions. Many of these are constant for the whole
+ * simulation; some are constant only after PME tuning completes.
  */
 static void
-init_interaction_const_first_stage(FILE                       *fp,
-                                   interaction_const_t       **interaction_const,
-                                   const t_forcerec           *fr)
+init_interaction_const(FILE                       *fp,
+                       interaction_const_t       **interaction_const,
+                       const t_forcerec           *fr)
 {
     interaction_const_t *ic;
     const real           minusSix          = -6.0;
@@ -2107,30 +2106,19 @@ init_interaction_const_first_stage(FILE                       *fp,
     }
 
     *interaction_const = ic;
-
-    // Note that there is further construction in
-    // init_interaction_cost_second_stage()
 }
 
-/*! \brief Do second stage of construction of interaction constants
- *
- * Some parts of the interaction constants depend on which flavour of
- * the Verlet scheme is being used at run time.
- *
- * \todo There may be a better design available here.
+/*! \brief Manage initialization within the NBNXN module of
+ * run-time constants.
  */
 static void
-init_interaction_const_second_stage(FILE                       *fp,
-                                    const t_commrec gmx_unused *cr,
-                                    interaction_const_t        *interaction_const,
-                                    const t_forcerec           *fr,
-                                    real                        rtab)
+initialize_gpu_constants(const t_commrec gmx_unused      *cr,
+                         interaction_const_t             *interaction_const,
+                         const struct nonbonded_verlet_t *nbv)
 {
-    gmx_bool bUsesSimpleTables;
-
-    if (fr->nbv != NULL && fr->nbv->bUseGPU)
+    if (nbv != NULL && nbv->bUseGPU)
     {
-        nbnxn_gpu_init_const(fr->nbv->gpu_nbv, interaction_const, fr->nbv->grp);
+        nbnxn_gpu_init_const(nbv->gpu_nbv, interaction_const, nbv->grp);
 
         /* With tMPI + GPUs some ranks may be sharing GPU(s) and therefore
          * also sharing texture references. To keep the code simple, we don't
@@ -2152,8 +2140,6 @@ init_interaction_const_second_stage(FILE                       *fp,
 #endif  /* GMX_THREAD_MPI */
     }
 
-    bUsesSimpleTables = uses_simple_tables(fr->cutoff_scheme, fr->nbv, -1);
-    init_interaction_const_tables(fp, interaction_const, bUsesSimpleTables, rtab);
 }
 
 static void init_nb_verlet(FILE                *fp,
@@ -2271,7 +2257,7 @@ static void init_nb_verlet(FILE                *fp,
 
     for (i = 0; i < nbv->ngrp; i++)
     {
-        gpu_set_host_malloc_and_free(nbv->grp[0].kernel_type == nbnxnk8x8x8_CUDA,
+        gpu_set_host_malloc_and_free(nbv->grp[0].kernel_type == nbnxnk8x8x8_GPU,
                                      &nb_alloc, &nb_free);
 
         nbnxn_init_pairlist_set(&nbv->grp[i].nbl_lists,
@@ -3254,7 +3240,7 @@ void init_forcerec(FILE              *fp,
     snew(fr->excl_load, fr->nthreads+1);
 
     /* fr->ic is used both by verlet and group kernels (to some extent) now */
-    init_interaction_const_first_stage(fp, &fr->ic, fr);
+    init_interaction_const(fp, &fr->ic, fr);
 
     if (fr->cutoff_scheme == ecutsVERLET)
     {
@@ -3266,7 +3252,10 @@ void init_forcerec(FILE              *fp,
         init_nb_verlet(fp, &fr->nbv, bFEP_NonBonded, ir, fr, cr, nbpu_opt);
     }
 
-    init_interaction_const_second_stage(fp, cr, fr->ic, fr, rtab);
+    initialize_gpu_constants(cr, fr->ic, fr->nbv);
+    init_interaction_const_tables(fp, fr->ic,
+                                  uses_simple_tables(fr->cutoff_scheme, fr->nbv, -1),
+                                  rtab);
 
     if (ir->eDispCorr != edispcNO)
     {
@@ -3341,9 +3330,9 @@ void forcerec_set_excl_load(t_forcerec           *fr,
     }
 }
 
-/* Frees GPU memory and destroys the CUDA context.
+/* Frees GPU memory and destroys the GPU context.
  *
- * Note that this function needs to be called even if CUDA GPUs are not used
+ * Note that this function needs to be called even if GPUs are not used
  * in this run because the PME ranks have no knowledge of whether GPUs
  * are used or not, but all ranks need to enter the barrier below.
  */

@@ -36,8 +36,8 @@
  *  \brief Define OpenCL implementation of nbnxn_gpu.h
  *
  *  \author Anca Hamuraru <anca@streamcomputing.eu>
- *  \author Teemu Virolainen <teemu@streamcomputing.eu> 
- *  \author Dimitrios Karkoulis <dimitris.karkoulis@gmail.com> 
+ *  \author Teemu Virolainen <teemu@streamcomputing.eu>
+ *  \author Dimitrios Karkoulis <dimitris.karkoulis@gmail.com>
  *  \ingroup module_mdlib
  */
 #include "gmxpre.h"
@@ -627,7 +627,9 @@ void dump_compare_results_cj4(nbnxn_cj4_t* results, int cnt, char* out_file, cha
         while (c != '\n')
         {
             if (1 != fscanf(pf, "%c", &c))
+            {
                 break;
+            }
         }
 
         for (int index = 0; index < cnt; index++)
@@ -637,8 +639,10 @@ void dump_compare_results_cj4(nbnxn_cj4_t* results, int cnt, char* out_file, cha
 
             for (int j = 0; j < 4; j++)
             {
-                if (1 != fscanf(pf, "%d", &ref_val))
+                if (1 != fscanf(pf, "%20d", &ref_val))
+                {
                     break;
+                }
 
                 if (ref_val != results[index].cj[j])
                 {
@@ -651,8 +655,10 @@ void dump_compare_results_cj4(nbnxn_cj4_t* results, int cnt, char* out_file, cha
 
             for (int j = 0; j < 2; j++)
             {
-                if (1 != fscanf(pf, "%d", &ref_val))
+                if (1 != fscanf(pf, "%20d", &ref_val))
+                {
                     break;
+                }
 
                 if (ref_val != results[index].imei[j].excl_ind)
                 {
@@ -662,8 +668,10 @@ void dump_compare_results_cj4(nbnxn_cj4_t* results, int cnt, char* out_file, cha
                     diff++;
                 }
 
-                if (1 != fscanf(pf, "%u", &u_ref_val))
+                if (1 != fscanf(pf, "%20u", &u_ref_val))
+                {
                     break;
+                }
 
                 if (u_ref_val != results[index].imei[j].imask)
                 {
@@ -711,8 +719,10 @@ void dump_compare_results_f(float* results, int cnt, char* out_file, char* ref_f
         for (int index = 0; index < cnt; index++)
         {
             float ref_val;
-            if (1 != fscanf(pf, "%f", &ref_val))
+            if (1 != fscanf(pf, "%20f", &ref_val))
+            {
                 break;
+            }
 
             if (((ref_val - results[index]) > cmp_eps) ||
                 ((ref_val - results[index]) < -cmp_eps))

@@ -199,7 +199,6 @@ void ocl_pfree(void *h_ptr)
     if (h_ptr)
     {
         free(h_ptr);
-        h_ptr = NULL;
     }
     return;
 }

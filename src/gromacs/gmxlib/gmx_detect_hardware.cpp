@@ -154,44 +154,6 @@ static void print_gpu_detection_stats(FILE                 *fplog,
     }
 }
 
-/*! \brief Helper function for writing a string of GPU IDs.
- *
- * \param[in] ids  A container of integer GPU IDs
- * \return         A comma-separated string of GPU IDs */
-template <typename Container>
-static std::string makeGpuIdsString(const Container &ids)
-{
-    std::string output;
-
-    if (0 != ids.size())
-    {
-        typename Container::const_iterator it = ids.begin();
-        output += gmx::formatString("%d", *it);
-        for (++it; it != ids.end(); ++it)
-        {
-            output += gmx::formatString(",%d", *it);
-        }
-    }
-    return output;
-}
-
-template <typename Container>
-static std::string makeGpuNamesString(const Container &ids)
-{
-    std::string output;
-
-    if (0 != ids.size())
-    {
-        typename Container::const_iterator it = ids.begin();
-        output += gmx::formatString("%s", *it);
-        for (++it; it != ids.end(); ++it)
-        {
-            output += gmx::formatString(",%s", *it);
-        }
-    }
-    return output;
-}
-
 /*! \brief Helper function for reporting GPU usage information
  * in the mdrun log file
  *
@@ -221,9 +183,9 @@ makeGpuUsageReport(const gmx_gpu_info_t *gpu_info,
     {
         // gpu_opt->dev_compatible is only populated during auto-selection
         std::string gpuIdsString =
-            makeGpuIdsString(gmx::ConstArrayRef<int>(gpu_opt->dev_compatible,
-                                                     gpu_opt->dev_compatible +
-                                                     gpu_opt->n_dev_compatible));
+            formatAndJoin(gmx::constArrayRefFromArray(gpu_opt->dev_compatible,
+                                                      gpu_opt->n_dev_compatible),
+                          ",", gmx::StringFormatter("%d"));
         bool bPluralGpus = gpu_opt->n_dev_compatible > 1;
         output += gmx::formatString("%d compatible GPU%s %s present, with ID%s %s\n",
                                     gpu_opt->n_dev_compatible,
@@ -236,22 +198,20 @@ makeGpuUsageReport(const gmx_gpu_info_t *gpu_info,
     {
 #if defined(GMX_GPU) && defined(GMX_USE_OPENCL)
         std::vector<char*> gpuNamesInUse;
-#else
-        std::vector<int>   gpuIdsInUse;
-#endif
         for (int i = 0; i < ngpu_use; i++)
         {
-#if defined(GMX_GPU) && defined(GMX_USE_OPENCL)
             gpuNamesInUse.push_back(get_ocl_gpu_device_name(gpu_info, gpu_opt, i));
-#else
-            gpuIdsInUse.push_back(get_cuda_gpu_device_id(gpu_info, gpu_opt, i));
-#endif
         }
-
-#if defined(GMX_GPU) && defined(GMX_USE_OPENCL)
-        std::string gpuIdsString = makeGpuNamesString(gpuNamesInUse);
+        std::string gpuIdsString =
+            formatAndJoin(gpuNamesInUse, ",", gmx::StringFormatter("%s"));
 #else
-        std::string gpuIdsString = makeGpuIdsString(gpuIdsInUse);
+        std::vector<int> gpuIdsInUse;
+        for (int i = 0; i < ngpu_use; i++)
+        {
+            gpuIdsInUse.push_back(get_cuda_gpu_device_id(gpu_info, gpu_opt, i));
+        }
+        std::string gpuIdsString =
+            formatAndJoin(gpuIdsInUse, ",", gmx::StringFormatter("%d"));
 #endif
         int         numGpusInUse = gmx_count_gpu_dev_unique(gpu_info, gpu_opt);
         bool        bPluralGpus  = numGpusInUse > 1;
@@ -402,7 +362,8 @@ void gmx_check_hw_runconf_consistency(FILE                *fplog,
         sprintf(th_or_proc, "process");
     }
 
-    if (bUseGPU && hwinfo->gpu_info.n_dev_compatible > 0 && !bEmulateGPU)
+    if (bUseGPU && hwinfo->gpu_info.n_dev_compatible > 0 &&
+        !bEmulateGPU)
     {
         int  ngpu_comp, ngpu_use;
         char gpu_comp_plural[2], gpu_use_plural[2];
@@ -534,8 +495,8 @@ int gmx_count_gpu_dev_shared(const gmx_gpu_opt_t *gpu_opt)
         {
             for (j = i + 1; j < ngpu; j++)
             {
-                same_count +=
-                    (gpu_opt->dev_use[i] == gpu_opt->dev_use[j]);
+                same_count      += (gpu_opt->dev_use[i] ==
+                                    gpu_opt->dev_use[j]);
             }
         }
     }
@@ -678,10 +639,7 @@ static void gmx_detect_gpus(FILE *fplog, const t_commrec *cr)
     {
         char detection_error[STRLEN] = "", sbuf[STRLEN];
 
-        int  detect_gpu_ret;
-
-        detect_gpu_ret = detect_gpus(&hwinfo_g->gpu_info, detection_error);
-        if (detect_gpu_ret != 0)
+        if (detect_gpus(&hwinfo_g->gpu_info, detection_error) != 0)
         {
             if (detection_error[0] != '\0')
             {
@@ -701,6 +659,7 @@ static void gmx_detect_gpus(FILE *fplog, const t_commrec *cr)
 #ifdef GMX_LIB_MPI
     /* Broadcast the GPU info to the other ranks within this node */
     MPI_Bcast(&hwinfo_g->gpu_info.n_dev, 1, MPI_INT, 0, physicalnode_comm);
+
     if (hwinfo_g->gpu_info.n_dev > 0)
     {
         int dev_size;
@@ -840,6 +799,7 @@ void gmx_select_gpu_ids(FILE *fplog, const t_commrec *cr,
         int  res;
 
         snew(checkres, gpu_opt->n_dev_use);
+
         res = check_selected_gpus(checkres, gpu_info, gpu_opt);
 
         if (!res)

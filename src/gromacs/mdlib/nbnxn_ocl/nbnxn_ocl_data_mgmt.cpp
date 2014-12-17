@@ -51,7 +51,6 @@
 #include <string.h>
 
 #include "gromacs/gmxlib/gpu_utils/gpu_utils.h"
-#include "gromacs/gmxlib/gpu_utils/ocl_compiler.hpp"
 #include "gromacs/gmxlib/ocl_tools/oclutils.h"
 #include "gromacs/legacyheaders/gmx_detect_hardware.h"
 #include "gromacs/legacyheaders/tables.h"
@@ -423,7 +422,7 @@ static void init_nbparam(cl_nbparam_t              *nbp,
 void nbnxn_gpu_pme_loadbal_update_param(const nonbonded_verlet_t    *nbv,
                                         const interaction_const_t   *ic)
 {
-    if (!nbv || nbv->grp[0].kernel_type != nbnxnk8x8x8_CUDA)
+    if (!nbv || nbv->grp[0].kernel_type != nbnxnk8x8x8_GPU)
     {
         return;
     }
@@ -522,11 +521,13 @@ void nbnxn_gpu_init(FILE gmx_unused      *fplog,
 {
     gmx_nbnxn_ocl_t            *nb;
     cl_int                      cl_error;
-    bool gmx_unused             bStreamSync;
-    bool gmx_unused             bNoStreamSync;
-    bool gmx_unused             bTMPIAtomics;
-    bool gmx_unused             bX86;
-    bool gmx_unused             bOldDriver;
+    /*
+       bool gmx_unused             bStreamSync;
+       bool gmx_unused             bNoStreamSync;
+       bool gmx_unused             bTMPIAtomics;
+       bool gmx_unused             bX86;
+       bool gmx_unused             bOldDriver;
+     */
     cl_command_queue_properties queue_properties;
 
     assert(gpu_info);
@@ -739,7 +740,7 @@ static void
 nbnxn_ocl_clear_e_fshift(gmx_nbnxn_ocl_t *nb)
 {
 
-    cl_int               cl_error = CL_SUCCESS;
+    cl_int               cl_error;
     cl_atomdata_t *      adat     = nb->atdat;
     cl_command_queue     ls       = nb->stream[eintLocal];
 
@@ -771,7 +772,7 @@ nbnxn_ocl_clear_e_fshift(gmx_nbnxn_ocl_t *nb)
 static void nbnxn_ocl_clear_f(gmx_nbnxn_ocl_t *nb, int natoms_clear)
 {
 
-    cl_int               cl_error = CL_SUCCESS;
+    cl_int               cl_error;
     cl_atomdata_t *      adat     = nb->atdat;
     cl_command_queue     ls       = nb->stream[eintLocal];
     cl_float             value    = 0.0f;
@@ -790,7 +791,7 @@ static void nbnxn_ocl_clear_f(gmx_nbnxn_ocl_t *nb, int natoms_clear)
 
     arg_no    = 0;
     cl_error  = clSetKernelArg(memset_f, arg_no++, sizeof(cl_mem), &(adat->f));
-    cl_error  = clSetKernelArg(memset_f, arg_no++, sizeof(cl_float), &value);
+    cl_error |= clSetKernelArg(memset_f, arg_no++, sizeof(cl_float), &value);
     cl_error |= clSetKernelArg(memset_f, arg_no++, sizeof(cl_uint), &natoms_flat);
     assert(cl_error == CL_SUCCESS);
 

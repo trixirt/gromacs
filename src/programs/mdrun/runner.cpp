@@ -1113,7 +1113,7 @@ int mdrunner(gmx_hw_opt_t *hw_opt,
         {
             /* Here the master rank decides if all ranks will use GPUs */
             bUseGPU = (hwinfo->gpu_info.n_dev_compatible > 0 ||
-                getenv("GMX_EMULATE_GPU") != NULL);
+                       getenv("GMX_EMULATE_GPU") != NULL);
 
             /* TODO add GPU kernels for this and replace this check by:
              * (bUseGPU && (ir->vdwtype == evdwPME &&

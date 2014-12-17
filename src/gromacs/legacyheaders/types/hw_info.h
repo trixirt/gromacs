@@ -68,10 +68,10 @@ static const char * const gpu_detect_res_str[] =
  * The gmx_hardware_detect module initializes it. */
 struct gmx_gpu_info_t
 {
-    gmx_bool             bDetectGPUs;          /* Did we try to detect GPUs? */
-    int                  n_dev;                /* total number of GPU devices detected */
-    struct gmx_device_info_t *gpu_dev;              /* GPU devices detected in the system (per node) */
-    int                  n_dev_compatible;     /* number of compatible GPUs */
+    gmx_bool                  bDetectGPUs;      /* Did we try to detect GPUs? */
+    int                       n_dev;            /* total number of GPU devices detected */
+    struct gmx_device_info_t *gpu_dev;          /* GPU devices detected in the system (per node) */
+    int                       n_dev_compatible; /* number of compatible GPUs */
 };
 
 /* Hardware information structure with CPU and GPU information.
@@ -80,9 +80,9 @@ struct gmx_gpu_info_t
  *       (i.e. must be able to be shared among all threads) */
 typedef struct
 {
-    struct gmx_gpu_info_t gpu_info;       /* Information about GPUs detected in the system */
+    struct gmx_gpu_info_t gpu_info;      /* Information about GPUs detected in the system */
 
-    gmx_cpuid_t     cpuid_info;          /* CPUID information about CPU detected;
+    gmx_cpuid_t           cpuid_info;    /* CPUID information about CPU detected;
                                             NOTE: this will only detect the CPU thread 0 of the
                                             current process runs on. */
     int             nthreads_hw_avail;   /* Number of hardware threads available; this number
