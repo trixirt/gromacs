@@ -1,9 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
- * Copyright (c) 2001-2004, The GROMACS development team.
- * Copyright (c) 2011,2013, by the GROMACS development team, led by
+ * Copyright (c) 2014, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -34,43 +32,34 @@
  * To help us fund GROMACS development, we humbly ask that you cite
  * the research papers on the package. Check out http://www.gromacs.org.
  */
-#ifndef _nlistheuristics_h
-#define _nlistheuristics_h
+/*! \internal \file
+ * \brief
+ * Declares trajectory analysis module for RDF calculations.
+ *
+ * \author Teemu Murtola <teemu.murtola@gmail.com>
+ * \ingroup module_trajectoryanalysis
+ */
+#ifndef GMX_TRAJECTORYANALYSIS_MODULES_RDF_H
+#define GMX_TRAJECTORYANALYSIS_MODULES_RDF_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include "gromacs/trajectoryanalysis/analysismodule.h"
 
-#if 0
-}
-/* Hack to make automatic indenting work */
-#endif
+namespace gmx
+{
 
-typedef struct {
-    gmx_bool        bGStatEveryStep;
-    gmx_int64_t     step_ns;
-    gmx_int64_t     step_nscheck;
-    gmx_int64_t     nns;
-    matrix          scale_tot;
-    int             nabnsb;
-    double          s1;
-    double          s2;
-    double          ab;
-    double          lt_runav;
-    double          lt_runav2;
-} gmx_nlheur_t;
+namespace analysismodules
+{
 
-void reset_nlistheuristics(gmx_nlheur_t *nlh, gmx_int64_t step);
+class RdfInfo
+{
+    public:
+        static const char name[];
+        static const char shortDescription[];
+        static TrajectoryAnalysisModulePointer create();
+};
 
-void init_nlistheuristics(gmx_nlheur_t *nlh,
-                          gmx_bool bGStatEveryStep, gmx_int64_t step);
+} // namespace analysismodules
 
-void update_nliststatistics(gmx_nlheur_t *nlh, gmx_int64_t step);
-
-void set_nlistheuristics(gmx_nlheur_t *nlh, gmx_bool bReset, gmx_int64_t step);
-
-#ifdef __cplusplus
-}
-#endif
+} // namespace gmx
 
 #endif
