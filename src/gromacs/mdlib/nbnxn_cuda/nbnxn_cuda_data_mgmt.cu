@@ -437,7 +437,7 @@ static void init_nbparam(cu_nbparam_t              *nbp,
 void nbnxn_gpu_pme_loadbal_update_param(const nonbonded_verlet_t    *nbv,
                                         const interaction_const_t   *ic)
 {
-    if (!nbv || nbv->grp[0].kernel_type != nbnxnk8x8x8_CUDA)
+    if (!nbv || nbv->grp[0].kernel_type != nbnxnk8x8x8_GPU)
     {
         return;
     }

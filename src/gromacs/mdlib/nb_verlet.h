@@ -44,14 +44,14 @@ extern "C" {
 #endif
 
 
-/** Nonbonded NxN kernel types: plain C, CPU SIMD, GPU CUDA, GPU emulation */
+/** Nonbonded NxN kernel types: plain C, CPU SIMD, GPU, GPU emulation */
 typedef enum
 {
     nbnxnkNotSet = 0,
     nbnxnk4x4_PlainC,
     nbnxnk4xN_SIMD_4xN,
     nbnxnk4xN_SIMD_2xNN,
-    nbnxnk8x8x8_CUDA,
+    nbnxnk8x8x8_GPU,
     nbnxnk8x8x8_PlainC,
     nbnxnkNR
 } nbnxn_kernel_type;
@@ -104,7 +104,7 @@ typedef struct nonbonded_verlet_t {
     gmx_bool                 bUseGPU;         /* TRUE when GPU acceleration is used */
     gmx_nbnxn_gpu_t         *gpu_nbv;         /* pointer to GPU nb verlet data     */
     int                      min_ci_balanced; /* pair list balancing parameter
-                                                 used for the 8x8x8 CUDA kernels    */
+                                                 used for the 8x8x8 GPU kernels    */
 } nonbonded_verlet_t;
 
 #ifdef __cplusplus

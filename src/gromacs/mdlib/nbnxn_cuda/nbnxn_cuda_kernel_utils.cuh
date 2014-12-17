@@ -608,17 +608,4 @@ void reduce_energy_warp_shfl(float E_lj, float E_el,
 }
 #endif /* __CUDA_ARCH__ */
 
-/*! Writes in debug_buffer the input value.
- *  Each thread has its own unique location in debug_buffer.
- *  Works for 2D global configurations.
- */
-__device__
-void print_to_debug_buffer_f(float* debug_buffer, float value)
-{
-    if (debug_buffer)
-    {
-        debug_buffer[(blockIdx.y * blockDim.y + threadIdx.y) * gridDim.x * blockDim.x + blockIdx.x * blockDim.x + threadIdx.x] = value;
-    }
-}
-
 #endif /* NBNXN_CUDA_KERNEL_UTILS_CUH */

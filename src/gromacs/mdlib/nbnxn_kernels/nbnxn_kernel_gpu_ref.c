@@ -162,7 +162,6 @@ nbnxn_kernel_gpu_ref(const nbnxn_pairlist_t     *nbl,
             /* we have the diagonal:
              * add the charge self interaction energy term
              */
-
             for (im = 0; im < NCL_PER_SUPERCL; im++)
             {
                 ci = sci*NCL_PER_SUPERCL + im;
@@ -173,7 +172,6 @@ nbnxn_kernel_gpu_ref(const nbnxn_pairlist_t     *nbl,
                     vctot += iq*iq;
                 }
             }
-
             if (!bEwald)
             {
                 vctot *= -facel*0.5*iconst->c_rf;
