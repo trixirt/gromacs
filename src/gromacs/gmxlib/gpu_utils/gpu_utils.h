@@ -186,8 +186,8 @@ int get_cuda_gpu_device_id(const struct gmx_gpu_info_t gmx_unused *gpu_info,
  */
 OPENCL_FUNC_QUALIFIER
 char* get_ocl_gpu_device_name(const gmx_gpu_info_t gmx_unused *gpu_info,
-                              const gmx_gpu_opt_t gmx_unused  *gpu_opt,
-                              int gmx_unused                   idx) OPENCL_FUNC_TERM_WITH_RETURN(NULL)
+                              const gmx_gpu_opt_t  gmx_unused *gpu_opt,
+                              int                  gmx_unused  idx) OPENCL_FUNC_TERM_WITH_RETURN(NULL)
 
 /*! \brief Formats and returns a device information string for a given GPU.
  *

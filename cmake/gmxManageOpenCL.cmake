@@ -50,17 +50,6 @@ find_package(OpenCL REQUIRED)
 
 message(STATUS "OPENCL_INCLUDE_DIRS: " "${OPENCL_INCLUDE_DIRS} ")
 message(STATUS "OPENCL_LIBRARIES: " "${OPENCL_LIBRARIES} ")
-# detect OpenCL devices in the build host machine
-# TO DO: Test the WIN32 branch on Linux
-# TO DO: Have just one branch that would work for both Windows and Linux
-#if (NOT GMX_OPENCL_DETECTION_DONE)
-#	include(gmxDetectGpu)
-#	if (WIN32 OR UNIX)
-#		gmx_find_OpenCL()
-#	else()
-#		gmx_detect_OpenCL()
-#	endif()
-#endif()
 
 #Now configure options
 message(STATUS "Setting OpenCL specific options")

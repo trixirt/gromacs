@@ -387,6 +387,8 @@ class Sasa : public TrajectoryAnalysisModule
          * Empty if the free energy output has not been requested.
          */
         std::vector<real>       dgsFactor_;
+        //! Calculation algorithm.
+        SurfaceAreaCalculator   calculator_;
 
         // Copy and assign disallowed by base.
 };
@@ -432,8 +434,10 @@ Sasa::initOptions(Options *options, TrajectoryAnalysisSettings *settings)
         //"which can be used to restrain surface atoms.[PAR]",
 
         "With the [TT]-tv[tt] option the total volume and density of the",
-        "molecule can be computed.",
-        "Please consider whether the normal probe radius is appropriate",
+        "molecule can be computed. With [TT]-pbc[tt] (the default), you",
+        "must ensure that your molecule/surface group is not split across PBC.",
+        "Otherwise, you will get non-sensical results.",
+        "Please also consider whether the normal probe radius is appropriate",
         "in this case or whether you would rather use, e.g., 0. It is good",
         "to keep in mind that the results for volume and density are very",
         "approximate. For example, in ice Ih, one can easily fit water molecules in the",
@@ -608,6 +612,8 @@ Sasa::initAnalysis(const TrajectoryAnalysisSettings &settings,
             outputSel_[g].setOriginalId(i, j);
         }
     }
+
+    calculator_.setDotCount(ndots_);
 
     // Initialize all the output data objects and initialize the output plotters.
 
@@ -907,12 +913,10 @@ Sasa::analyzeFrame(int frnr, const t_trxframe &fr, t_pbc *pbc,
     real  totarea, totvolume;
     real *area = NULL, *surfacedots = NULL;
     int   nsurfacedots;
-    int   retval = nsc_dclm_pbc(surfaceSel.coordinates().data(), &radii_[0],
-                                frameData.index_.size(), ndots_, flag, &totarea,
-                                &area, &totvolume, &surfacedots, &nsurfacedots,
-                                &frameData.index_[0],
-                                pbc != NULL ? pbc->ePBC : epbcNONE,
-                                pbc != NULL ? pbc->box : NULL);
+    calculator_.calculate(surfaceSel.coordinates().data(), &radii_[0], pbc,
+                          frameData.index_.size(), &frameData.index_[0], flag,
+                          &totarea, &totvolume, &area,
+                          &surfacedots, &nsurfacedots);
     // Unpack the atomwise areas into the frameData.atomAreas_ array for easier
     // indexing in the case of dynamic surfaceSel.
     if (area != NULL)
@@ -934,10 +938,6 @@ Sasa::analyzeFrame(int frnr, const t_trxframe &fr, t_pbc *pbc,
         sfree(area);
     }
     scoped_guard_sfree dotsGuard(surfacedots);
-    if (retval != 0)
-    {
-        GMX_THROW(InternalError("nsc_dclm_pbc failed"));
-    }
 
     if (bConnolly)
     {

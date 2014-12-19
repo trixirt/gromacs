@@ -162,9 +162,11 @@ option(GMX_COOL_QUOTES "Enable Gromacs cool quotes" ON)
 mark_as_advanced(GMX_COOL_QUOTES)
 gmx_add_cache_dependency(GMX_COOL_QUOTES BOOL "NOT GMX_FAHCORE" OFF)
 
+option(GMX_GPU  "Enable GPU acceleration" ON)
+option(GMX_USE_OPENCL "Enable OpenCL acceleration" OFF)
+
 # Decide on GPU settings based on user-settings and GPU/CUDA detection.
 # We support CUDA >=v4.0 on *nix, but <= v4.1 doesn't work with MSVC
-option(GMX_USE_OPENCL "Enable OpenCL accelerators" OFF)
 if(NOT GMX_USE_OPENCL)
     if(MSVC)
         set(REQUIRED_CUDA_VERSION 4.1)
@@ -175,21 +177,12 @@ if(NOT GMX_USE_OPENCL)
     include(gmxManageGPU)
 else()
     #Now the OpenCL path
-    if(GMX_GPU)
-        #1.1 For nvidia, 1.2 for amd/intel. 2.0 cannot test
-        #set(REQUIRED_OPENCL_MIN_VERSION 1.1)
-        #set(REQUIRED_OPENCL_MAX_VERSION 1.2)
+    if(GMX_GPU)        
+        set(REQUIRED_OPENCL_MIN_VERSION 1.1)        
         include(gmxManageOpenCL)
     else(GMX_GPU)
         message(FATAL_ERROR "OpenCL requested but GPU option is not enabled (try -DGMX_GPU=on) ")
     endif(GMX_GPU)
-endif()
-
-if(GMX_CPU_ACCELERATION)
-    # Stay compatible with old Jenkins command line options for specific SIMD acceleration
-    set(GMX_SIMD "${GMX_CPU_ACCELERATION}" CACHE STRING "SIMD instruction set level and compiler optimization" FORCE)
-    message("You set GMX_CPU_ACCELERATION, which is deprecated, and will be removed in a later version of GROMACS. It is replaced by GMX_SIMD. For now, copying the value from GMX_CPU_ACCELERATION to GMX_SIMD.")
-    # TODO remove all references to GMX_CPU_ACCELERATION in master branch
 endif()
 
 include(gmxDetectSimd)
@@ -235,8 +228,6 @@ mark_as_advanced(GMX_BROKEN_CALLOC)
 option(GMX_LOAD_PLUGINS "Compile with plugin support, needed to read VMD supported file formats" ON)
 mark_as_advanced(GMX_LOAD_PLUGINS)
 
-option(GMX_GPU  "Enable GPU acceleration" ON)
-option(GMX_USE_OPENCL "Enable OpenCL accelerators" OFF)
 option(GMX_OPENMP "Enable OpenMP-based multithreading" ON)
 
 option(GMX_USE_TNG "Use the TNG library for trajectory I/O" ON)

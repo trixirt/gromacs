@@ -65,7 +65,7 @@ if(NOT GMX_DETECT_OPENCL_AVAILABLE)
 
   # User specified OpenCL location
   if(OPENCL_ROOT)
-    message(STATUS "OpenCL: Searching in custom location")    
+    message(STATUS "OpenCL: Searching in custom location")
     set(CMAKE_FIND_ROOT_PATH ${OPENCL_ROOT})
     set(_CMAKE_FIND_ROOT_PATH ${CMAKE_FIND_ROOT_PATH})
     set(_OPENCL_ROOT_OPTS "ONLY_CMAKE_FIND_ROOT_PATH NO_DEFAULT_PATH")
@@ -77,7 +77,7 @@ if(NOT GMX_DETECT_OPENCL_AVAILABLE)
 
   # AMD APP SDK
   elseif(NOT "$ENV{AMDAPPSDKROOT}" STREQUAL "")
-    message(STATUS "OpenCL: Searching for AMD APP SDK")    
+    message(STATUS "OpenCL: Searching for AMD APP SDK")
     set(CMAKE_FIND_ROOT_PATH $ENV{AMDAPPSDKROOT})
     set(_CMAKE_FIND_ROOT_PATH ${CMAKE_FIND_ROOT_PATH})
     set(_OPENCL_ROOT_OPTS "ONLY_CMAKE_FIND_ROOT_PATH NO_DEFAULT_PATH")
@@ -92,7 +92,7 @@ if(NOT GMX_DETECT_OPENCL_AVAILABLE)
 
   # NVIDIA CUDA
   elseif(NOT "$ENV{CUDA_PATH}" STREQUAL "")
-    message(STATUS "OpenCL: Searching for NVIDIA CUDA SDK")    
+    message(STATUS "OpenCL: Searching for NVIDIA CUDA SDK")
     set(CMAKE_FIND_ROOT_PATH $ENV{CUDA_PATH})
     set(_CMAKE_FIND_ROOT_PATH ${CMAKE_FIND_ROOT_PATH})
     set(_OPENCL_ROOT_OPTS "ONLY_CMAKE_FIND_ROOT_PATH NO_DEFAULT_PATH")
@@ -102,8 +102,8 @@ if(NOT GMX_DETECT_OPENCL_AVAILABLE)
         set(_OPENCL_LIB_DIR_SUFFIX "\\Win32")
       else()
         #set(_OPENCL_LIB_OPTS PATH_SUFFIX Win64)
-        #set(_OPENCL_LIB_OPTS "PATH_SUFFIX x64")        
-        set(_OPENCL_LIB_DIR_SUFFIX "\\x64")     
+        #set(_OPENCL_LIB_OPTS "PATH_SUFFIX x64")
+        set(_OPENCL_LIB_DIR_SUFFIX "\\x64")
       endif()
     else()
       if(SIZEOF_VOID_P EQUAL 4)
@@ -111,11 +111,11 @@ if(NOT GMX_DETECT_OPENCL_AVAILABLE)
       else()
         set(_OPENCL_LIB_DIR_SUFFIX 64)
       endif()
-    endif() 
+    endif()
 
   # Intel OpenCL SDK
   elseif(NOT "$ENV{INTELOCLSDKROOT}" STREQUAL "")
-    message(STATUS "OpenCL: Searching for Intel OpenCL SDK")    
+    message(STATUS "OpenCL: Searching for Intel OpenCL SDK")
     set(CMAKE_FIND_ROOT_PATH $ENV{INTELOCLSDKROOT})
     set(_CMAKE_FIND_ROOT_PATH ${CMAKE_FIND_ROOT_PATH})
     set(_OPENCL_ROOT_OPTS "ONLY_CMAKE_FIND_ROOT_PATH NO_DEFAULT_PATH")
@@ -145,13 +145,13 @@ if(NOT GMX_DETECT_OPENCL_AVAILABLE)
   else()
     set(_OPENCL_INCLUDE_BASE CL)
   endif()
-  
+
   # Find the headers
   find_path(OPENCL_INCLUDE_DIR ${_OPENCL_INCLUDE_BASE}/cl.h
     PATHS /include
     ${_OPENCL_ROOT_OPTS}
   )
-  
+
   if(OPENCL_INCLUDE_DIR)
     # Interrogate the C header for version information
     set(CMAKE_REQUIRED_INCLUDES ${OPENCL_INCLUDE_DIR})
@@ -187,20 +187,12 @@ if(NOT GMX_DETECT_OPENCL_AVAILABLE)
 
     unset(CMAKE_REQUIRED_INCLUDES)
   endif()
-  
- 
-  # Find the library
-  #find_library(OPENCL_LIBRARY OpenCL
-#   PATHS /lib${_OPENCL_LIB_DIR_SUFFIX}
-#    ${_OPENCL_LIB_OPTS}    
-#   ${_OPENCL_ROOT_OPTS}
-#   ) 
 
   find_library(OPENCL_LIBRARY OpenCL
-    PATHS /lib${_OPENCL_LIB_DIR_SUFFIX}    
+    PATHS /lib${_OPENCL_LIB_DIR_SUFFIX}
     ${_OPENCL_ROOT_OPTS}
-   )  
-  
+   )
+
   # Restore the original search paths
   set(CMAKE_FIND_ROOT_PATH ${_CMAKE_FIND_ROOT_PATH})
 
@@ -208,9 +200,9 @@ if(NOT GMX_DETECT_OPENCL_AVAILABLE)
    FIND_PACKAGE_HANDLE_STANDARD_ARGS(OpenCL
      REQUIRED_VARS OPENCL_INCLUDE_DIR OPENCL_LIBRARY
      VERSION_VAR OPENCL_VERSION_STRING
-   )   
-  
+   )
+
   set(OPENCL_INCLUDE_DIRS ${OPENCL_INCLUDE_DIR})
   set(OPENCL_LIBRARIES ${OPENCL_LIBRARY})
-  
+
 endif()

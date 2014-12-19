@@ -520,6 +520,12 @@ load_ocl_source(const char* filename, size_t* p_source_length)
     size_t source_length;
 
     source_length = 0;
+
+    if (!filename)
+    {
+        return NULL;
+    }
+
     filestream    = fopen(filename, "rb");
     if (!filestream)
     {
@@ -633,7 +639,6 @@ handle_ocl_build_log(
             if (build_log_file)
             {
                 fprintf(build_log_file, "%s", complete_message);
-                fclose(build_log_file);
             }
 
             printf("The OpenCL compilation log has been saved in \"%s\"\n", log_fname.c_str());
@@ -645,6 +650,8 @@ handle_ocl_build_log(
                 fprintf(stderr, "%s", complete_message);
             }
         }
+        if (build_log_file)
+            fclose(build_log_file);
         free(complete_message);
         free(build_info);
     }

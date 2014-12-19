@@ -155,7 +155,7 @@ version for GROMACS code as used as the back-end compiler for nvcc,
 but it could be faster to mix compiler versions to suit particular
 contexts.
 
-To make it possible to use other accelerators, Gromacs also includes
+To make it possible to use other accelerators, GROMACS also includes
 OpenCL support. The current version works with NVIDIA GPUs and
 GCN-based AMD GPUs. The minimum OpenCL version required is 1.1
 
@@ -542,6 +542,13 @@ and the following CMake flags must be set:
 
 Gromacs loads and builds at runtime the OpenCL kernels. To do so, it needs to
 know the location of the OpenCL source files.
+
+If you want to run the installed version, the path to the OpenCL files is
+automatically defined.
+If you do not wish to install Gromacs, but run the version built from sources,
+you need to provide the path to the source tree with the OpenCL kernels like
+below:
+    export GMX_OCL_FILE_PATH=/path-to-gromacs/src/
 	
 ### Static linking ###
 Dynamic linking of the GROMACS executables will lead to a

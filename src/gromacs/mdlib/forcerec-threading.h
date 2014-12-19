@@ -1,9 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
- * Copyright (c) 2001-2004, The GROMACS development team.
- * Copyright (c) 2013,2014, by the GROMACS development team, led by
+ * Copyright (c) 2014, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -35,44 +33,28 @@
  * the research papers on the package. Check out http://www.gromacs.org.
  */
 
-#ifndef GMX_EWALD_LONG_RANGE_CORRECTION_H
-#define GMX_EWALD_LONG_RANGE_CORRECTION_H
+#ifndef GMX_MDLIB_FORCEREC_THREADING_H
+#define GMX_MDLIB_FORCEREC_THREADING_H
 
-#include "gromacs/legacyheaders/types/commrec.h"
-#include "gromacs/legacyheaders/types/forcerec.h"
-#include "gromacs/math/vectypes.h"
-#include "gromacs/topology/block.h"
-#include "gromacs/utility/basedefinitions.h"
-#include "gromacs/utility/real.h"
+#include "gromacs/utility/bitmask.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/*! \brief Calculate long-range Ewald correction terms.
- *
- * For the group cutoff scheme (only), calculates the correction to
- * the Ewald sums (electrostatic and/or LJ) due to pairs excluded from
- * the long-ranged part.
- *
- * For both cutoff schemes, but only for Coulomb interactions,
- * calculates correction for surface dipole terms. */
-void
-ewald_LRcorrection(int start, int end,
-                   t_commrec *cr, int thread, t_forcerec *fr,
-                   real *chargeA, real *chargeB,
-                   real *C6A, real *C6B,
-                   real *sigmaA, real *sigmaB,
-                   real *sigma3A, real *sigma3B,
-                   gmx_bool bHaveChargeOrTypePerturbed,
-                   gmx_bool calc_excl_corr,
-                   t_blocka *excl, rvec x[],
-                   matrix box, rvec mu_tot[],
-                   int ewald_geometry, real epsilon_surface,
-                   rvec *f, tensor vir_q, tensor vir_lj,
-                   real *Vcorr_q, real *Vcorr_lj,
-                   real lambda_q, real lambda_lj,
-                   real *dvdlambda_q, real *dvdlambda_lj);
+struct f_thread_t {
+    rvec             *f;
+    int               f_nalloc;
+    gmx_bitmask_t     red_mask; /* Mask for marking which parts of f are filled */
+    rvec             *fshift;
+    real              ener[F_NRE];
+    gmx_grppairener_t grpp;
+    real              Vcorr_q;
+    real              Vcorr_lj;
+    real              dvdl[efptNR];
+    tensor            vir_q;
+    tensor            vir_lj;
+};
 
 #ifdef __cplusplus
 }

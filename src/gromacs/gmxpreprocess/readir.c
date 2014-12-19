@@ -159,7 +159,7 @@ static void GetSimTemps(int ntemps, t_simtemp *simtemp, double *temperature_lamb
         }
         else if (simtemp->eSimTempScale == esimtempEXPONENTIAL)
         {
-            simtemp->temperatures[i] = simtemp->simtemp_low + (simtemp->simtemp_high-simtemp->simtemp_low)*((exp(temperature_lambdas[i])-1)/(exp(1.0)-1));
+            simtemp->temperatures[i] = simtemp->simtemp_low + (simtemp->simtemp_high-simtemp->simtemp_low)*(gmx_expm1(temperature_lambdas[i])/gmx_expm1(1.0));
         }
         else
         {
@@ -912,7 +912,7 @@ void check_ir(const char *mdparin, t_inputrec *ir, t_gromppopts *opts,
             CHECK(ir->bPeriodicMols);
             if (ir->ePBC != epbcNONE)
             {
-                warning(wi, "Removing the rotation around the center of mass in a periodic system (this is not a problem when you have only one molecule).");
+                warning(wi, "Removing the rotation around the center of mass in a periodic system, this can lead to artifacts. Only use this on a single (cluster of) molecules. This cluster should not cross periodic boundaries.");
             }
         }
     }
@@ -4281,7 +4281,10 @@ void triple_check(const char *mdparin, t_inputrec *ir, gmx_mtop_t *sys,
     check_disre(sys);
 }
 
-void double_check(t_inputrec *ir, matrix box, gmx_bool bConstr, warninp_t wi)
+void double_check(t_inputrec *ir, matrix box,
+                  gmx_bool bHasNormalConstraints,
+                  gmx_bool bHasAnyConstraints,
+                  warninp_t wi)
 {
     real        min_size;
     gmx_bool    bTWIN;
@@ -4294,7 +4297,7 @@ void double_check(t_inputrec *ir, matrix box, gmx_bool bConstr, warninp_t wi)
         warning_error(wi, ptr);
     }
 
-    if (bConstr && ir->eConstrAlg == econtSHAKE)
+    if (bHasNormalConstraints && ir->eConstrAlg == econtSHAKE)
     {
         if (ir->shake_tol <= 0.0)
         {
@@ -4317,7 +4320,7 @@ void double_check(t_inputrec *ir, matrix box, gmx_bool bConstr, warninp_t wi)
         }
     }
 
-    if ( (ir->eConstrAlg == econtLINCS) && bConstr)
+    if ( (ir->eConstrAlg == econtLINCS) && bHasNormalConstraints)
     {
         /* If we have Lincs constraints: */
         if (ir->eI == eiMD && ir->etc == etcNO &&
@@ -4338,9 +4341,9 @@ void double_check(t_inputrec *ir, matrix box, gmx_bool bConstr, warninp_t wi)
         }
     }
 
-    if (bConstr && ir->epc == epcMTTK)
+    if (bHasAnyConstraints && ir->epc == epcMTTK)
     {
-        warning_note(wi, "MTTK with constraints is deprecated, and will be removed in GROMACS 5.1");
+        warning_error(wi, "Constraints are not implemented with MTTK pressure control.");
     }
 
     if (ir->LincsWarnAngle > 90.0)
