@@ -85,7 +85,7 @@ __attribute__((reqd_work_group_size(CL_SIZE, CL_SIZE, 1)))
     #ifdef CALC_ENERGIES
         __kernel void NB_KERNEL_FUNC_NAME(nbnxn_kernel, _VF_opencl)
     #else
-        __kernel void NB_KERNEL_FUNC_NAME(nbnxn_kernel, _F_opencl)        
+        __kernel void NB_KERNEL_FUNC_NAME(nbnxn_kernel, _F_opencl)
     #endif
 #endif
 (int ntypes,                                                               /* IN  */
@@ -93,7 +93,7 @@ __attribute__((reqd_work_group_size(CL_SIZE, CL_SIZE, 1)))
  const __global float4 *restrict xq,                                       /* IN  */
  __global float *restrict f,                /* stores float3 values */     /* OUT */
  __global float *restrict e_lj,                                            /* OUT */
- __global float *restrict e_el,                                            /* OUT */ 
+ __global float *restrict e_el,                                            /* OUT */
 __global float *restrict fshift,            /* stores float3 values */     /* OUT */
  const __global int *restrict atom_types,                                  /* IN  */
  const __global float *restrict shift_vec,  /* stores float3 values */     /* IN  */
@@ -172,7 +172,7 @@ __global float *restrict fshift,            /* stores float3 values */     /* OU
     unsigned int wexcl, imask, mask_ji;
     float4       xqbuf;
     float3       xi, xj, rv, f_ij, fcj_buf/*, fshift_buf*/;
-	float        fshift_buf;
+    float        fshift_buf;
     float3       fci_buf[NCL_PER_SUPERCL]; /* i force buffer */
     nbnxn_sci_t  nb_sci;
 
@@ -195,7 +195,7 @@ __global float *restrict fshift,            /* stores float3 values */     /* OU
 #endif
     /* Local buffer used to implement __any warp vote function from CUDA.
        volatile is used to avoid compiler optimizations for AMD builds. */
-    volatile __local uint *warp_any = (__local uint*)(LOCAL_OFFSET);    
+    volatile __local uint *warp_any = (__local uint*)(LOCAL_OFFSET);
 #undef LOCAL_OFFSET
 
     nb_sci      = pl_sci[bidx];         /* my i super-cluster's index = current bidx */
@@ -275,7 +275,6 @@ __global float *restrict fshift,            /* stores float3 values */     /* OU
         bCalcFshift = false;
     }
 
-	//fshift_buf = (float3)(0.0f);
     fshift_buf = 0.0f;
 
     /* loop over the j clusters = seen by any of the atoms in the current super-cluster */
@@ -534,15 +533,15 @@ __global float *restrict fshift,            /* stores float3 values */     /* OU
 
     /* add up local shift forces into global mem */    
 	//if (bCalcFshift && tidxj == 0)
-	//	atomicAdd_g_f3(&(fshift[3 * nb_sci.shift]),fshift_buf);
+    //	atomicAdd_g_f3(&(fshift[3 * nb_sci.shift]),fshift_buf);
     if (bCalcFshift)
     {      
-		/* Only threads with tidxj < 3 will update fshift.
-		   The threads performing the update must be the same with the threads
-		   which stored the reduction result in reduce_force_i function
-		*/
-		if (tidxj < 3)
-			atomicAdd_g_f(&(fshift[3 * nb_sci.shift + tidxj]), fshift_buf);		
+        /* Only threads with tidxj < 3 will update fshift.
+           The threads performing the update must be the same with the threads
+           which stored the reduction result in reduce_force_i function
+        */
+        if (tidxj < 3)
+            atomicAdd_g_f(&(fshift[3 * nb_sci.shift + tidxj]), fshift_buf);		
     }
 
 #ifdef CALC_ENERGIES
