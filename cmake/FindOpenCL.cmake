@@ -32,177 +32,210 @@
 # To help us fund GROMACS development, we humbly ask that you cite
 # the research papers on the package. Check out http://www.gromacs.org.
 
-# - Try to find OpenCL
-# This module tries to find an OpenCL implementation on your system. Currently
-# it supports searching system locations or detecting environment variables
-# for the following implementations:
-#  AMD Advanced Parallel Processing SDK
-#  NVIDIA CUDA Toolkit
-#  Intel OpenCL SDK
-#  Generic system installed version
-#  Custom location
+#.rst:
+# FindOPENCL
+# ----------
 #
-# To set manually the paths, define these environment or CMake variables:
-#  OPENCL_ROOT         - Root path containing include/CL/cl.h
+# Try to find OPENCL
 #
-# Once done this will define
-#  GMX_DETECT_OPENCL_AVAILABLE              - System has an OpenCL library
-#  OPENCL_INCLUDE_DIRS       - The OpenCL include directories needed
-#  OPENCL_LIBRARIES          - Link libraries needed for OpenCL
-#  OPENCL_VERSION_STRING     - Version of OpenCL that was found
-#  OPENCL_HAS_CXX            - Whether or not C++ bindings are available
-#  OPENCL_CXX_VERSION_STRING - Version of the C++ bindings if available
-#  OPENCL_CXX_DEFINITIONS    - Compiler defines needed for the C++ bindings
-#                             (May be nexessary if C++ bindings are of a
-#                              different version than the C API; i.e OpenCL 1.2
-#                              but with C++ bindings for 1.1)
+# Once done this will define::
+#
+#   OPENCL_FOUND          - True if OPENCL was found
+#   OPENCL_INCLUDE_DIRS   - include directories for OPENCL
+#   OPENCL_LIBRARIES      - link against this library to use OPENCL
+#   OPENCL_VERSION_STRING - Highest supported OPENCL version (eg. 1.2)
+#   OPENCL_VERSION_MAJOR  - The major version of the OPENCL implementation
+#   OPENCL_VERSION_MINOR  - The minor version of the OPENCL implementation
+#
+# The module will also define two cache variables::
+#
+#   OPENCL_INCLUDE_DIR    - the OPENCL include directory
+#   OPENCL_LIBRARY        - the path to the OPENCL library
+#
+# This is a modified version of FindOpenCL.cmake from cmake v3.1.0
+# (see comments at the end of the file).
+# The following changes have been made:
+#     1. OpenCL is written in all caps (OPENCL)
+#     2. The following block has been modified:
+#include(${CMAKE_CURRENT_LIST_DIR}/FindPackageHandleStandardArgs.cmake)
+#find_package_handle_standard_args(
+#  OpenCL
+#  FOUND_VAR OpenCL_FOUND
+#  REQUIRED_VARS OpenCL_LIBRARY OpenCL_INCLUDE_DIR
+#  VERSION_VAR OpenCL_VERSION_STRING)
+#     has been replaced by:
+#include(FindPackageHandleStandardArgs)
+#FIND_PACKAGE_HANDLE_STANDARD_ARGS(OPENCL
+#  REQUIRED_VARS OPENCL_LIBRARY OPENCL_INCLUDE_DIR
+#  VERSION_VAR OPENCL_VERSION_STRING)
 
-message(STATUS "Detecting OpenCL capability")
+function(_FIND_OPENCL_VERSION)
+  include(CheckSymbolExists)
+  include(CMakePushCheckState)
+  set(CMAKE_REQUIRED_QUIET ${OPENCL_FIND_QUIETLY})
 
-if(NOT GMX_DETECT_OPENCL_AVAILABLE)
-  include(CheckTypeSize)
-  CHECK_TYPE_SIZE("void*" SIZEOF_VOID_P)
+  CMAKE_PUSH_CHECK_STATE()
+  foreach(VERSION "2_0" "1_2" "1_1" "1_0")
+    set(CMAKE_REQUIRED_INCLUDES "${OPENCL_INCLUDE_DIR}")
 
-  # User specified OpenCL location
-  if(OPENCL_ROOT)
-    message(STATUS "OpenCL: Searching in custom location")
-    set(CMAKE_FIND_ROOT_PATH ${OPENCL_ROOT})
-    set(_CMAKE_FIND_ROOT_PATH ${CMAKE_FIND_ROOT_PATH})
-    set(_OPENCL_ROOT_OPTS "ONLY_CMAKE_FIND_ROOT_PATH NO_DEFAULT_PATH")
-  elseif(NOT "$ENV{OPENCL_ROOT}" STREQUAL "")
-    message(STATUS "OpenCL: Searching in custom location")
-    set(_CMAKE_FIND_ROOT_PATH ${CMAKE_FIND_ROOT_PATH})
-    set(CMAKE_FIND_ROOT_PATH $ENV{OPENCL_ROOT})
-    set(_OPENCL_ROOT_OPTS "ONLY_CMAKE_FIND_ROOT_PATH NO_DEFAULT_PATH")
-
-  # AMD APP SDK
-  elseif(NOT "$ENV{AMDAPPSDKROOT}" STREQUAL "")
-    message(STATUS "OpenCL: Searching for AMD APP SDK")
-    set(CMAKE_FIND_ROOT_PATH $ENV{AMDAPPSDKROOT})
-    set(_CMAKE_FIND_ROOT_PATH ${CMAKE_FIND_ROOT_PATH})
-    set(_OPENCL_ROOT_OPTS "ONLY_CMAKE_FIND_ROOT_PATH NO_DEFAULT_PATH")
-    if(SIZEOF_VOID_P EQUAL 4)
-      #set(_OPENCL_LIB_OPTS "PATH_SUFFIXES x86")
-      set(_OPENCL_LIB_DIR_SUFFIX "\\x86")
+    if(APPLE)
+      CHECK_SYMBOL_EXISTS(
+        CL_VERSION_${VERSION}
+        "${OPENCL_INCLUDE_DIR}/OPENCL/cl.h"
+        OPENCL_VERSION_${VERSION})
     else()
-      #set(_OPENCL_LIB_OPTS PATH_SUFFIX x86_64)
-      #set(_OPENCL_LIB_OPTS "PATH_SUFFIXES x86_64")
-      set(_OPENCL_LIB_DIR_SUFFIX "\\x86_64")
+      CHECK_SYMBOL_EXISTS(
+        CL_VERSION_${VERSION}
+        "${OPENCL_INCLUDE_DIR}/CL/cl.h"
+        OPENCL_VERSION_${VERSION})
     endif()
 
-  # NVIDIA CUDA
-  elseif(NOT "$ENV{CUDA_PATH}" STREQUAL "")
-    message(STATUS "OpenCL: Searching for NVIDIA CUDA SDK")
-    set(CMAKE_FIND_ROOT_PATH $ENV{CUDA_PATH})
-    set(_CMAKE_FIND_ROOT_PATH ${CMAKE_FIND_ROOT_PATH})
-    set(_OPENCL_ROOT_OPTS "ONLY_CMAKE_FIND_ROOT_PATH NO_DEFAULT_PATH")
-    if(WIN32)
-      if(SIZEOF_VOID_P EQUAL 4)
-        #set(_OPENCL_LIB_OPTS "PATH_SUFFIX Win32")
-        set(_OPENCL_LIB_DIR_SUFFIX "\\Win32")
-      else()
-        #set(_OPENCL_LIB_OPTS PATH_SUFFIX Win64)
-        #set(_OPENCL_LIB_OPTS "PATH_SUFFIX x64")
-        set(_OPENCL_LIB_DIR_SUFFIX "\\x64")
-      endif()
-    else()
-      if(SIZEOF_VOID_P EQUAL 4)
-        set(_OPENCL_LIB_DIR_SUFFIX)
-      else()
-        set(_OPENCL_LIB_DIR_SUFFIX 64)
-      endif()
+    if(OPENCL_VERSION_${VERSION})
+      string(REPLACE "_" "." VERSION "${VERSION}")
+      set(OPENCL_VERSION_STRING ${VERSION} PARENT_SCOPE)
+      string(REGEX MATCHALL "[0-9]+" version_components "${VERSION}")
+      list(GET version_components 0 major_version)
+      list(GET version_components 1 minor_version)
+      set(OPENCL_VERSION_MAJOR ${major_version} PARENT_SCOPE)
+      set(OPENCL_VERSION_MINOR ${minor_version} PARENT_SCOPE)
+      break()
     endif()
+  endforeach()
+  CMAKE_POP_CHECK_STATE()
+endfunction()
 
-  # Intel OpenCL SDK
-  elseif(NOT "$ENV{INTELOCLSDKROOT}" STREQUAL "")
-    message(STATUS "OpenCL: Searching for Intel OpenCL SDK")
-    set(CMAKE_FIND_ROOT_PATH $ENV{INTELOCLSDKROOT})
-    set(_CMAKE_FIND_ROOT_PATH ${CMAKE_FIND_ROOT_PATH})
-    set(_OPENCL_ROOT_OPTS "ONLY_CMAKE_FIND_ROOT_PATH NO_DEFAULT_PATH")
-    if(WIN32)
-      if(SIZEOF_VOID_P EQUAL 4)
-        #set(_OPENCL_LIB_OPTS "PATH_SUFFIX x86")
-        set(_OPENCL_LIB_DIR_SUFFIX "\\x86")
-      else()
-        #set(_OPENCL_LIB_OPTS "PATH_SUFFIX x64")
-        set(_OPENCL_LIB_DIR_SUFFIX "\\x64")
-      endif()
-    else()
-      if(SIZEOF_VOID_P EQUAL 4)
-        set(_OPENCL_LIB_DIR_SUFFIX)
-      else()
-        set(_OPENCL_LIB_DIR_SUFFIX 64)
-      endif()
-    endif()
+find_path(OPENCL_INCLUDE_DIR
+  NAMES
+    CL/cl.h OPENCL/cl.h
+  PATHS
+    ENV "PROGRAMFILES(X86)"
+    ENV AMDAPPSDKROOT
+    ENV INTELOCLSDKROOT
+    ENV NVSDKCOMPUTE_ROOT
+    ENV CUDA_PATH
+    ENV ATISTREAMSDKROOT
+  PATH_SUFFIXES
+    include
+    OPENCL/common/inc
+    "AMD APP/include")
 
-  # System location
-  else()
-    message(STATUS "OpenCL: Searching in system location")
+_FIND_OPENCL_VERSION()
+
+if(WIN32)
+  if(CMAKE_SIZEOF_VOID_P EQUAL 4)
+    find_library(OPENCL_LIBRARY
+      NAMES OPENCL
+      PATHS
+        ENV "PROGRAMFILES(X86)"
+        ENV AMDAPPSDKROOT
+        ENV INTELOCLSDKROOT
+        ENV CUDA_PATH
+        ENV NVSDKCOMPUTE_ROOT
+        ENV ATISTREAMSDKROOT
+      PATH_SUFFIXES
+        "AMD APP/lib/x86"
+        lib/x86
+        lib/Win32
+        OPENCL/common/lib/Win32)
+  elseif(CMAKE_SIZEOF_VOID_P EQUAL 8)
+    find_library(OPENCL_LIBRARY
+      NAMES OPENCL
+      PATHS
+        ENV "PROGRAMFILES(X86)"
+        ENV AMDAPPSDKROOT
+        ENV INTELOCLSDKROOT
+        ENV CUDA_PATH
+        ENV NVSDKCOMPUTE_ROOT
+        ENV ATISTREAMSDKROOT
+      PATH_SUFFIXES
+        "AMD APP/lib/x86_64"
+        lib/x86_64
+        lib/x64
+        OPENCL/common/lib/x64)
   endif()
-
-  if(APPLE)
-    set(_OPENCL_INCLUDE_BASE OpenCL)
-  else()
-    set(_OPENCL_INCLUDE_BASE CL)
-  endif()
-
-  # Find the headers
-  find_path(OPENCL_INCLUDE_DIR ${_OPENCL_INCLUDE_BASE}/cl.h
-    PATHS /include
-    ${_OPENCL_ROOT_OPTS}
-  )
-
-  if(OPENCL_INCLUDE_DIR)
-    # Interrogate the C header for version information
-    set(CMAKE_REQUIRED_INCLUDES ${OPENCL_INCLUDE_DIR})
-
-    include(CheckSymbolExists)
-    foreach(_MINOR_VER 0 1 2 3)
-      CHECK_SYMBOL_EXISTS(CL_VERSION_1_${_MINOR_VER} "CL/cl.h" _OPENCL_VER)
-      if(_OPENCL_VER)
-        set(OPENCL_VERSION_STRING "1.${_MINOR_VER}")
-        unset(_OPENCL_VER CACHE)
-      else()
-        break()
-      endif()
-    endforeach()
-
-    if(EXISTS ${OPENCL_INCLUDE_DIR}/${_OPENCL_INCLUDE_BASE}/cl.hpp)
-      set(OPENCL_HAS_CXX TRUE)
-
-      # Interrogate the C++ header for seperate version information
-      file(STRINGS ${OPENCL_INCLUDE_DIR}/${_OPENCL_INCLUDE_BASE}/cl.hpp
-        _OPENCL_VER REGEX "version 1\\.[0-3]"
-      )
-      string(REGEX MATCH "1\\.([0-9])" OPENCL_CXX_VERSION_STRING
-        "${_OPENCL_VER}"
-      )
-      set(_MINOR_VER ${CMAKE_MATCH_1})
-      if(OPENCL_CXX_VERSION_STRING VERSION_LESS OPENCL_VERSION_STRING)
-        set(OPENCL_CXX_DEFINITIONS -DCL_USE_DEPRECATED_OPENCL_1_${_MINOR_VER}_APIS)
-      endif()
-    else()
-      set(OPENCL_HAS_CXX FALSE)
-    endif()
-
-    unset(CMAKE_REQUIRED_INCLUDES)
-  endif()
-
-  find_library(OPENCL_LIBRARY OpenCL
-    PATHS /lib${_OPENCL_LIB_DIR_SUFFIX}
-    ${_OPENCL_ROOT_OPTS}
-   )
-
-  # Restore the original search paths
-  set(CMAKE_FIND_ROOT_PATH ${_CMAKE_FIND_ROOT_PATH})
-
-  include(FindPackageHandleStandardArgs)
-   FIND_PACKAGE_HANDLE_STANDARD_ARGS(OpenCL
-     REQUIRED_VARS OPENCL_INCLUDE_DIR OPENCL_LIBRARY
-     VERSION_VAR OPENCL_VERSION_STRING
-   )
-
-  set(OPENCL_INCLUDE_DIRS ${OPENCL_INCLUDE_DIR})
-  set(OPENCL_LIBRARIES ${OPENCL_LIBRARY})
-
+else()
+  find_library(OPENCL_LIBRARY
+    NAMES OPENCL)
 endif()
+
+set(OPENCL_LIBRARIES ${OPENCL_LIBRARY})
+set(OPENCL_INCLUDE_DIRS ${OPENCL_INCLUDE_DIR})
+
+include(FindPackageHandleStandardArgs)
+FIND_PACKAGE_HANDLE_STANDARD_ARGS(OPENCL
+  REQUIRED_VARS OPENCL_LIBRARY OPENCL_INCLUDE_DIR
+  VERSION_VAR OPENCL_VERSION_STRING)
+
+mark_as_advanced(
+  OPENCL_INCLUDE_DIR
+  OPENCL_LIBRARY)
+ 
+#=============================================================================
+# Copyright 2014 Matthaeus G. Chajdas
+#
+# Distributed under the OSI-approved BSD License (the "License");
+# see accompanying file Copyright.txt for details.
+#
+# This software is distributed WITHOUT ANY WARRANTY; without even the
+# implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# See the License for more information.
+#=============================================================================
+# cmake 3.1.0 Copyright.txt file content is attached below:
+#
+#CMake - Cross Platform Makefile Generator
+#Copyright 2000-2014 Kitware, Inc.
+#Copyright 2000-2011 Insight Software Consortium
+#All rights reserved.
+#
+#Redistribution and use in source and binary forms, with or without
+#modification, are permitted provided that the following conditions
+#are met:
+#
+#* Redistributions of source code must retain the above copyright
+#  notice, this list of conditions and the following disclaimer.
+#
+#* Redistributions in binary form must reproduce the above copyright
+#  notice, this list of conditions and the following disclaimer in the
+#  documentation and/or other materials provided with the distribution.
+#
+#* Neither the names of Kitware, Inc., the Insight Software Consortium,
+#  nor the names of their contributors may be used to endorse or promote
+#  products derived from this software without specific prior written
+#  permission.
+#
+#THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+#"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+#LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+#A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+#HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+#SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+#LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+#DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+#THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+#(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+#OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+#------------------------------------------------------------------------------
+#
+#The above copyright and license notice applies to distributions of
+#CMake in source and binary form.  Some source files contain additional
+#notices of original copyright by their contributors; see each source
+#for details.  Third-party software packages supplied with CMake under
+#compatible licenses provide their own copyright notices documented in
+#corresponding subdirectories.
+#
+#------------------------------------------------------------------------------
+#
+#CMake was initially developed by Kitware with the following sponsorship:
+#
+# * National Library of Medicine at the National Institutes of Health
+#   as part of the Insight Segmentation and Registration Toolkit (ITK).
+#
+# * US National Labs (Los Alamos, Livermore, Sandia) ASC Parallel
+#   Visualization Initiative.
+#
+# * National Alliance for Medical Image Computing (NAMIC) is funded by the
+#   National Institutes of Health through the NIH Roadmap for Medical Research,
+#   Grant U54 EB005149.
+#
+# * Kitware, Inc.

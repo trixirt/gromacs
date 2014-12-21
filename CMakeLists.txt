@@ -162,12 +162,11 @@ option(GMX_COOL_QUOTES "Enable Gromacs cool quotes" ON)
 mark_as_advanced(GMX_COOL_QUOTES)
 gmx_add_cache_dependency(GMX_COOL_QUOTES BOOL "NOT GMX_FAHCORE" OFF)
 
-option(GMX_GPU  "Enable GPU acceleration" ON)
 option(GMX_USE_OPENCL "Enable OpenCL acceleration" OFF)
 
-# Decide on GPU settings based on user-settings and GPU/CUDA detection.
-# We support CUDA >=v4.0 on *nix, but <= v4.1 doesn't work with MSVC
 if(NOT GMX_USE_OPENCL)
+    # Decide on GPU settings based on user-settings and GPU/CUDA detection.
+    # We support CUDA >=v4.0 on *nix, but <= v4.1 doesn't work with MSVC
     if(MSVC)
         set(REQUIRED_CUDA_VERSION 4.1)
     else()
@@ -228,6 +227,7 @@ mark_as_advanced(GMX_BROKEN_CALLOC)
 option(GMX_LOAD_PLUGINS "Compile with plugin support, needed to read VMD supported file formats" ON)
 mark_as_advanced(GMX_LOAD_PLUGINS)
 
+option(GMX_GPU  "Enable GPU acceleration" ON)
 option(GMX_OPENMP "Enable OpenMP-based multithreading" ON)
 
 option(GMX_USE_TNG "Use the TNG library for trajectory I/O" ON)

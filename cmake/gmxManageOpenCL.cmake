@@ -32,45 +32,27 @@
 # To help us fund GROMACS development, we humbly ask that you cite
 # the research papers on the package. Check out http://www.gromacs.org.
 
-option(GMX_OPENCL_FORCE_CL11_API "Try this if you are having compilations issues with OpenCL enabled" OFF)
-option(GMX_OPENCL_HIDE_COMMENT_WARNING "Tell compiler to hide warnings for comments caused by cl_gl_ext.h on Linux" ON)
-
 if(GMX_DOUBLE)
     message(FATAL_ERROR "OpenCL not available in double precision - Yet!")
 endif()
 
-#Look for OpenCL
-find_package(OpenCL REQUIRED)
+# Look for OpenCL
+# TODO: FindOpenCL module is available in cmake starting with version 3.1.0.
+# A modified version of that module is used here.
+# Remove FindOpenCL.cmake file when GROMACS switches to cmake 3.1.0 or higher.
+find_package(OpenCL)
 
-
-#Well the package is REQUIRED so if not found we have stopped already
-#But if it was not required consider handling the cases where:
-#1) nothing was found (mark something as off and jump out)
-#2) OpenCL library was found, but not the headers. Ask the use to install an SDK/Opencl dev package
-
-message(STATUS "OPENCL_INCLUDE_DIRS: " "${OPENCL_INCLUDE_DIRS} ")
-message(STATUS "OPENCL_LIBRARIES: " "${OPENCL_LIBRARIES} ")
-
-#Now configure options
-message(STATUS "Setting OpenCL specific options")
-    #Where can OpenCL headers be? and with what priority?
-    #1: In system
-    #2: In paths indicated by environtment variables
-    #3: In standard installation paths (e.g. /opt/AMDAPP, /usr/local/cuda etc..
-    #4: In Gromacs
-
-if(GMX_OPENCL_FORCE_CL11_API)
-    set(OPENCL_DEFINITIONS "-DCL_USE_DEPRECATED_OPENCL_1_1_APIS")
-endif(GMX_OPENCL_FORCE_CL11_API)
-
-if(UNIX AND GMX_OPENCL_HIDE_COMMENT_WARNING)
-    set(OPENCL_DEFINITIONS ${OPENCL_DEFINITIONS} " -Wno-comment")
+if (OPENCL_FOUND)
+    if (OPENCL_VERSION_STRING VERSION_LESS REQUIRED_OPENCL_MIN_VERSION)
+        message(FATAL_ERROR "OpenCL " "${OPENCL_VERSION_STRING}" " is not supported. OpenCL version " "${REQUIRED_OPENCL_MIN_VERSION}" " or newer is required.")
+        return ()
+    endif()
+else ()
+    message(FATAL_ERROR "OpenCL not found.")
+    return()
 endif()
 
-add_definitions(${OPENCL_DEFINITIONS})
 include_directories(${OPENCL_INCLUDE_DIRS})
-
-message(STATUS "OpenCL lib: " ${OPENCL_LIBRARIES} ", PATH: " ${OPENCL_INCLUDE_DIRS} ", DEFINITIONS: " ${OPENCL_DEFINITIONS})
 
 macro(gmx_gpu_setup)
     # no OpenMP is no good!
