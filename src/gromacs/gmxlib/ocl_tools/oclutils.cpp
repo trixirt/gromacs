@@ -43,6 +43,7 @@
 
 #include <cassert>
 #include <cstdio>
+#include <stdlib.h>
 
 #include "gromacs/utility/fatalerror.h"
 
