@@ -46,6 +46,8 @@
 extern "C" {
 #endif
 
+/* To prevent warnings when linking against OpenCL > 1.1 */
+#define CL_USE_DEPRECATED_OPENCL_1_1_APIS
 #include <CL/opencl.h>
 
 /*! \brief OpenCL vendor IDs */
