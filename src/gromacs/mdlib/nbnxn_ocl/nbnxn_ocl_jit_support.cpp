@@ -174,8 +174,8 @@ nbnxn_ocl_compile_kernels_inner(int                        mygpu,
     }
 
     cl_error =
-        ocl_compile_program(_default_source_,
-                            _auto_vendor_kernels_,
+        ocl_compile_program(default_source,
+                            auto_vendor_kernels,
                             &gmx_algo_family,
                             bOclDoFastGen,
                             result_str,

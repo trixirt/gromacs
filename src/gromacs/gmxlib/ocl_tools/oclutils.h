@@ -52,10 +52,10 @@ extern "C" {
 
 /*! \brief OpenCL vendor IDs */
 typedef enum {
-    _OCL_VENDOR_NVIDIA_ = 0,
-    _OCL_VENDOR_AMD_,
-    _OCL_VENDOR_INTEL_,
-    _OCL_VENDOR_UNKNOWN_
+    OCL_VENDOR_NVIDIA = 0,
+    OCL_VENDOR_AMD,
+    OCL_VENDOR_INTEL,
+    OCL_VENDOR_UNKNOWN
 } ocl_vendor_id_t;
 
 /*! \internal \brief OpenCL GPU device identificator

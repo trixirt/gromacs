@@ -56,10 +56,10 @@
  * Only affects the bottom level kernel sources (nbnxn_ocl_kernel_[spec].cl)
  */
 typedef enum {
-    _generic_vendor_kernels_ = 0, /**< Standard (warp-less) source file with generated methods/energy/prune */
-    _nvidia_vendor_kernels_,      /**< Nvidia source file with generated methods/energy/prune */
-    _amd_vendor_kernels_,         /**< AMD source file with generated methods/energy/prune */
-    _auto_vendor_kernels_         /**< Compiler will select source based on vendor id*/
+    generic_vendor_kernels = 0, /**< Standard (warp-less) source file with generated methods/energy/prune */
+    nvidia_vendor_kernels,      /**< Nvidia source file with generated methods/energy/prune */
+    amd_vendor_kernels,         /**< AMD source file with generated methods/energy/prune */
+    auto_vendor_kernels         /**< Compiler will select source based on vendor id*/
 } kernel_vendor_spec_t;
 
 /*! \brief Kernel sources index
@@ -68,7 +68,7 @@ typedef enum {
  * This affect the top level kernel sources (nbnxn_ocl_kernels.cl)
  */
 typedef enum {
-    _default_source_ = 0  /* The default top-level source  */
+    default_source = 0  /* The default top-level source  */
 } kernel_source_index_t;
 
 /*! \internal

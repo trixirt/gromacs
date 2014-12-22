@@ -89,8 +89,8 @@ static bool is_compatible_gpu(int stat)
 static int is_gmx_supported_gpu_id(struct gmx_device_info_t *ocl_gpu_device)
 {
     /* Only AMD and NVIDIA GPUs are supported for now */
-    if ((_OCL_VENDOR_NVIDIA_ == ocl_gpu_device->vendor_e) ||
-        (_OCL_VENDOR_AMD_ == ocl_gpu_device->vendor_e))
+    if ((OCL_VENDOR_NVIDIA == ocl_gpu_device->vendor_e) ||
+        (OCL_VENDOR_AMD == ocl_gpu_device->vendor_e))
     {
         return egpuCompatible;
     }
@@ -109,21 +109,21 @@ ocl_vendor_id_t get_vendor_id(char *vendor_name)
     {
         if (strstr(vendor_name, "NVIDIA"))
         {
-            return _OCL_VENDOR_NVIDIA_;
+            return OCL_VENDOR_NVIDIA;
         }
         else
         if (strstr(vendor_name, "AMD") ||
             strstr(vendor_name, "Advanced Micro Devices"))
         {
-            return _OCL_VENDOR_AMD_;
+            return OCL_VENDOR_AMD;
         }
         else
         if (strstr(vendor_name, "Intel"))
         {
-            return _OCL_VENDOR_INTEL_;
+            return OCL_VENDOR_INTEL;
         }
     }
-    return _OCL_VENDOR_UNKNOWN_;
+    return OCL_VENDOR_UNKNOWN;
 }
 
 
@@ -248,7 +248,7 @@ int detect_gpus(gmx_gpu_info_t *gpu_info, char *err_str)
                 int last = -1;
                 for (int i = 0; i < gpu_info->n_dev; i++)
                 {
-                    if (_OCL_VENDOR_AMD_ == gpu_info->gpu_dev[i].vendor_e)
+                    if (OCL_VENDOR_AMD == gpu_info->gpu_dev[i].vendor_e)
                     {
                         if ((last + 1) < i)
                         {
@@ -266,7 +266,7 @@ int detect_gpus(gmx_gpu_info_t *gpu_info, char *err_str)
                 {
                     for (int i = 0; i < gpu_info->n_dev; i++)
                     {
-                        if (_OCL_VENDOR_NVIDIA_ == gpu_info->gpu_dev[i].vendor_e)
+                        if (OCL_VENDOR_NVIDIA == gpu_info->gpu_dev[i].vendor_e)
                         {
                             if ((last + 1) < i)
                             {

@@ -183,7 +183,7 @@ create_ocl_build_options_length(
     size_t build_options_length = 0;
     size_t whitespace           = 1;
 
-    assert(build_device_vendor_id <= _OCL_VENDOR_UNKNOWN_);
+    assert(build_device_vendor_id <= OCL_VENDOR_UNKNOWN);
 
     if (custom_build_options_prepend)
     {
@@ -191,7 +191,7 @@ create_ocl_build_options_length(
             strlen(custom_build_options_prepend)+whitespace;
     }
 
-    if ( (build_device_vendor_id == _OCL_VENDOR_AMD_) && getenv("GMX_OCL_DEBUG") && getenv("GMX_OCL_FORCE_CPU") )
+    if ( (build_device_vendor_id == OCL_VENDOR_AMD) && getenv("GMX_OCL_DEBUG") && getenv("GMX_OCL_FORCE_CPU") )
     {
         build_options_length += get_ocl_build_option_length(_generic_debug_symbols_)+whitespace;
     }
@@ -208,13 +208,13 @@ create_ocl_build_options_length(
             get_ocl_build_option_length(_generic_fast_relaxed_math_)+whitespace;
     }
 
-    if ((build_device_vendor_id == _OCL_VENDOR_NVIDIA_) && getenv("GMX_OCL_VERBOSE"))
+    if ((build_device_vendor_id == OCL_VENDOR_NVIDIA) && getenv("GMX_OCL_VERBOSE"))
     {
         build_options_length +=
             get_ocl_build_option_length(_nvidia_verbose_) + whitespace;
     }
 
-    if ((build_device_vendor_id == _OCL_VENDOR_AMD_) && getenv("GMX_OCL_DUMP_INTERM_FILES"))
+    if ((build_device_vendor_id == OCL_VENDOR_AMD) && getenv("GMX_OCL_DUMP_INTERM_FILES"))
     {
         /* To dump OpenCL build intermediate files, caching must be off */
         if (NULL != getenv("GMX_OCL_NOGENCACHE"))
@@ -285,7 +285,7 @@ create_ocl_build_options(
         build_options_string[char_added++] = ' ';
     }
 
-    if ((build_device_vendor_id == _OCL_VENDOR_NVIDIA_) && getenv("GMX_OCL_VERBOSE"))
+    if ((build_device_vendor_id == OCL_VENDOR_NVIDIA) && getenv("GMX_OCL_VERBOSE"))
     {
         strncpy(build_options_string + char_added,
                 get_ocl_build_option(_nvidia_verbose_),
@@ -295,7 +295,7 @@ create_ocl_build_options(
         build_options_string[char_added++] = ' ';
     }
 
-    if ((build_device_vendor_id == _OCL_VENDOR_AMD_) && getenv("GMX_OCL_DUMP_INTERM_FILES"))
+    if ((build_device_vendor_id == OCL_VENDOR_AMD) && getenv("GMX_OCL_DUMP_INTERM_FILES"))
     {
         /* To dump OpenCL build intermediate files, caching must be off */
         if (NULL != getenv("GMX_OCL_NOGENCACHE"))
@@ -309,7 +309,7 @@ create_ocl_build_options(
         }
     }
 
-    if ( ( build_device_vendor_id == _OCL_VENDOR_AMD_ ) && getenv("GMX_OCL_DEBUG") && getenv("GMX_OCL_FORCE_CPU"))
+    if ( ( build_device_vendor_id == OCL_VENDOR_AMD ) && getenv("GMX_OCL_DEBUG") && getenv("GMX_OCL_FORCE_CPU"))
     {
         strncpy( build_options_string+char_added,
                  get_ocl_build_option(_generic_debug_symbols_),
@@ -639,16 +639,16 @@ ocl_autoselect_kernel_from_vendor(ocl_vendor_id_t vendor_id)
     printf("Selecting kernel source automatically\n");
     switch (vendor_id)
     {
-        case _OCL_VENDOR_AMD_:
-            kernel_vendor = _amd_vendor_kernels_;
+        case OCL_VENDOR_AMD:
+            kernel_vendor = amd_vendor_kernels;
             printf("Selecting kernel for AMD\n");
             break;
-        case _OCL_VENDOR_NVIDIA_:
-            kernel_vendor = _nvidia_vendor_kernels_;
+        case OCL_VENDOR_NVIDIA:
+            kernel_vendor = nvidia_vendor_kernels;
             printf("Selecting kernel for Nvidia\n");
             break;
         default:
-            kernel_vendor = _generic_vendor_kernels_;
+            kernel_vendor = generic_vendor_kernels;
             printf("Selecting generic kernel\n");
             break;
     }
@@ -663,7 +663,7 @@ ocl_autoselect_kernel_from_vendor(ocl_vendor_id_t vendor_id)
 static const char *
 ocl_get_vendor_specific_define(kernel_vendor_spec_t kernel_spec)
 {
-    assert(kernel_spec < _auto_vendor_kernels_ );
+    assert(kernel_spec < auto_vendor_kernels );
     printf("Setting up kernel vendor spec definitions:  %s \n", kernel_vendor_spec_definitions[kernel_spec]);
     return kernel_vendor_spec_definitions[kernel_spec];
 }
@@ -750,7 +750,7 @@ ocl_get_build_options_string(cl_context           context,
     warp_size = ocl_get_warp_size(context, device_id);
 
     /* Select vendor specific kernels automatically */
-    if (kernel_vendor_spec == _auto_vendor_kernels_)
+    if (kernel_vendor_spec == auto_vendor_kernels)
     {
         kernel_vendor_spec = ocl_autoselect_kernel_from_vendor(ocl_device_vendor);
     }
@@ -989,7 +989,7 @@ ocl_compile_program(
                 }
             }
             else
-            if ((_OCL_VENDOR_NVIDIA_ == ocl_device_vendor) && getenv("GMX_OCL_DUMP_INTERM_FILES"))
+            if ((OCL_VENDOR_NVIDIA == ocl_device_vendor) && getenv("GMX_OCL_DUMP_INTERM_FILES"))
             {
                 /* If dumping intermediate files has been requested and this is an NVIDIA card
                    => write PTX to file */
