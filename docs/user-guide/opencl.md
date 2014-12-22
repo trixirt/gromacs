@@ -13,9 +13,9 @@ Also check "Known Limitations" chapter.
 
 2. OPENCL SETUP
    ============
-Build Gromacs with OpenCL support enabled
+Build GROMACS with OpenCL support enabled
 -----------------------------------------
-To build Gromacs with OpenCL support enabled, an OpenCL SDK must be installed
+To build GROMACS with OpenCL support enabled, an OpenCL SDK must be installed
 and the following cmake flags must be set:
 	GMX_GPU
 	GMX_USE_OPENCL
@@ -24,17 +24,6 @@ your system, the following cmake entries will be defined:
 	OPENCL_INCLUDE_DIR - the OpenCL include directory
 	OPENCL_LIBRARY - the OpenCL library directory
 The two paths will be automatically used to configure the project. 
-
-Run Gromacs with OpenCL accelerations enabled
----------------------------------------------
-Gromacs loads and builds at runtime the OpenCL kernels. To do so, it needs to
-know the location of the OpenCL source files.
-If you want to run the installed version, the path to the OpenCL files is
-automatically defined.
-If you do not wish to install Gromacs, but run the version built from sources,
-you need to provide the path to the source tree with the OpenCL kernels like
-below:
-	export GMX_OCL_FILE_PATH=/path-to-gromacs/src/
 
 Caching options for building the kernels
 ----------------------------------------
@@ -58,11 +47,8 @@ PP ranks can also be used for OpenCL devices: -gpu_id
 Environment Variables For OpenCL
 --------------------------------
 Currently, several environment variables exist that help customize some aspects
-of the OpenCL version of Gromacs. They are mostly related to the runtime
+of the OpenCL version of GROMACS. They are mostly related to the runtime
 compilation of OpenCL kernels, but they are also used on the device selection.
-
-   GXM_OCL_FILE_PATH: Is the full path to Gromacs src folder. Useful when gmx
-   is called from a folder other than the installation/bin folder.
    
    GMX_OCL_NOGENCACHE: Disable caching for OpenCL kernel builds.
    
@@ -102,7 +88,7 @@ compilation of OpenCL kernels, but they are also used on the device selection.
    compiler options.
    
    GMX_OCL_FORCE_CPU: Force the selection of a CPU device instead of a GPU.
-   This exists only for debugging purposes. Do not expect Gromacs to function
+   This exists only for debugging purposes. Do not expect GROMACS to function
    properly with this option on, it is solely for the simplicity of stepping
    in a kernel and see what is happening.
    
@@ -116,6 +102,10 @@ compilation of OpenCL kernels, but they are also used on the device selection.
    Equivalent of CUDA env var GMX_CUDA_NB_EWALD_TWINCUT
    
    GMX_DISABLE_OCL_TIMING: Disables timing for OpenCL operations
+   
+   GXM_OCL_FILE_PATH: Use this parameter to force GROMACS to load the OpenCL
+   kernels from a custom location. Use it only if you want to overwrite
+   GROMACS default behavior or if you want to test your own kernels.
 
 3. KNOWN LIMITATIONS
    =================

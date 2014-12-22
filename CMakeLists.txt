@@ -164,20 +164,24 @@ gmx_add_cache_dependency(GMX_COOL_QUOTES BOOL "NOT GMX_FAHCORE" OFF)
 
 option(GMX_USE_OPENCL "Enable OpenCL acceleration" OFF)
 
+# Decide on GPU settings based on user-settings and GPU/CUDA detection.
+# We support CUDA >=v4.0 on *nix, but <= v4.1 doesn't work with MSVC
+if(MSVC)
+    set(REQUIRED_CUDA_VERSION 4.1)
+else()
+    set(REQUIRED_CUDA_VERSION 4.0)
+endif()
+set(REQUIRED_CUDA_COMPUTE_CAPABILITY 2.0)
+
+# OpenCL required version: 1.1 or newer
+set(REQUIRED_OPENCL_MIN_VERSION 1.1)
+
 if(NOT GMX_USE_OPENCL)
-    # Decide on GPU settings based on user-settings and GPU/CUDA detection.
-    # We support CUDA >=v4.0 on *nix, but <= v4.1 doesn't work with MSVC
-    if(MSVC)
-        set(REQUIRED_CUDA_VERSION 4.1)
-    else()
-        set(REQUIRED_CUDA_VERSION 4.0)
-    endif()
-    set(REQUIRED_CUDA_COMPUTE_CAPABILITY 2.0)
+    # CUDA detection is done only if GMX_USE_OPENCL is OFF
     include(gmxManageGPU)
 else()
     #Now the OpenCL path
-    if(GMX_GPU)        
-        set(REQUIRED_OPENCL_MIN_VERSION 1.1)        
+    if(GMX_GPU)
         include(gmxManageOpenCL)
     else(GMX_GPU)
         message(FATAL_ERROR "OpenCL requested but GPU option is not enabled (try -DGMX_GPU=on) ")
