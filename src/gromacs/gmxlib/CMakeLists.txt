@@ -45,7 +45,6 @@ if(GMX_GPU AND NOT GMX_USE_OPENCL)
     add_subdirectory(cuda_tools)
 elseif(GMX_GPU AND GMX_USE_OPENCL)
     add_subdirectory(ocl_tools)
-    set(GMXLIB_OPENCL_KERNELS ${GMXLIB_OPENCL_KERNELS} PARENT_SCOPE)
 endif()
 add_subdirectory(gpu_utils)
 

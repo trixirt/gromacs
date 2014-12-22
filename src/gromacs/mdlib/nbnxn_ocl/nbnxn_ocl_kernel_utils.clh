@@ -34,7 +34,6 @@
  */
 
 #include "vectype_ops.clh"
-#include "nbnxn_consts.h"
 
 #define CL_SIZE                 (NBNXN_GPU_CLUSTER_SIZE)
 #define NCL_PER_SUPERCL         (NBNXN_GPU_NCLUSTER_PER_SUPERCLUSTER)
@@ -56,7 +55,7 @@
 #ifndef NBNXN_OPENCL_KERNEL_UTILS_CLH
 #define NBNXN_OPENCL_KERNEL_UTILS_CLH
 
-__constant sampler_t generic_sampler     = CLK_NORMALIZED_COORDS_FALSE /* Natural coords */
+__constant sampler_t generic_sampler     = CLK_NORMALIZED_COORDS_FALSE  /* Natural coords */
                                             | CLK_ADDRESS_NONE          /* No clamp/repeat*/ 
                                             | CLK_FILTER_NEAREST ;      /* No interpolation */
 
@@ -70,11 +69,6 @@ __constant sampler_t generic_sampler     = CLK_NORMALIZED_COORDS_FALSE /* Natura
 #define ONE_SIXTH_F     0.16666667f
 #define ONE_TWELVETH_F  0.08333333f
 
-
-///////////////////////////////////////////////////////////////////////////////////////
-// TODO: these data structures must be shared between the OpenCL device and OpenCL host code
-//
-///////////////////////////////////////////////////////////////////////////////////////////////
 
 // Data structures shared between OpenCL device code and OpenCL host code
 // TODO: review, improve
@@ -100,7 +94,6 @@ typedef struct {
 
 // Data structure shared between the OpenCL device code and OpenCL host code
 // Must not contain OpenCL objects (buffers)
-// TODO: review, improve
 typedef struct cl_nbparam_params
 {
 
@@ -130,8 +123,6 @@ typedef struct cl_nbparam_params
     float                  coulomb_tab_scale;  /**< table scale/spacing                        */
 }cl_nbparam_params_t;
 
-
-// TODO: review, improve
 typedef struct {
     int sci;            /* i-super-cluster       */
     int shift;          /* Shift vector index plus possible flags */
@@ -155,11 +146,6 @@ typedef struct {
                             * each unsigned has bitS for 4*8 i clusters
                             */
 } nbnxn_excl_t;
-
-///////////////////////////////////////////////////////////////////////////////////////////////
-// 
-///////////////////////////////////////////////////////////////////////////////////////////////
-
 
 /*! i-cluster interaction mask for a super-cluster with all NCL_PER_SUPERCL bits set */
 __constant unsigned supercl_interaction_mask = ((1U << NCL_PER_SUPERCL) - 1U);

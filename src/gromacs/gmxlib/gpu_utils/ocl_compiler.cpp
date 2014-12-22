@@ -57,20 +57,11 @@
 #include <string>
 
 #include "gromacs/utility/stringutil.h"
+#include "gromacs/pbcutil/ishift.h"
+#include "gromacs/mdlib/nbnxn_consts.h"
+#include "gromacs/utility/programcontext.h"
 
-/* This path is defined by CMake and it depends on the install prefix option.
-   The opencl kernels are installed in bin/opencl.*/
-#if !defined(OCL_INSTALL_FULL_PATH)
-#pragma error "OCL_INSTALL_FULL_PATH has not been defined"
-#endif
-
-#if defined(__linux__) || (defined(__APPLE__) && defined(__MACH__))
 #define SEPARATOR '/'
-#define SSEPARATOR "/"
-#elif defined(_WIN32)
-#define SEPARATOR '\\'
-#define SSEPARATOR "\\"
-#endif
 
 /*! \brief Compiler options index
  */
@@ -100,25 +91,8 @@ static const char* build_options_list[] = {
     "-cl-fast-relaxed-math",            /**< Fast math */
     "-cl-opt-disable",                  /**< Disable optimisations */
     "-g",                               /**< Debug symbols */
-    "-save-temps",                      /**< AMD option to dump intermediate temporary
+    "-save-temps"                       /**< AMD option to dump intermediate temporary
                                              files such as IL or ISA code */
-    "-I" "\""OCL_INSTALL_FULL_PATH "\"" /**< Include path to kernel sources */
-    /*,
-       "-I../../src/gromacs/gmxlib/ocl_tools           -I../../src/gromacs/mdlib/nbnxn_ocl            -I../../src/gromacs/pbcutil            -I../../src/gromacs/mdlib"
-       -I../../../gromacs/src/gromacs/gmxlib/ocl_tools -I../../../gromacs/src/gromacs/mdlib/nbnxn_ocl -I../../../gromacs/src/gromacs/pbcutil -I../../../gromacs/src/gromacs/mdlib" */
-};
-
-/*! \brief Include paths when using the GMX_OCL_FILE_PATH to point to the gromacs source tree */
-#define INCLUDE_PATH_COUNT 4
-
-/*! \brief List of include paths relative to the path defined by \p GMX_OCL_FILE_PATH
- */
-static const char* include_path_list[] =
-{
-    "gromacs" SSEPARATOR "mdlib" SSEPARATOR "nbnxn_ocl",
-    "gromacs" SSEPARATOR "gmxlib" SSEPARATOR "ocl_tools",
-    "gromacs" SSEPARATOR "pbcutil",
-    "gromacs" SSEPARATOR "mdlib"
 };
 
 /*! \brief Available sources
@@ -250,12 +224,6 @@ create_ocl_build_options_length(
         }
     }
 
-    build_options_length +=
-        get_ocl_build_option_length(_include_install_opencl_dir_)+whitespace;
-
-    /*build_options_length +=
-        get_ocl_build_option_length(_include_source_opencl_dirs_)+whitespace; */
-
     if (custom_build_options_append)
     {
         build_options_length +=
@@ -351,20 +319,6 @@ create_ocl_build_options(
         build_options_string[char_added++] = ' ';
     }
 
-    strncpy( build_options_string+char_added,
-             get_ocl_build_option(_include_install_opencl_dir_),
-             get_ocl_build_option_length(_include_install_opencl_dir_)
-             );
-    char_added += get_ocl_build_option_length(_include_install_opencl_dir_);
-    build_options_string[char_added++] = ' ';
-
-    /* strncpy( build_options_string+char_added,
-              get_ocl_build_option(_include_source_opencl_dirs_),
-              get_ocl_build_option_length(_include_source_opencl_dirs_)
-       );
-       char_added += get_ocl_build_option_length(_include_source_opencl_dirs_);
-       build_options_string[char_added++]=' '; */
-
     if (custom_build_options_append)
     {
         strncpy( build_options_string+char_added,
@@ -382,13 +336,38 @@ create_ocl_build_options(
     return build_options_string;
 }
 
+/*! \brief Get the full path to the main folder storing OpenCL kernels.
+ *
+ * By default, this function call defaultJITDataPath to obtain the path to
+ * the OpenCL repository. defaultJITDataPath knows how to handle both a launch
+ * from the source tree and a launch from the install folder.
+ * The user can overwrite this behavior by defining GXM_OCL_FILE_PATH
+ * environment variable.
+ *
+ * \return String with the full path to the main folder storing OpenCL kernels.
+ */
+static const char*
+get_ocl_root_path()
+{
+    const char* ocl_root_path = NULL;
+
+    /* Use GMX_OCL_FILE_PATH if the user has defined it */
+    ocl_root_path = getenv("GMX_OCL_FILE_PATH");
+
+    if (!ocl_root_path)
+    {
+        /* Standard way of getting ocl_root_dir */
+        ocl_root_path = gmx::getProgramContext().defaultJITDataPath();
+    }
+
+    return ocl_root_path;
+}
+
 /*! \brief Get the size of the full kernel source file path and name
  *
- * If GMX_OCL_FILE_PATH is defined in the environment the following full path size is returned:
- *  strlen($GMX_OCL_FILE_PATH) + strlen(kernel_id.cl) + separator + null term
- * Otherwise the following full path size is returned (OCL_INSTALL_FULL_PATH is provided by CMAKE
- *  installation prefix path) :
- *  strlen( OCL_INSTALL_FULL_PATH ) + strlen(kernel_id.cl) + separator + null term
+ * The following full path size is computed:
+ * strlen(ocl_root_path) + strlen(kernel_id.cl) + separator + null term
+ * ocl_root_path is provided by the get_ocl_root_path function.
  *
  * \param kernel_src_id Id of the kernel source (auto,nvidia,amd,nowarp)
  * \return Size in bytes of the full kernel source file path and name including
@@ -397,31 +376,25 @@ create_ocl_build_options(
 static size_t
 get_ocl_kernel_source_file_info(kernel_source_index_t kernel_src_id)
 {
-    char * gmx_pathname = NULL;
-    if ( (gmx_pathname = getenv("GMX_OCL_FILE_PATH")) != NULL)
+    const char* ocl_root_path = get_ocl_root_path();
+
+    if (!ocl_root_path)
     {
-        return (strlen(gmx_pathname)                        /* Path to gromacs source    */
-                + strlen(kernel_filenames[kernel_src_id])   /* Kernel source filename   */
-                + strlen(include_path_list[0])              /* Path from gmx src to kernel src */
-                + 2                                         /* separator and null char  */
-                );
+        return 0;
     }
-    else
-    {
-        /* Kernel source are located in the installation folder of Gromacs */
-        return( strlen(kernel_filenames[kernel_src_id])     /* Kernel source filename     */
-                + strlen(OCL_INSTALL_FULL_PATH)             /* Full path to kernel source */
-                + 2);                                       /* separator and null char    */
-    }
+
+    return (strlen(ocl_root_path) +                     /* Path to the main OpenCL folder*/
+            1 +                                         /* Separator */
+            strlen(kernel_filenames[kernel_src_id]) +   /* Kernel source file name */
+            1                                           /* null char */
+            );
 }
 
 /*! \brief Compose and the full path and name of the kernel src to be used
  *
- * If GMX_OCL_FILE_PATH is defined in the environment the following full path size is composed:
- *  $GMX_OCL_FILE_PATH/kernel_id.cl
- * Otherwise the following full path is composed (OCL_INSTALL_FULL_PATH is provided by CMAKE
- *  installation prefix path):
- *  OCL_INSTALL_FULL_PATH/kernel_id.cl
+ * The following full path size is computed:
+ * strlen(ocl_root_path) + strlen(kernel_id.cl) + separator + null term
+ * ocl_root_path is provided by the get_ocl_root_path function.
  *
  * \param ocl_kernel_filename   String where the full path and name will be saved
  * \param kernel_src_id         Id of the kernel source (default)
@@ -435,74 +408,35 @@ get_ocl_kernel_source_path(
         size_t gmx_unused       kernel_filename_len)
 {
     char *filepath = NULL;
+    const char* ocl_root_path = NULL;
 
     assert(kernel_filename_len != 0);
     assert(ocl_kernel_filename != NULL);
 
-    if ( (filepath = getenv("GMX_OCL_FILE_PATH")) != NULL)
-    {
-        FILE  *file_ok = NULL;
+    ocl_root_path = get_ocl_root_path();
+    if (!ocl_root_path)
+        return NULL;
 
-        size_t chars_copied = 0;
-        strncpy(ocl_kernel_filename, filepath, strlen(filepath));
-        chars_copied += strlen(filepath);
+    size_t chars_copied = 0;
+    strncpy(ocl_kernel_filename, ocl_root_path, strlen(ocl_root_path));
+    chars_copied += strlen(ocl_root_path);
 
-        strncpy(&ocl_kernel_filename[chars_copied],
-                include_path_list[0],
-                strlen(include_path_list[0]));
-        chars_copied += strlen(include_path_list[0]);
+    ocl_kernel_filename[chars_copied++] = SEPARATOR;
 
-        ocl_kernel_filename[chars_copied++] = SEPARATOR;
+    strncpy(&ocl_kernel_filename[chars_copied],
+            kernel_filenames[kernel_src_id],
+            strlen(kernel_filenames[kernel_src_id]) );
+    chars_copied += strlen(kernel_filenames[kernel_src_id]);
 
-        strncpy(&ocl_kernel_filename[chars_copied],
-                kernel_filenames[kernel_src_id],
-                strlen(kernel_filenames[kernel_src_id]));
-        chars_copied += strlen(kernel_filenames[kernel_src_id]);
+    ocl_kernel_filename[chars_copied++] = '\0';
 
-        ocl_kernel_filename[chars_copied++] = '\0';
+    assert(chars_copied == kernel_filename_len);
 
-        assert(chars_copied == kernel_filename_len);
-
-
-        //Try to open the file to check that it exists
-        file_ok = fopen(ocl_kernel_filename, "rb");
-        if (file_ok)
-        {
-            fclose(file_ok);
-        }
-        else
-        {
-            printf("Warning, you seem to have misconfigured the GMX_OCL_FILE_PATH environent variable: %s\n",
-                   filepath);
-        }
-    }
-    else
-    {
-        size_t chars_copied = 0;
-        strncpy(ocl_kernel_filename, OCL_INSTALL_FULL_PATH, strlen(OCL_INSTALL_FULL_PATH));
-        chars_copied += strlen(OCL_INSTALL_FULL_PATH);
-
-        ocl_kernel_filename[chars_copied++] = SEPARATOR;
-
-        strncpy(&ocl_kernel_filename[chars_copied],
-                kernel_filenames[kernel_src_id],
-                strlen(kernel_filenames[kernel_src_id]) );
-        chars_copied += strlen(kernel_filenames[kernel_src_id]);
-
-        ocl_kernel_filename[chars_copied++] = '\0';
-
-        assert(chars_copied == kernel_filename_len);
-
-    }
     return ocl_kernel_filename;
 }
 
 /* Undefine the separators */
-#if defined(__linux__) || (defined(__APPLE__) && defined(__MACH__))
 #undef SEPARATOR
-#elif defined(_WIN32)
-#undef SEPARATOR
-#endif
 
 /*! \brief Loads the src inside the file filename onto a string in memory
  *
@@ -797,7 +731,7 @@ check_ocl_cache(char            *ocl_binary_filename,
     return true;
 }
 
-/*! \brief TODO */
+/*! \brief Builds a string with build options for the OpenCL kernels */
 char*
 ocl_get_build_options_string(cl_context           context,
                              cl_device_id         device_id,
@@ -806,9 +740,9 @@ ocl_get_build_options_string(cl_context           context,
                              gmx_algo_family_t  * p_gmx_algo_family,
                              int                  DoFastGen)
 {
-    char * build_options_string              = NULL;
-    char   custom_build_options_prepend[512] = { 0 };
-    char  *custom_build_options_append       = NULL;
+    char * build_options_string               = NULL;
+    char   custom_build_options_prepend[1024] = { 0 };
+    char  *custom_build_options_append        = NULL;
     char  *oclpath   = NULL;
     cl_int warp_size = 0;
 
@@ -821,32 +755,31 @@ ocl_get_build_options_string(cl_context           context,
         kernel_vendor_spec = ocl_autoselect_kernel_from_vendor(ocl_device_vendor);
     }
 
-    /* Create include paths for non-standard location of the kernel sources */
-    if ((oclpath = getenv("GMX_OCL_FILE_PATH")) != NULL)
+    const char* ocl_root_path = get_ocl_root_path();
+
+    /* Create include paths for kernel sources.
+       All OpenCL kernel files are expected to be stored in one single folder. */
+    if (ocl_root_path)
     {
+        char incl_opt_start[] = "-I\"";
+        char incl_opt_end[] = "\"";
         size_t chars = 0;
+
         custom_build_options_append =
-            (char*)calloc((strlen(oclpath) + 32)*INCLUDE_PATH_COUNT, 1);
+            (char*)calloc((strlen(ocl_root_path)    /* Path to the OpenCL folder */
+                         + strlen(incl_opt_start)   /* -I" */
+                         + strlen(incl_opt_end)     /* " */
+                         + 1                        /* null char */
+                         ), 1);
 
-        for (int i = 0; i < INCLUDE_PATH_COUNT; i++)
-        {
-            strncpy(&custom_build_options_append[chars], "-I", strlen("-I"));
-            chars += strlen("-I");
+        strncpy(&custom_build_options_append[chars], incl_opt_start, strlen(incl_opt_start));
+        chars += strlen(incl_opt_start);
 
-            strncpy(&custom_build_options_append[chars], oclpath, strlen(oclpath));
-            chars += strlen(oclpath);
+        strncpy(&custom_build_options_append[chars], ocl_root_path, strlen(ocl_root_path));
+        chars += strlen(ocl_root_path);        
 
-            strncpy(
-                    &custom_build_options_append[chars],
-                    include_path_list[i],
-                    strlen(include_path_list[i])
-                    );
-            chars += strlen(include_path_list[i]);
-
-            strncpy(&custom_build_options_append[chars], " ", 1);
-            chars += 1;
-        }
-        printf("GMX_OCL_FILE_PATH includes: %s\n", custom_build_options_append);
+        strncpy(&custom_build_options_append[chars], incl_opt_end, strlen(incl_opt_end));
+        chars += strlen(incl_opt_end);
     }
 
     /* Get vendor specific define (amd,nvidia,nowarp) */
@@ -860,12 +793,18 @@ ocl_get_build_options_string(cl_context           context,
         ocl_get_fastgen_define(p_gmx_algo_family, kernel_fastgen_define);
     }
 
-    /* Compose the build options to be prepended */
+    /* Compose the build options to be prepended.
+       This also includes macros from nbnxn_consts.h and ishift.h */
     sprintf(custom_build_options_prepend,
-            "-DWARP_SIZE_TEST=%d %s %s",
+            "-DWARP_SIZE_TEST=%d %s %s -DCENTRAL=%d -DNBNXN_GPU_NCLUSTER_PER_SUPERCLUSTER=%d -DNBNXN_GPU_CLUSTER_SIZE=%d -DNBNXN_GPU_JGROUP_SIZE=%d -DNBNXN_AVOID_SING_R2_INC=%f",
             warp_size,
             kernel_vendor_spec_define,
-            kernel_fastgen_define
+            kernel_fastgen_define,
+            CENTRAL,                                /* Defined in ishift.h */
+            NBNXN_GPU_NCLUSTER_PER_SUPERCLUSTER,    /* Defined in nbnxn_consts.h */
+            NBNXN_GPU_CLUSTER_SIZE,                 /* Defined in nbnxn_consts.h */
+            NBNXN_GPU_JGROUP_SIZE,                  /* Defined in nbnxn_consts.h */
+            NBNXN_AVOID_SING_R2_INC                 /* Defined in nbnxn_consts.h */
             );
 
     /* Get the size of the complete build options string */
