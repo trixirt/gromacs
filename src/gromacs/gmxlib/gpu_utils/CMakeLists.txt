@@ -35,7 +35,6 @@
 if(GMX_GPU)
     if (GMX_USE_OPENCL)
         file(GLOB GPU_UTILS_SOURCES *ocl*.cpp)
-        SET_SOURCE_FILES_PROPERTIES( ${GPU_UTILS_SOURCES} PROPERTIES LANGUAGE CXX )
     else()
         file(GLOB GPU_UTILS_SOURCES *.cu)
     endif()
