@@ -763,7 +763,7 @@ set(CMAKE_INSTALL_DIR     share/cmake)
 # TODO: Make GMXRC adapt if this is changed
 set(PKGCONFIG_INSTALL_DIR ${LIB_INSTALL_DIR}/pkgconfig)
 set(OCL_INSTALL_DIR_NAME  opencl) #Used as define in the source
-set(OCL_INSTALL_FULL_PATH ${CMAKE_INSTALL_PREFIX}/${BIN_INSTALL_DIR}/${OCL_INSTALL_DIR_NAME})
+set(OCL_INSTALL_DIR       ${DATA_INSTALL_DIR}/${OCL_INSTALL_DIR_NAME})
 set(INCL_INSTALL_DIR      include)
 
 # These variables get written into config.h for use in finding the data

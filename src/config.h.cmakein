@@ -248,7 +248,7 @@
 #cmakedefine GMX_USE_OPENCL
 
 /* Define relative path to OpenCL kernels */
-#define OCL_INSTALL_FULL_PATH "@OCL_INSTALL_FULL_PATH@"
+#define OCL_INSTALL_DIR "@OCL_INSTALL_DIR@"
 
 /* Define to 1 if fseeko (and presumably ftello) exists and is declared. */
 #cmakedefine HAVE_FSEEKO
