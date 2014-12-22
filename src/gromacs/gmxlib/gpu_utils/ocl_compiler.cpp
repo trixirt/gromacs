@@ -407,15 +407,17 @@ get_ocl_kernel_source_path(
         kernel_source_index_t   kernel_src_id,
         size_t gmx_unused       kernel_filename_len)
 {
-    char *filepath = NULL;
-    const char* ocl_root_path = NULL;
+    char       *filepath      = NULL;
+    const char *ocl_root_path = NULL;
 
     assert(kernel_filename_len != 0);
     assert(ocl_kernel_filename != NULL);
 
     ocl_root_path = get_ocl_root_path();
     if (!ocl_root_path)
+    {
         return NULL;
+    }
 
     size_t chars_copied = 0;
     strncpy(ocl_kernel_filename, ocl_root_path, strlen(ocl_root_path));
@@ -585,7 +587,10 @@ handle_ocl_build_log(
             }
         }
         if (build_log_file)
+        {
             fclose(build_log_file);
+        }
+
         free(complete_message);
         free(build_info);
     }
@@ -761,22 +766,22 @@ ocl_get_build_options_string(cl_context           context,
        All OpenCL kernel files are expected to be stored in one single folder. */
     if (ocl_root_path)
     {
-        char incl_opt_start[] = "-I\"";
-        char incl_opt_end[] = "\"";
-        size_t chars = 0;
+        char   incl_opt_start[] = "-I\"";
+        char   incl_opt_end[]   = "\"";
+        size_t chars            = 0;
 
         custom_build_options_append =
             (char*)calloc((strlen(ocl_root_path)    /* Path to the OpenCL folder */
-                         + strlen(incl_opt_start)   /* -I" */
-                         + strlen(incl_opt_end)     /* " */
-                         + 1                        /* null char */
-                         ), 1);
+                           + strlen(incl_opt_start) /* -I" */
+                           + strlen(incl_opt_end)   /* " */
+                           + 1                      /* null char */
+                           ), 1);
 
         strncpy(&custom_build_options_append[chars], incl_opt_start, strlen(incl_opt_start));
         chars += strlen(incl_opt_start);
 
         strncpy(&custom_build_options_append[chars], ocl_root_path, strlen(ocl_root_path));
-        chars += strlen(ocl_root_path);        
+        chars += strlen(ocl_root_path);
 
         strncpy(&custom_build_options_append[chars], incl_opt_end, strlen(incl_opt_end));
         chars += strlen(incl_opt_end);
