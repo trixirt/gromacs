@@ -333,7 +333,7 @@ std::string findDefaultJITDataPath(const std::string &binaryPath)
                                "src/gromacs/mdlib/nbnxn_ocl",
                                OCL_INSTALL_DIR,
                                &isAcceptableJITPath,
-                               NULL);
+                               OCL_INSTALL_FULL_PATH);
 }
 
 //! \}
