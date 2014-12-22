@@ -168,8 +168,8 @@ int detect_gpus(gmx_gpu_info_t *gpu_info, char *err_str)
         {
             cl_uint ocl_device_count;
 
-            CALLOCLFUNC_LOGERROR(clGetDeviceIDs(ocl_platform_ids[i], req_dev_type, 0, NULL, &ocl_device_count), err_str, retval)
-            if (0 != retval)
+            /* If requesting req_dev_type devices fails, just go to the next platform */
+            if (CL_SUCCESS != clGetDeviceIDs(ocl_platform_ids[i], req_dev_type, 0, NULL, &ocl_device_count), err_str, retval)            
             {
                 continue;
             }
@@ -198,8 +198,8 @@ int detect_gpus(gmx_gpu_info_t *gpu_info, char *err_str)
             {
                 cl_uint ocl_device_count;
 
-                CALLOCLFUNC_LOGERROR(clGetDeviceIDs(ocl_platform_ids[i], req_dev_type, gpu_info->n_dev, ocl_device_ids, &ocl_device_count), err_str, retval)
-                if (0 != retval)
+                /* If requesting req_dev_type devices fails, just go to the next platform */
+                if (CL_SUCCESS != clGetDeviceIDs(ocl_platform_ids[i], req_dev_type, gpu_info->n_dev, ocl_device_ids, &ocl_device_count))                
                 {
                     continue;
                 }
