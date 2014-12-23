@@ -407,7 +407,6 @@ get_ocl_kernel_source_path(
         kernel_source_index_t   kernel_src_id,
         size_t gmx_unused       kernel_filename_len)
 {
-    char       *filepath      = NULL;
     const char *ocl_root_path = NULL;
 
     assert(kernel_filename_len != 0);
@@ -748,7 +747,6 @@ ocl_get_build_options_string(cl_context           context,
     char * build_options_string               = NULL;
     char   custom_build_options_prepend[1024] = { 0 };
     char  *custom_build_options_append        = NULL;
-    char  *oclpath   = NULL;
     cl_int warp_size = 0;
 
     /* Get the reported warp size. Compile a small dummy kernel to do so */
