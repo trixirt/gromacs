@@ -258,7 +258,7 @@ std::string findFallbackLibraryDataPath()
 std::string findDefaultDataPath(const std::string &binaryPath,
                                 const std::string &srcDataPath,
                                 const std::string &binDataPath,
-                                bool(*isAcceptableDataPath) (const std::string &),
+                                bool               (*isAcceptableDataPath) (const std::string &),
                                 const std::string &fallbackPath
                                 )
 {

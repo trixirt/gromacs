@@ -43,11 +43,10 @@
  * but e.g. organizing the defines for various physics models
  * is leaking in here a bit.
  */
+
 #include "gmxpre.h"
 
 #include "ocl_compiler.h"
-
-#include "config.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -56,15 +55,18 @@
 
 #include <string>
 
-#include "gromacs/utility/stringutil.h"
-#include "gromacs/pbcutil/ishift.h"
 #include "gromacs/mdlib/nbnxn_consts.h"
+#include "gromacs/pbcutil/ishift.h"
 #include "gromacs/utility/programcontext.h"
+#include "gromacs/utility/stringutil.h
 
-/* Stringify helper macro */
-#define STRINGIFY_MACRO(c) STRINGIFY_PARAM(c)
+/* Stringifies the input argument */
 #define STRINGIFY_PARAM(c) #c
 
+/* Stringifies the result of expansion of a macro argument */
+#define STRINGIFY_MACRO(c) STRINGIFY_PARAM(c)
+
+/* Path separator */
 #define SEPARATOR '/'
 
 /*! \brief Compiler options index
@@ -538,7 +540,7 @@ handle_ocl_build_log(
 
     if (dumpFile || dumpStdErr)
     {
-        FILE      * build_log_file       = NULL;
+        FILE       *build_log_file       = NULL;
         const char *fail_header          = "Compilation of source file failed! \n";
         const char *success_header       = "Compilation of source file was successful! \n";
         const char *log_header           = "--------------LOG START---------------\n";
@@ -786,7 +788,6 @@ ocl_get_build_options_string(cl_context           context,
         chars += strlen(ocl_root_path);
 
         strncpy(&custom_build_options_append[chars], incl_opt_end, strlen(incl_opt_end));
-        chars += strlen(incl_opt_end);
     }
 
     /* Get vendor specific define (amd,nvidia,nowarp) */

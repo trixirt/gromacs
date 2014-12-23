@@ -41,9 +41,10 @@
 
 #include "oclutils.h"
 
+#include <stdlib.h>
+
 #include <cassert>
 #include <cstdio>
-#include <stdlib.h>
 
 #include "gromacs/utility/fatalerror.h"
 
