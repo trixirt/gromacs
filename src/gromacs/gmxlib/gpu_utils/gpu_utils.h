@@ -46,9 +46,12 @@
 #ifndef GMX_GMXLIB_GPU_UTILS_GPU_UTILS_H
 #define GMX_GMXLIB_GPU_UTILS_GPU_UTILS_H
 
-#if (defined __GNUC__) && (407 > __GNUC__ * 100 + __GNUC_MINOR__)
-    #pragma GCC diagnostic push
-    #pragma GCC diagnostic ignored "-Wuninitialized"
+#ifndef __INTEL_COMPILER
+#if (defined __GNUC__) && (defined __GNUC_MINOR__)
+#if ((4 == __GNUC__) && ((4 <= __GNUC_MINOR__) && (6 >= __GNUC_MINOR__)))
+    #pragma GCC diagnostic ignored "-Wunused-variable"
+#endif
+#endif
 #endif
 
 #include "gromacs/gmxlib/gpu_utils/gpu_macros.h"
@@ -240,8 +243,12 @@ void gpu_set_host_malloc_and_free(bool               bUseGpuKernels,
 }
 #endif
 
-#if (defined __GNUC__) && (407 > __GNUC__ * 100 + __GNUC_MINOR__)
-    #pragma GCC diagnostic pop
+#ifndef __INTEL_COMPILER
+#if (defined __GNUC__) && (defined __GNUC_MINOR__)
+#if ((4 == __GNUC__) && ((4 <= __GNUC_MINOR__) && (6 >= __GNUC_MINOR__)))
+    #pragma GCC diagnostic warning "-Wunused-variable"
+#endif
+#endif
 #endif
 
 #endif
