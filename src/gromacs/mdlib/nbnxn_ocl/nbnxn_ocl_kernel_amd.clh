@@ -539,7 +539,7 @@ __global float *restrict fshift,            /* stores float3 values */     /* OU
            which stored the reduction result in reduce_force_i function
         */
         if (tidxj < 3)
-            atomicAdd_g_f(&(fshift[3 * nb_sci.shift + tidxj]), fshift_buf);		
+            atomicAdd_g_f(&(fshift[3 * nb_sci.shift + tidxj]), fshift_buf);
     }
 
 #ifdef CALC_ENERGIES

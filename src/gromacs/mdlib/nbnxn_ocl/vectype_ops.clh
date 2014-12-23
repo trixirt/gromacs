@@ -86,7 +86,7 @@ _INLINE_ void atomicAdd_l_f(volatile __local float *addr, float val)
     } next, expected, current;
 	current.f32    = *addr;
     do{
-  	    expected.f32 = current.f32;
+        expected.f32 = current.f32;
         next.f32     = expected.f32 + val;
 		current.u32  = atomic_cmpxchg( (volatile __local unsigned int *)addr, expected.u32, next.u32);
     } while( current.u32 != expected.u32 );

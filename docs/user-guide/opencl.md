@@ -100,9 +100,9 @@ compilation of OpenCL kernels, but they are also used on the device selection.
    
    GMX_OCL_NB_EWALD_TWINCUT: Forces the use of twin-range cutoff kernel.
    Equivalent of CUDA env var GMX_CUDA_NB_EWALD_TWINCUT
-   
+
    GMX_DISABLE_OCL_TIMING: Disables timing for OpenCL operations
-   
+
    GXM_OCL_FILE_PATH: Use this parameter to force GROMACS to load the OpenCL
    kernels from a custom location. Use it only if you want to overwrite
    GROMACS default behavior or if you want to test your own kernels.

@@ -494,7 +494,7 @@ void reduce_force_i_generic(__local float *f_buf, __global float *fout,
 
         if (bCalcFshift)
         {
-            (*fshift_buf) += f;            
+            (*fshift_buf) += f;
         }
     }
 }

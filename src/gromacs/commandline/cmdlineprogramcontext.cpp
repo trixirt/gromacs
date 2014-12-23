@@ -255,7 +255,7 @@ std::string findFallbackLibraryDataPath()
  * Extra logic is present to allow running binaries from the build tree such
  * that they use up-to-date data files from the source tree.
  */
-std::string findDefaultDataPath(const std::string &binaryPath, 
+std::string findDefaultDataPath(const std::string &binaryPath,
                                 const std::string &srcDataPath,
                                 const std::string &binDataPath,
                                 bool(*isAcceptableDataPath) (const std::string &),
@@ -278,7 +278,7 @@ std::string findDefaultDataPath(const std::string &binaryPath,
         buildBinPath = Path::join(CMAKE_BINARY_DIR, "bin");
 #endif
         if (Path::isEquivalent(searchPath, buildBinPath))
-        {            
+        {
             std::string testPath = Path::join(CMAKE_SOURCE_DIR, srcDataPath);
             if (isAcceptableDataPath(testPath))
             {
