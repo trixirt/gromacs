@@ -91,7 +91,8 @@ ocl_compile_program(
         cl_context                  context,
         cl_device_id                device_id,
         ocl_vendor_id_t             ocl_device_vendor,
-        cl_program *                p_program
+        cl_program *                p_program,
+        char *                      custom_build_options
         );
 
 #endif

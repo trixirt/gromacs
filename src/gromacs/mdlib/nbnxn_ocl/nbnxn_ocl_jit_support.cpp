@@ -54,7 +54,16 @@
 #include "gromacs/utility/cstringutil.h"
 #include "gromacs/utility/fatalerror.h"
 
+#include "gromacs/mdlib/nbnxn_consts.h"
+#include "gromacs/pbcutil/ishift.h"
+
 #include "nbnxn_ocl_types.h"
+
+/* Stringifies the input argument */
+#define STRINGIFY_PARAM(c) #c
+
+/* Stringifies the result of expansion of a macro argument */
+#define STRINGIFY_MACRO(c) STRINGIFY_PARAM(c)
 
 //! This function is documented in the header file
 void
@@ -144,6 +153,7 @@ nbnxn_ocl_compile_kernels_inner(int                        mygpu,
     cl_context                context;
     cl_program                program;
     cl_int                    cl_error;
+    char                      runtime_consts[256];
 
     gmx_algo_family_t         gmx_algo_family;
 
@@ -173,6 +183,17 @@ nbnxn_ocl_compile_kernels_inner(int                        mygpu,
         return FALSE;
     }
 
+    sprintf(runtime_consts,
+        "-DCENTRAL=%d -DNBNXN_GPU_NCLUSTER_PER_SUPERCLUSTER=%d -DNBNXN_GPU_CLUSTER_SIZE=%d -DNBNXN_GPU_JGROUP_SIZE=%d -DNBNXN_AVOID_SING_R2_INC=%s",
+        CENTRAL,                                    /* Defined in ishift.h */
+        NBNXN_GPU_NCLUSTER_PER_SUPERCLUSTER,        /* Defined in nbnxn_consts.h */
+        NBNXN_GPU_CLUSTER_SIZE,                     /* Defined in nbnxn_consts.h */
+        NBNXN_GPU_JGROUP_SIZE,                      /* Defined in nbnxn_consts.h */
+        STRINGIFY_MACRO(NBNXN_AVOID_SING_R2_INC)    /* Defined in nbnxn_consts.h */
+                                                    /* NBNXN_AVOID_SING_R2_INC passed as string to avoid
+                                                        floating point representation problems with sprintf */
+        );
+
     cl_error =
         ocl_compile_program(default_source,
                             auto_vendor_kernels,
@@ -182,7 +203,8 @@ nbnxn_ocl_compile_kernels_inner(int                        mygpu,
                             context,
                             device_id,
                             selected_ocl_gpu->vendor_e,
-                            &program
+                            &program,
+                            runtime_consts
                             );
     if (cl_error != CL_SUCCESS)
     {

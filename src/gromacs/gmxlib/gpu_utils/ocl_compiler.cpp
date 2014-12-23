@@ -55,16 +55,8 @@
 
 #include <string>
 
-#include "gromacs/mdlib/nbnxn_consts.h"
-#include "gromacs/pbcutil/ishift.h"
 #include "gromacs/utility/programcontext.h"
 #include "gromacs/utility/stringutil.h"
-
-/* Stringifies the input argument */
-#define STRINGIFY_PARAM(c) #c
-
-/* Stringifies the result of expansion of a macro argument */
-#define STRINGIFY_MACRO(c) STRINGIFY_PARAM(c)
 
 /* Path separator */
 #define SEPARATOR '/'
@@ -748,7 +740,8 @@ ocl_get_build_options_string(cl_context           context,
                              kernel_vendor_spec_t kernel_vendor_spec,
                              ocl_vendor_id_t      ocl_device_vendor,
                              gmx_algo_family_t  * p_gmx_algo_family,
-                             int                  DoFastGen)
+                             int                  DoFastGen,
+                             char *               runtime_consts)
 {
     char * build_options_string               = NULL;
     char   custom_build_options_prepend[1024] = { 0 };
@@ -801,20 +794,13 @@ ocl_get_build_options_string(cl_context           context,
         ocl_get_fastgen_define(p_gmx_algo_family, kernel_fastgen_define);
     }
 
-    /* Compose the build options to be prepended.
-       This also includes macros from nbnxn_consts.h and ishift.h */
+    /* Compose the build options to be prepended. */
     sprintf(custom_build_options_prepend,
-            "-DWARP_SIZE_TEST=%d %s %s -DCENTRAL=%d -DNBNXN_GPU_NCLUSTER_PER_SUPERCLUSTER=%d -DNBNXN_GPU_CLUSTER_SIZE=%d -DNBNXN_GPU_JGROUP_SIZE=%d -DNBNXN_AVOID_SING_R2_INC=%s",
+            "-DWARP_SIZE_TEST=%d %s %s %s",
             warp_size,
             kernel_vendor_spec_define,
             kernel_fastgen_define,
-            CENTRAL,                                    /* Defined in ishift.h */
-            NBNXN_GPU_NCLUSTER_PER_SUPERCLUSTER,        /* Defined in nbnxn_consts.h */
-            NBNXN_GPU_CLUSTER_SIZE,                     /* Defined in nbnxn_consts.h */
-            NBNXN_GPU_JGROUP_SIZE,                      /* Defined in nbnxn_consts.h */
-            STRINGIFY_MACRO(NBNXN_AVOID_SING_R2_INC)    /* Defined in nbnxn_consts.h */
-                                                        /* NBNXN_AVOID_SING_R2_INC passed as string to avoid
-                                                           floating point representation problems with sprintf */
+            runtime_consts ? runtime_consts : ""
             );
 
     /* Get the size of the complete build options string */
@@ -877,6 +863,10 @@ print_ocl_binaries_to_file(cl_program program, char* file_name)
  * \param ocl_device_vendor  Enumerator of the device vendor to compile for
  * \param p_program          Pointer to the cl_program where the compiled
  *                            cl_program will be stored
+ * \param runtime_consts     Optional string with runtime constants.
+ *                           Each constant is given according to the following
+ *                           format: "-Dname=value".
+ *                           Multiple defines are separated by blanks.
  * \return cl_int with the build status AND any other OpenCL error appended to it
  */
 cl_int
@@ -889,7 +879,8 @@ ocl_compile_program(
         cl_context                  context,
         cl_device_id                device_id,
         ocl_vendor_id_t             ocl_device_vendor,
-        cl_program *                p_program
+        cl_program *                p_program,
+        char *                      runtime_consts
         )
 {
     char         * build_options_string   = NULL;
@@ -937,7 +928,8 @@ ocl_compile_program(
     build_options_string =
         ocl_get_build_options_string(context, device_id, kernel_vendor_spec,
                                      ocl_device_vendor, p_gmx_algo_family,
-                                     DoFastGen);
+                                     DoFastGen,
+                                     runtime_consts);
 
     /* Check if OpenCL caching is ON */
     bCacheOclBuild = (NULL == getenv("GMX_OCL_NOGENCACHE"));
