@@ -61,6 +61,10 @@
 #include "gromacs/mdlib/nbnxn_consts.h"
 #include "gromacs/utility/programcontext.h"
 
+/* Stringify helper macro */
+#define STRINGIFY_MACRO(c) STRINGIFY_PARAM(c)
+#define STRINGIFY_PARAM(c) #c
+
 #define SEPARATOR '/'
 
 /*! \brief Compiler options index
@@ -799,15 +803,17 @@ ocl_get_build_options_string(cl_context           context,
     /* Compose the build options to be prepended.
        This also includes macros from nbnxn_consts.h and ishift.h */
     sprintf(custom_build_options_prepend,
-            "-DWARP_SIZE_TEST=%d %s %s -DCENTRAL=%d -DNBNXN_GPU_NCLUSTER_PER_SUPERCLUSTER=%d -DNBNXN_GPU_CLUSTER_SIZE=%d -DNBNXN_GPU_JGROUP_SIZE=%d -DNBNXN_AVOID_SING_R2_INC=%f",
+            "-DWARP_SIZE_TEST=%d %s %s -DCENTRAL=%d -DNBNXN_GPU_NCLUSTER_PER_SUPERCLUSTER=%d -DNBNXN_GPU_CLUSTER_SIZE=%d -DNBNXN_GPU_JGROUP_SIZE=%d -DNBNXN_AVOID_SING_R2_INC=%s",
             warp_size,
             kernel_vendor_spec_define,
             kernel_fastgen_define,
-            CENTRAL,                                /* Defined in ishift.h */
-            NBNXN_GPU_NCLUSTER_PER_SUPERCLUSTER,    /* Defined in nbnxn_consts.h */
-            NBNXN_GPU_CLUSTER_SIZE,                 /* Defined in nbnxn_consts.h */
-            NBNXN_GPU_JGROUP_SIZE,                  /* Defined in nbnxn_consts.h */
-            NBNXN_AVOID_SING_R2_INC                 /* Defined in nbnxn_consts.h */
+            CENTRAL,                                    /* Defined in ishift.h */
+            NBNXN_GPU_NCLUSTER_PER_SUPERCLUSTER,        /* Defined in nbnxn_consts.h */
+            NBNXN_GPU_CLUSTER_SIZE,                     /* Defined in nbnxn_consts.h */
+            NBNXN_GPU_JGROUP_SIZE,                      /* Defined in nbnxn_consts.h */
+            STRINGIFY_MACRO(NBNXN_AVOID_SING_R2_INC)    /* Defined in nbnxn_consts.h */
+                                                        /* NBNXN_AVOID_SING_R2_INC passed as string to avoid
+                                                           floating point representation problems with sprintf */
             );
 
     /* Get the size of the complete build options string */
