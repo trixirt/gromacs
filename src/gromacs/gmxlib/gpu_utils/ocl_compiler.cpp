@@ -66,18 +66,18 @@
 /*! \brief Compiler options index
  */
 typedef enum {
-    _invalid_option_          = 0,
-    _amd_cpp_,
-    _nvidia_verbose_,
-    _generic_cl11_,
-    _generic_cl12_,
-    _generic_fast_relaxed_math_,
-    _generic_noopt_compilation_,
-    _generic_debug_symbols_,
-    _amd_dump_temp_files_,
-    _include_install_opencl_dir_,
-    _include_source_opencl_dirs_,
-    _num_build_options_
+    b_invalid_option          = 0,
+    b_amd_cpp,
+    b_nvidia_verbose,
+    b_generic_cl11,
+    b_generic_cl12,
+    b_generic_fast_relaxed_math,
+    b_generic_noopt_compilation,
+    b_generic_debug_symbols,
+    b_amd_dump_temp_files,
+    b_include_install_opencl_dir,
+    b_include_source_opencl_dirs,
+    b_num_build_options
 } build_options_index_t;
 
 /*! \brief List of available OpenCL compiler options
@@ -137,13 +137,13 @@ static const char * kernel_VdW_family_definitions[] =
  */
 static const char* get_ocl_build_option(build_options_index_t build_option_id)
 {
-    if (build_option_id < _num_build_options_)
+    if (build_option_id < b_num_build_options)
     {
         return build_options_list[build_option_id];
     }
     else
     {
-        return build_options_list[_invalid_option_];
+        return build_options_list[b_invalid_option];
     }
 }
 
@@ -155,13 +155,13 @@ static const char* get_ocl_build_option(build_options_index_t build_option_id)
 static size_t get_ocl_build_option_length(build_options_index_t build_option_id)
 {
 
-    if (build_option_id < _num_build_options_)
+    if (build_option_id < b_num_build_options)
     {
         return strlen(build_options_list[build_option_id]);
     }
     else
     {
-        return strlen(build_options_list[_invalid_option_]);
+        return strlen(build_options_list[b_invalid_option]);
     }
 }
 
@@ -193,25 +193,25 @@ create_ocl_build_options_length(
 
     if ( (build_device_vendor_id == OCL_VENDOR_AMD) && getenv("GMX_OCL_DEBUG") && getenv("GMX_OCL_FORCE_CPU") )
     {
-        build_options_length += get_ocl_build_option_length(_generic_debug_symbols_)+whitespace;
+        build_options_length += get_ocl_build_option_length(b_generic_debug_symbols)+whitespace;
     }
 
     if (getenv("GMX_OCL_NOOPT"))
     {
         build_options_length +=
-            get_ocl_build_option_length(_generic_noopt_compilation_)+whitespace;
+            get_ocl_build_option_length(b_generic_noopt_compilation)+whitespace;
     }
 
     if (getenv("GMX_OCL_FASTMATH"))
     {
         build_options_length +=
-            get_ocl_build_option_length(_generic_fast_relaxed_math_)+whitespace;
+            get_ocl_build_option_length(b_generic_fast_relaxed_math)+whitespace;
     }
 
     if ((build_device_vendor_id == OCL_VENDOR_NVIDIA) && getenv("GMX_OCL_VERBOSE"))
     {
         build_options_length +=
-            get_ocl_build_option_length(_nvidia_verbose_) + whitespace;
+            get_ocl_build_option_length(b_nvidia_verbose) + whitespace;
     }
 
     if ((build_device_vendor_id == OCL_VENDOR_AMD) && getenv("GMX_OCL_DUMP_INTERM_FILES"))
@@ -220,7 +220,7 @@ create_ocl_build_options_length(
         if (NULL != getenv("GMX_OCL_NOGENCACHE"))
         {
             build_options_length +=
-                get_ocl_build_option_length(_amd_dump_temp_files_) + whitespace;
+                get_ocl_build_option_length(b_amd_dump_temp_files) + whitespace;
         }
     }
 
@@ -267,10 +267,10 @@ create_ocl_build_options(
     if (getenv("GMX_OCL_NOOPT") )
     {
         strncpy( build_options_string+char_added,
-                 get_ocl_build_option(_generic_noopt_compilation_),
-                 get_ocl_build_option_length(_generic_noopt_compilation_) );
+                 get_ocl_build_option(b_generic_noopt_compilation),
+                 get_ocl_build_option_length(b_generic_noopt_compilation) );
 
-        char_added += get_ocl_build_option_length(_generic_noopt_compilation_);
+        char_added += get_ocl_build_option_length(b_generic_noopt_compilation);
         build_options_string[char_added++] = ' ';
 
     }
@@ -278,20 +278,20 @@ create_ocl_build_options(
     if (getenv("GMX_OCL_FASTMATH") )
     {
         strncpy( build_options_string+char_added,
-                 get_ocl_build_option(_generic_fast_relaxed_math_),
-                 get_ocl_build_option_length(_generic_fast_relaxed_math_) );
+                 get_ocl_build_option(b_generic_fast_relaxed_math),
+                 get_ocl_build_option_length(b_generic_fast_relaxed_math) );
 
-        char_added += get_ocl_build_option_length(_generic_fast_relaxed_math_);
+        char_added += get_ocl_build_option_length(b_generic_fast_relaxed_math);
         build_options_string[char_added++] = ' ';
     }
 
     if ((build_device_vendor_id == OCL_VENDOR_NVIDIA) && getenv("GMX_OCL_VERBOSE"))
     {
         strncpy(build_options_string + char_added,
-                get_ocl_build_option(_nvidia_verbose_),
-                get_ocl_build_option_length(_nvidia_verbose_));
+                get_ocl_build_option(b_nvidia_verbose),
+                get_ocl_build_option_length(b_nvidia_verbose));
 
-        char_added += get_ocl_build_option_length(_nvidia_verbose_);
+        char_added += get_ocl_build_option_length(b_nvidia_verbose);
         build_options_string[char_added++] = ' ';
     }
 
@@ -301,10 +301,10 @@ create_ocl_build_options(
         if (NULL != getenv("GMX_OCL_NOGENCACHE"))
         {
             strncpy(build_options_string + char_added,
-                    get_ocl_build_option(_amd_dump_temp_files_),
-                    get_ocl_build_option_length(_amd_dump_temp_files_));
+                    get_ocl_build_option(b_amd_dump_temp_files),
+                    get_ocl_build_option_length(b_amd_dump_temp_files));
 
-            char_added += get_ocl_build_option_length(_amd_dump_temp_files_);
+            char_added += get_ocl_build_option_length(b_amd_dump_temp_files);
             build_options_string[char_added++] = ' ';
         }
     }
@@ -312,10 +312,10 @@ create_ocl_build_options(
     if ( ( build_device_vendor_id == OCL_VENDOR_AMD ) && getenv("GMX_OCL_DEBUG") && getenv("GMX_OCL_FORCE_CPU"))
     {
         strncpy( build_options_string+char_added,
-                 get_ocl_build_option(_generic_debug_symbols_),
-                 get_ocl_build_option_length(_generic_debug_symbols_) );
+                 get_ocl_build_option(b_generic_debug_symbols),
+                 get_ocl_build_option_length(b_generic_debug_symbols) );
 
-        char_added += get_ocl_build_option_length(_generic_debug_symbols_);
+        char_added += get_ocl_build_option_length(b_generic_debug_symbols);
         build_options_string[char_added++] = ' ';
     }
 
