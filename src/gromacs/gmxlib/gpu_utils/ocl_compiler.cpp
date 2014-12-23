@@ -58,7 +58,7 @@
 #include "gromacs/mdlib/nbnxn_consts.h"
 #include "gromacs/pbcutil/ishift.h"
 #include "gromacs/utility/programcontext.h"
-#include "gromacs/utility/stringutil.h
+#include "gromacs/utility/stringutil.h"
 
 /* Stringifies the input argument */
 #define STRINGIFY_PARAM(c) #c
