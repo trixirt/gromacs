@@ -68,6 +68,12 @@
 #FIND_PACKAGE_HANDLE_STANDARD_ARGS(OPENCL
 #  REQUIRED_VARS OPENCL_LIBRARY OPENCL_INCLUDE_DIR
 #  VERSION_VAR OPENCL_VERSION_STRING)
+#     3. The following block has been modified:
+#  find_library(OPENCL_LIBRARY
+#   NAMES OPENCL)
+#     has been replaced by:
+#  find_library(OPENCL_LIBRARY
+#   NAMES OpenCL)
 
 function(_FIND_OPENCL_VERSION)
   include(CheckSymbolExists)
@@ -155,7 +161,7 @@ if(WIN32)
   endif()
 else()
   find_library(OPENCL_LIBRARY
-    NAMES OPENCL)
+    NAMES OpenCL)
 endif()
 
 set(OPENCL_LIBRARIES ${OPENCL_LIBRARY})
