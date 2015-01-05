@@ -58,7 +58,8 @@
 #include "gromacs/utility/programcontext.h"
 #include "gromacs/utility/stringutil.h"
 
-/* Path separator */
+/*! \brief Path separator
+ */
 #define SEPARATOR '/'
 
 /*! \brief Compiler options index

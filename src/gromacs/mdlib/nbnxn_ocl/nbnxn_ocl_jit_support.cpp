@@ -49,20 +49,21 @@
 #include "gromacs/gmxlib/gpu_utils/ocl_compiler.h"
 #include "gromacs/legacyheaders/types/enums.h"
 #include "gromacs/legacyheaders/types/interaction_const.h"
+#include "gromacs/mdlib/nbnxn_consts.h"
 #include "gromacs/mdlib/nbnxn_gpu.h"
 #include "gromacs/mdlib/nbnxn_gpu_jit_support.h"
+#include "gromacs/pbcutil/ishift.h"
 #include "gromacs/utility/cstringutil.h"
 #include "gromacs/utility/fatalerror.h"
 
-#include "gromacs/mdlib/nbnxn_consts.h"
-#include "gromacs/pbcutil/ishift.h"
-
 #include "nbnxn_ocl_types.h"
 
-/* Stringifies the input argument */
+/*! \brief Stringifies the input argument
+ */
 #define STRINGIFY_PARAM(c) #c
 
-/* Stringifies the result of expansion of a macro argument */
+/*! \brief Stringifies the result of expansion of a macro argument
+ */
 #define STRINGIFY_MACRO(c) STRINGIFY_PARAM(c)
 
 //! This function is documented in the header file
@@ -184,15 +185,15 @@ nbnxn_ocl_compile_kernels_inner(int                        mygpu,
     }
 
     sprintf(runtime_consts,
-        "-DCENTRAL=%d -DNBNXN_GPU_NCLUSTER_PER_SUPERCLUSTER=%d -DNBNXN_GPU_CLUSTER_SIZE=%d -DNBNXN_GPU_JGROUP_SIZE=%d -DNBNXN_AVOID_SING_R2_INC=%s",
-        CENTRAL,                                    /* Defined in ishift.h */
-        NBNXN_GPU_NCLUSTER_PER_SUPERCLUSTER,        /* Defined in nbnxn_consts.h */
-        NBNXN_GPU_CLUSTER_SIZE,                     /* Defined in nbnxn_consts.h */
-        NBNXN_GPU_JGROUP_SIZE,                      /* Defined in nbnxn_consts.h */
-        STRINGIFY_MACRO(NBNXN_AVOID_SING_R2_INC)    /* Defined in nbnxn_consts.h */
-                                                    /* NBNXN_AVOID_SING_R2_INC passed as string to avoid
-                                                        floating point representation problems with sprintf */
-        );
+            "-DCENTRAL=%d -DNBNXN_GPU_NCLUSTER_PER_SUPERCLUSTER=%d -DNBNXN_GPU_CLUSTER_SIZE=%d -DNBNXN_GPU_JGROUP_SIZE=%d -DNBNXN_AVOID_SING_R2_INC=%s",
+            CENTRAL,                                    /* Defined in ishift.h */
+            NBNXN_GPU_NCLUSTER_PER_SUPERCLUSTER,        /* Defined in nbnxn_consts.h */
+            NBNXN_GPU_CLUSTER_SIZE,                     /* Defined in nbnxn_consts.h */
+            NBNXN_GPU_JGROUP_SIZE,                      /* Defined in nbnxn_consts.h */
+            STRINGIFY_MACRO(NBNXN_AVOID_SING_R2_INC)    /* Defined in nbnxn_consts.h */
+                                                        /* NBNXN_AVOID_SING_R2_INC passed as string to avoid
+                                                           floating point representation problems with sprintf */
+            );
 
     cl_error =
         ocl_compile_program(default_source,

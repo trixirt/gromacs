@@ -49,7 +49,7 @@
 #ifndef __INTEL_COMPILER
 #if (defined __GNUC__) && (defined __GNUC_MINOR__)
 #if ((4 == __GNUC__) && ((4 <= __GNUC_MINOR__) && (6 >= __GNUC_MINOR__)))
-    #pragma GCC diagnostic ignored "-Wunused-variable"
+    #pragma GCC diagnostic ignored "-Wunused-parameter"
 #endif
 #endif
 #endif
@@ -246,7 +246,7 @@ void gpu_set_host_malloc_and_free(bool               bUseGpuKernels,
 #ifndef __INTEL_COMPILER
 #if (defined __GNUC__) && (defined __GNUC_MINOR__)
 #if ((4 == __GNUC__) && ((4 <= __GNUC_MINOR__) && (6 >= __GNUC_MINOR__)))
-    #pragma GCC diagnostic warning "-Wunused-variable"
+    #pragma GCC diagnostic warning "-Wunused-parameter"
 #endif
 #endif
 #endif
