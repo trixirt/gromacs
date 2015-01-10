@@ -763,6 +763,105 @@ void dump_compare_results_f(float* results, int cnt, char* out_file, char* ref_f
 }
 
 /*! \brief
+ * Debug function for dumping cj4, f and fshift buffers.
+ * By default this function does nothing. To enable debugging for any of these
+ * buffers, uncomment the corresponding definition inside the function:
+ * DEBUG_DUMP_CJ4_OCL, DEBUG_DUMP_F_OCL, DEBUG_DUMP_FSHIFT_OCL.
+ */
+static
+void debug_dump_cj4_f_fshift(gmx_nbnxn_ocl_t               *nb,
+                             const struct nbnxn_atomdata_t *nbatom,
+                             cl_command_queue               stream,
+                             int                            adat_begin,
+                             int                            adat_len)
+{
+/* Uncomment this define to enable cj4 debugging for the first kernel run */
+//#define DEBUG_DUMP_CJ4_OCL
+#ifdef DEBUG_DUMP_CJ4_OCL
+    {
+        static int run_step = 1;
+
+        if (DEBUG_RUN_STEP == run_step)
+        {
+            nbnxn_cj4_t *temp_cj4;
+            int          cnt;
+            size_t       size;
+            char         ocl_file_name[256]  = {0};
+            char         cuda_file_name[256] = {0};
+
+            cnt      = nb->plist[0]->ncj4;
+            size     = cnt * sizeof(nbnxn_cj4_t);
+            temp_cj4 = (nbnxn_cj4_t*)malloc(size);
+
+            ocl_copy_D2H_async(temp_cj4, nb->plist[0]->cj4, 0,
+                               size, stream, NULL);
+
+            // Make sure all data has been transfered back from device
+            clFinish(stream);
+
+            sprintf(ocl_file_name, "ocl_cj4_%d.txt", DEBUG_RUN_STEP);
+            sprintf(cuda_file_name, "cuda_cj4_%d.txt", DEBUG_RUN_STEP);
+            dump_compare_results_cj4(temp_cj4, cnt, ocl_file_name, cuda_file_name);
+
+            free(temp_cj4);
+        }
+
+        run_step++;
+    }
+#endif
+
+/* Uncomment this define to enable f debugging for the first kernel run */
+//#define DEBUG_DUMP_F_OCL
+#ifdef DEBUG_DUMP_F_OCL
+    {
+        static int run_step = 1;
+
+        if (DEBUG_RUN_STEP == run_step)
+        {
+            char ocl_file_name[256]  = {0};
+            char cuda_file_name[256] = {0};
+
+            // Make sure all data has been transfered back from device
+            clFinish(stream);
+
+            sprintf(ocl_file_name, "ocl_f_%d.txt", DEBUG_RUN_STEP);
+            sprintf(cuda_file_name, "cuda_f_%d.txt", DEBUG_RUN_STEP);
+
+            dump_compare_results_f(nbatom->out[0].f + adat_begin * 3, (adat_len) * 3,
+                                   ocl_file_name, cuda_file_name);
+        }
+
+        run_step++;
+    }
+#endif
+
+/* Uncomment this define to enable fshift debugging for the first kernel run */
+//#define DEBUG_DUMP_FSHIFT_OCL
+#ifdef DEBUG_DUMP_FSHIFT_OCL
+    {
+        static int run_step = 1;
+
+        if (DEBUG_RUN_STEP == run_step)
+        {
+            char ocl_file_name[256]  = {0};
+            char cuda_file_name[256] = {0};
+
+            // Make sure all data has been transfered back from device
+            clFinish(stream);
+
+            sprintf(ocl_file_name, "ocl_fshift_%d.txt", DEBUG_RUN_STEP);
+            sprintf(cuda_file_name, "cuda_fshift_%d.txt", DEBUG_RUN_STEP);
+
+            dump_compare_results_f(nb->nbst.fshift, SHIFTS * 3,
+                                   ocl_file_name, cuda_file_name);
+        }
+
+        run_step++;
+    }
+#endif
+}
+
+/*! \brief
  * Launch asynchronously the download of nonbonded forces from the GPU
  * (and energies/shift forces if required).
  */
@@ -894,90 +993,7 @@ void nbnxn_gpu_launch_cpyback(gmx_nbnxn_ocl_t               *nb,
         }
     }
 
-/* Uncomment this define to enable cj4 debugging for the first kernel run */
-//#define DEBUG_DUMP_CJ4_OCL
-#ifdef DEBUG_DUMP_CJ4_OCL
-    {
-        static int run_step = 1;
-
-        if (DEBUG_RUN_STEP == run_step)
-        {
-            nbnxn_cj4_t *temp_cj4;
-            int          cnt;
-            size_t       size;
-            char         ocl_file_name[256]  = {0};
-            char         cuda_file_name[256] = {0};
-
-            cnt      = nb->plist[0]->ncj4;
-            size     = cnt * sizeof(nbnxn_cj4_t);
-            temp_cj4 = (nbnxn_cj4_t*)malloc(size);
-
-            ocl_copy_D2H_async(temp_cj4, nb->plist[0]->cj4, 0,
-                               size, stream, NULL);
-
-            // Make sure all data has been transfered back from device
-            clFinish(stream);
-
-            sprintf(ocl_file_name, "ocl_cj4_%d.txt", DEBUG_RUN_STEP);
-            sprintf(cuda_file_name, "cuda_cj4_%d.txt", DEBUG_RUN_STEP);
-            dump_compare_results_cj4(temp_cj4, cnt, ocl_file_name, cuda_file_name);
-
-            free(temp_cj4);
-        }
-
-        run_step++;
-    }
-#endif
-
-/* Uncomment this define to enable f debugging for the first kernel run */
-//#define DEBUG_DUMP_F_OCL
-#ifdef DEBUG_DUMP_F_OCL
-    {
-        static int run_step = 1;
-
-        if (DEBUG_RUN_STEP == run_step)
-        {
-            char ocl_file_name[256]  = {0};
-            char cuda_file_name[256] = {0};
-
-            // Make sure all data has been transfered back from device
-            clFinish(stream);
-
-            sprintf(ocl_file_name, "ocl_f_%d.txt", DEBUG_RUN_STEP);
-            sprintf(cuda_file_name, "cuda_f_%d.txt", DEBUG_RUN_STEP);
-
-            dump_compare_results_f(nbatom->out[0].f + adat_begin * 3, (adat_len) * 3,
-                                   ocl_file_name, cuda_file_name);
-        }
-
-        run_step++;
-    }
-#endif
-
-/* Uncomment this define to enable fshift debugging for the first kernel run */
-//#define DEBUG_DUMP_FSHIFT_OCL
-#ifdef DEBUG_DUMP_FSHIFT_OCL
-    {
-        static int run_step = 1;
-
-        if (DEBUG_RUN_STEP == run_step)
-        {
-            char ocl_file_name[256]  = {0};
-            char cuda_file_name[256] = {0};
-
-            // Make sure all data has been transfered back from device
-            clFinish(stream);
-
-            sprintf(ocl_file_name, "ocl_fshift_%d.txt", DEBUG_RUN_STEP);
-            sprintf(cuda_file_name, "cuda_fshift_%d.txt", DEBUG_RUN_STEP);
-
-            dump_compare_results_f(nb->nbst.fshift, SHIFTS * 3,
-                                   ocl_file_name, cuda_file_name);
-        }
-
-        run_step++;
-    }
-#endif
+    debug_dump_cj4_f_fshift(nb, nbatom, stream, adat_begin, adat_len);
 }
 
 /*! \brief Atomic compare-exchange operation on unsigned values.
