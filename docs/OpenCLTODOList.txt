@@ -2,21 +2,23 @@ Gromacs – OpenCL Porting
 TODO List
 
 TABLE OF CONTENTS
-1. CODE IMPROVEMENTS
-2. ENHANCEMENTS
-3. OPTIMIZATIONS
-4. OTHER NOTES
-5. TESTED CONFIGURATIONS
+1. KNOWN LIMITATIONS
+2. CODE IMPROVEMENTS
+3. ENHANCEMENTS
+4. OPTIMIZATIONS
+5. OTHER NOTES
+6. TESTED CONFIGURATIONS
 
-1. CODE IMPROVEMENTS
+1. KNOWN LIMITATIONS
+   =================
+- Sharing an OpenCL GPU between two MPI ranks is not supported.
+  See also Issue #91 - https://github.com/StreamComputing/gromacs/issues/91
+
+2. CODE IMPROVEMENTS
    =================
 - Errors returned by OpenCL functions are handled by using assert calls. This
   needs to be improved.
   See also Issue #6 - https://github.com/StreamComputing/gromacs/issues/6
-
-- calc_nb_kernel_nblock validates any nwork_units input value. The implementation
-  needs to be updated to consider the maximum nwork_units accepted by the device.
-  See also Issue #12 - https://github.com/StreamComputing/gromacs/issues/12
 
 - clCreateBuffer is always called with CL_MEM_READ_WRITE flag. This needs to be
   updated so that only the flags that reflect how the buffer is used are provided.
@@ -29,21 +31,13 @@ TABLE OF CONTENTS
   file and shared between the host and the device.
   See also Issue #16 - https://github.com/StreamComputing/gromacs/issues/16
 
-- The size of one element of an OpenCL buffer cannot be computed by calling
-  sizeof(buffer[0]). This needs to be accounted for to ensure memory allocations
-  and memory copies correctly compute the buffer size.
-  See also Issue #17 - https://github.com/StreamComputing/gromacs/issues/17
-
-- Command queue synchronization using memory polling is never enabled for OpenCL devices.
-  See also Issue #51 - https://github.com/StreamComputing/gromacs/issues/51
-
 - Generating binary cache has a potential race condition in Multiple GPU runs
   See also Issue #71 - https://github.com/StreamComputing/gromacs/issues/71
 
 - Caching for OpenCL builds should detect when a rebuild is necessary
   See also Issue #72 - https://github.com/StreamComputing/gromacs/issues/72
 
-2. ENHANCEMENTS
+3. ENHANCEMENTS
    ============
 - Implement OpenCL kernels for Intel GPUs
 
@@ -55,13 +49,10 @@ TABLE OF CONTENTS
 - Implement warp independent kernels
   See also Issue #66 - https://github.com/StreamComputing/gromacs/issues/66
 
-- Improve the way the path to the OpenCL kernel files is determined
-  See also Issue #75 - https://github.com/StreamComputing/gromacs/issues/75
-
 - Have one OpenCL program object per OpenCL kernel
   See also Issue #86 - https://github.com/StreamComputing/gromacs/issues/86
 
-3. OPTIMIZATIONS
+4. OPTIMIZATIONS
    =============
 - Defining nbparam fields as constants when building the OpenCL kernels
   See also Issue #87 - https://github.com/StreamComputing/gromacs/issues/87
@@ -76,7 +67,7 @@ TABLE OF CONTENTS
 - Update ocl_pmalloc to allocate page locked memory
   See also Issue #90: https://github.com/StreamComputing/gromacs/issues/90
 
-4. OTHER NOTES
+5. OTHER NOTES
    ===========
 - NVIDIA GPUs are not handled differently depending on compute capability
 
@@ -88,7 +79,7 @@ TABLE OF CONTENTS
   instead of textures
   See also Issue #88 - https://github.com/StreamComputing/gromacs/issues/88
 
-5. TESTED CONFIGURATIONS
+6. TESTED CONFIGURATIONS
    =====================
 Tested devices:
 	NVIDIA GPUs: GeForce GTX 660M, GeForce GTX 750Ti, GeForce GTX 780
