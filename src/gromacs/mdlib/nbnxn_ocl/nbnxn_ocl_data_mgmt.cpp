@@ -72,9 +72,11 @@
 #include "nbnxn_ocl_types.h"
 
 
-/*! \brief This is a heuristically determined parameter for the Fermi architecture for
- * the minimum size of ci lists by multiplying this constant with the # of
- * multiprocessors on the current device.
+/*! \brief This parameter should be determined heuristically. No such tests
+ * have been run yet for the OpenCL implementation for neither NVIDIA, nor
+ * AMD cards.
+ * The value used here corresponds to the one determined for NVIDIA at the time
+ * of the OpenCL porting.
  */
 static unsigned int gpu_min_ci_balanced_factor = 40;
 
