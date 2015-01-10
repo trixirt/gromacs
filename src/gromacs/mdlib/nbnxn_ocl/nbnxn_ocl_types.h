@@ -282,8 +282,7 @@ struct gmx_nbnxn_ocl_t
     ///@}
 
     cl_bool             bUseTwoStreams; /**< true if doing both local/non-local NB work on GPU          */
-    cl_bool             bUseStreamSync; /**< true if the standard synchronization is used
-                                             and not memory polling-based waiting                       */
+
     cl_atomdata_t      *atdat;          /**< atom data                                                  */
     cl_nbparam_t       *nbparam;        /**< parameters required for the non-bonded calc.               */
     cl_plist_t         *plist[2];       /**< pair-list data structures (local and non-local)            */
@@ -299,10 +298,6 @@ struct gmx_nbnxn_ocl_t
     cl_event    misc_ops_done;    /**< event triggered when the operations that precede the
                                           main force calculations are done (e.g. buffer 0-ing)       */
 
-    /* NOTE: With current CUDA versions (<=5.0) timing doesn't work with multiple
-     * concurrent streams, so we won't time if both l/nl work is done on GPUs.
-     * Timer init/uninit is still done even with timing off so only the condition
-     * setting bDoTime needs to be change if this CUDA "feature" gets fixed. */
     cl_bool                     bDoTime; /**< True if event-based timing is enabled.                     */
     cl_timers_t                *timers;  /**< OpenCL event-based timers.                                 */
     struct gmx_wallclock_gpu_t *timings; /**< Timing data.                                               */

@@ -922,34 +922,6 @@ void nbnxn_gpu_launch_cpyback(gmx_nbnxn_ocl_t               *nb,
 
     /* beginning of timed D2H section */
 
-    if (!nb->bUseStreamSync)
-    {
-        /* For safety reasons set a few (5%) forces to NaN. This way even if the
-           polling "hack" fails with some future NVIDIA driver we'll get a crash. */
-        for (int i = adat_begin; i < 3*adat_end + 2; i += adat_len/20)
-        {
-#ifdef NAN
-            nbatom->out[0].f[i] = NAN;
-#else
-#  ifdef _MSVC
-            if (numeric_limits<float>::has_quiet_NaN)
-            {
-                nbatom->out[0].f[i] = numeric_limits<float>::quiet_NaN();
-            }
-            else
-#  endif
-            {
-                nbatom->out[0].f[i] = GMX_REAL_MAX;
-            }
-#endif
-        }
-
-        /* Set the last four bytes of the force array to a bit pattern
-           which can't be the result of the force calculation:
-           max exponent (127) and zero mantissa. */
-        *(unsigned int*)&nbatom->out[0].f[adat_end*3 - 1] = poll_wait_pattern;
-    }
-
     /* With DD the local D2H transfer can only start after the non-local
        has been launched. */
     if (iloc == eintLocal && nb->bUseTwoStreams)
@@ -993,24 +965,6 @@ void nbnxn_gpu_launch_cpyback(gmx_nbnxn_ocl_t               *nb,
     }
 
     debug_dump_cj4_f_fshift(nb, nbatom, stream, adat_begin, adat_len);
-}
-
-/*! \brief Atomic compare-exchange operation on unsigned values.
- *
- * It is used in polling wait for the GPU.
- */
-static inline bool atomic_cas(volatile unsigned int *ptr,
-                              unsigned int           oldval,
-                              unsigned int           newval)
-{
-    assert(ptr);
-
-#ifdef TMPI_ATOMICS
-    return tMPI_Atomic_cas((tMPI_Atomic_t *)ptr, oldval, newval);
-#else
-    gmx_incons("Atomic operations not available, atomic_cas() should not have been called!");
-    return true;
-#endif
 }
 
 /*! \brief
@@ -1075,26 +1029,9 @@ void nbnxn_gpu_wait_for_gpu(gmx_nbnxn_ocl_t *nb,
         adat_end = nb->atdat->natoms;
     }
 
-    if (nb->bUseStreamSync)
-    {
-
-        /* Actual sync point. Waits for everything to be finished in the command queue. TODO: Find out if a more fine grained solution is needed */
-        cl_error = clFinish(nb->stream[iloc]);
-        assert(CL_SUCCESS == cl_error);
-    }
-    else
-    {
-        /* Busy-wait until we get the signal pattern set in last byte
-         * of the l/nl float vector. This pattern corresponds to a floating
-         * point number which can't be the result of the force calculation
-         * (maximum, 127 exponent and 0 mantissa).
-         * The polling uses atomic compare-exchange.
-         */
-        poll_word = (volatile unsigned int*)&nbatom->out[0].f[adat_end*3 - 1];
-        while (atomic_cas(poll_word, poll_wait_pattern, poll_wait_pattern))
-        {
-        }
-    }
+    /* Actual sync point. Waits for everything to be finished in the command queue. TODO: Find out if a more fine grained solution is needed */
+    cl_error = clFinish(nb->stream[iloc]);
+    assert(CL_SUCCESS == cl_error);
 
     /* timing data accumulation */
     if (nb->bDoTime)
