@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2012,2013,2014, by the GROMACS development team, led by
+ * Copyright (c) 2012,2013,2014,2015, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -337,8 +337,8 @@ create_ocl_build_options(
 
 /*! \brief Get the full path to the main folder storing OpenCL kernels.
  *
- * By default, this function call defaultJITDataPath to obtain the path to
- * the OpenCL repository. defaultJITDataPath knows how to handle both a launch
+ * By default, this function call defaultJitDataPath to obtain the path to
+ * the OpenCL repository. defaultJitDataPath knows how to handle both a launch
  * from the source tree and a launch from the install folder.
  * The user can overwrite this behavior by defining GXM_OCL_FILE_PATH
  * environment variable.
@@ -356,7 +356,7 @@ get_ocl_root_path()
     if (!ocl_root_path)
     {
         /* Standard way of getting ocl_root_dir */
-        ocl_root_path = gmx::getProgramContext().defaultJITDataPath();
+        ocl_root_path = gmx::getProgramContext().defaultJitDataPath();
     }
 
     return ocl_root_path;

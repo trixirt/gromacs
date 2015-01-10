@@ -539,7 +539,9 @@ in a path found in `CMAKE_PREFIX_PATH` and the following CMake flags must be set
 
     $ cmake .. -DGMX_GPU=ON -DGMX_USE_OPENCL=ON
 
-	
+Because Nvidia OpenCL support is part of the CUDA package, a C++
+compiler supported by your CUDA installation is required.
+
 ### Static linking ###
 Dynamic linking of the GROMACS executables will lead to a
 smaller disk footprint when installed, and so is the default on

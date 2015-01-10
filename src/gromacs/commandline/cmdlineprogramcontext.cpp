@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2012,2013,2014, by the GROMACS development team, led by
+ * Copyright (c) 2012,2013,2014,2015, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -179,7 +179,7 @@ bool isAcceptableLibraryPath(const std::string &path)
  *
  * For now, it only checks for nbnxn_ocl_kernels.cl
  */
-bool isAcceptableJITPath(const std::string &path)
+bool isAcceptableJitPath(const std::string &path)
 {
     return Path::exists(Path::join(path, "nbnxn_ocl_kernels.cl"));
 }
@@ -327,12 +327,12 @@ std::string findDefaultLibraryDataPath(const std::string &binaryPath)
  * \returns  Path to the folder containg JIT data files.
  *
  */
-std::string findDefaultJITDataPath(const std::string &binaryPath)
+std::string findDefaultJitDataPath(const std::string &binaryPath)
 {
     return findDefaultDataPath(binaryPath,
                                "src/gromacs/mdlib/nbnxn_ocl",
                                OCL_INSTALL_DIR,
-                               &isAcceptableJITPath,
+                               &isAcceptableJitPath,
                                OCL_INSTALL_FULL_PATH);
 }
 
@@ -368,7 +368,7 @@ class CommandLineProgramContext::Impl
         std::string                   commandLine_;
         mutable std::string           fullBinaryPath_;
         mutable std::string           defaultLibraryDataPath_;
-        mutable std::string           defaultJITDataPath_;
+        mutable std::string           defaultJitDataPath_;
         mutable tMPI::mutex           binaryPathMutex_;
 };
 
@@ -479,16 +479,16 @@ const char *CommandLineProgramContext::defaultLibraryDataPath() const
     return impl_->defaultLibraryDataPath_.c_str();
 }
 
-const char *CommandLineProgramContext::defaultJITDataPath() const
+const char *CommandLineProgramContext::defaultJitDataPath() const
 {
     tMPI::lock_guard<tMPI::mutex> lock(impl_->binaryPathMutex_);
-    if (impl_->defaultJITDataPath_.empty())
+    if (impl_->defaultJitDataPath_.empty())
     {
         impl_->findBinaryPath();
-        impl_->defaultJITDataPath_ =
-            Path::normalize(findDefaultJITDataPath(impl_->fullBinaryPath_));
+        impl_->defaultJitDataPath_ =
+            Path::normalize(findDefaultJitDataPath(impl_->fullBinaryPath_));
     }
-    return impl_->defaultJITDataPath_.c_str();
+    return impl_->defaultJitDataPath_.c_str();
 }
 
 } // namespace gmx

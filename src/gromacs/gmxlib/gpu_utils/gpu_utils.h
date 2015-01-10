@@ -3,7 +3,7 @@
  *
  * Copyright (c) 1991-2000, University of Groningen, The Netherlands.
  * Copyright (c) 2001-2010, The GROMACS development team.
- * Copyright (c) 2012,2013,2014, by the GROMACS development team, led by
+ * Copyright (c) 2012,2013,2014,2015, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -46,9 +46,12 @@
 #ifndef GMX_GMXLIB_GPU_UTILS_GPU_UTILS_H
 #define GMX_GMXLIB_GPU_UTILS_GPU_UTILS_H
 
+/* gcc <= 4.6 gets confused about the macro expansion and/or
+   gmx_unused usage in this file, so we suppress warnings about unused
+   parameters */
 #ifndef __INTEL_COMPILER
 #if (defined __GNUC__) && (defined __GNUC_MINOR__)
-#if ((4 == __GNUC__) && ((4 <= __GNUC_MINOR__) && (6 >= __GNUC_MINOR__)))
+#if ((4 == __GNUC__) && ((4 <= __GNUC_MINOR__) && (6 <= __GNUC_MINOR__)))
     #pragma GCC diagnostic ignored "-Wunused-parameter"
 #endif
 #endif
@@ -245,7 +248,7 @@ void gpu_set_host_malloc_and_free(bool               bUseGpuKernels,
 
 #ifndef __INTEL_COMPILER
 #if (defined __GNUC__) && (defined __GNUC_MINOR__)
-#if ((4 == __GNUC__) && ((4 <= __GNUC_MINOR__) && (6 >= __GNUC_MINOR__)))
+#if ((4 == __GNUC__) && ((4 <= __GNUC_MINOR__) && (6 <= __GNUC_MINOR__)))
     #pragma GCC diagnostic warning "-Wunused-parameter"
 #endif
 #endif

@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2012,2013,2014, by the GROMACS development team, led by
+ * Copyright (c) 2012,2013,2014,2015, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -196,7 +196,7 @@ makeGpuUsageReport(const gmx_gpu_info_t *gpu_info,
     }
 
     {
-#if defined(GMX_GPU) && defined(GMX_USE_OPENCL)
+#ifdef GMX_USE_OPENCL
         std::vector<char*> gpuNamesInUse;
         for (int i = 0; i < ngpu_use; i++)
         {
@@ -529,7 +529,7 @@ static int gmx_count_gpu_dev_unique(const gmx_gpu_info_t *gpu_info,
      * to 1 indicates that the respective GPU was selected to be used. */
     for (i = 0; i < gpu_opt->n_dev_use; i++)
     {
-#if defined(GMX_GPU) && defined(GMX_USE_OPENCL)
+#ifdef GMX_USE_OPENCL
         uniq_ids[i] = 1;
 #else
         uniq_ids[get_cuda_gpu_device_id(gpu_info, gpu_opt, i)] = 1;
