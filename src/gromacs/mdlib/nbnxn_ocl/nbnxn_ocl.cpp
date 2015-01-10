@@ -95,19 +95,12 @@ static bool always_prune = (getenv("GMX_GPU_ALWAYS_PRUNE") != NULL);
 /*! \brief Specifies which kernel run to debug */
 #define DEBUG_RUN_STEP 2
 
-/*! \brief Bit-pattern used for polling-based GPU synchronization.
- *
- * It is used as a float and corresponds to having the exponent set to
- * the maximum (127 -- single precision) and the mantissa to 0.
- */
-static unsigned int poll_wait_pattern = (0x7FU << 23);
-
 /*! \brief Validates the input global work size parameter.
  */
 static inline void validate_global_work_size(size_t *global_work_size, int work_dim, gmx_device_info_t *dinfo)
 {
     cl_uint device_size_t_size_bits;
-    cl_uint host_size_t_size_bits;    
+    cl_uint host_size_t_size_bits;
 
     assert(dinfo);
 
@@ -115,16 +108,16 @@ static inline void validate_global_work_size(size_t *global_work_size, int work_
        sizeof(device size_t) for the device on which the kernel execution will
        be enqueued. See:
        https://www.khronos.org/registry/cl/sdk/1.0/docs/man/xhtml/clEnqueueNDRangeKernel.html
-    */
+     */
     device_size_t_size_bits = dinfo->adress_bits;
-    host_size_t_size_bits = (cl_uint)(sizeof(size_t) * 8);
+    host_size_t_size_bits   = (cl_uint)(sizeof(size_t) * 8);
 
     /* If sizeof(host size_t) <= sizeof(device size_t)
             => global_work_size components will always be valid
        else
             => get device limit for global work size and
             compare it against each component of global_work_size.
-    */
+     */
     if (host_size_t_size_bits > device_size_t_size_bits)
     {
         size_t device_limit;
@@ -132,13 +125,15 @@ static inline void validate_global_work_size(size_t *global_work_size, int work_
         device_limit = (((size_t)1) << device_size_t_size_bits) - 1;
 
         for (int i = 0; i < work_dim; i++)
+        {
             if (global_work_size[i] > device_limit)
             {
                 gmx_fatal(FARGS, "Watch out, the input system is too large to simulate!\n"
-                    "The number of nonbonded work units (=number of super-clusters) exceeds the"
-                    "device capabilities. Global work size limit exceeded (%d > %d)!",
-                    global_work_size[i], device_limit);
+                          "The number of nonbonded work units (=number of super-clusters) exceeds the"
+                          "device capabilities. Global work size limit exceeded (%d > %d)!",
+                          global_work_size[i], device_limit);
             }
+        }
     }
 }
 
@@ -477,7 +472,7 @@ void nbnxn_gpu_launch_kernel(gmx_nbnxn_ocl_t               *nb,
                                     bCalcEner,
                                     plist->bDoPrune || always_prune);
 
-    /* kernel launch config */    
+    /* kernel launch config */
     local_work_size[0] = CL_SIZE;
     local_work_size[1] = CL_SIZE;
     local_work_size[2] = 1;
@@ -769,11 +764,11 @@ void dump_compare_results_f(float* results, int cnt, char* out_file, char* ref_f
  * DEBUG_DUMP_CJ4_OCL, DEBUG_DUMP_F_OCL, DEBUG_DUMP_FSHIFT_OCL.
  */
 static
-void debug_dump_cj4_f_fshift(gmx_nbnxn_ocl_t               *nb,
-                             const struct nbnxn_atomdata_t *nbatom,
-                             cl_command_queue               stream,
-                             int                            adat_begin,
-                             int                            adat_len)
+void debug_dump_cj4_f_fshift(gmx_nbnxn_ocl_t               gmx_unused *nb,
+                             const struct nbnxn_atomdata_t gmx_unused *nbatom,
+                             cl_command_queue              gmx_unused  stream,
+                             int                           gmx_unused  adat_begin,
+                             int                           gmx_unused  adat_len)
 {
 /* Uncomment this define to enable cj4 debugging for the first kernel run */
 //#define DEBUG_DUMP_CJ4_OCL
@@ -871,7 +866,7 @@ void nbnxn_gpu_launch_cpyback(gmx_nbnxn_ocl_t               *nb,
                               int                            aloc)
 {
     cl_int gmx_unused cl_error;
-    int               adat_begin, adat_len, adat_end; /* local/nonlocal offset and length used for xq and f */
+    int               adat_begin, adat_len; /* local/nonlocal offset and length used for xq and f */
     int               iloc = -1;
 
     /* determine interaction locality from atom locality */
@@ -911,13 +906,11 @@ void nbnxn_gpu_launch_cpyback(gmx_nbnxn_ocl_t               *nb,
     {
         adat_begin  = 0;
         adat_len    = adat->natoms_local;
-        adat_end    = nb->atdat->natoms_local;
     }
     else
     {
         adat_begin  = adat->natoms_local;
         adat_len    = adat->natoms - adat->natoms_local;
-        adat_end    = nb->atdat->natoms;
     }
 
     /* beginning of timed D2H section */
@@ -948,7 +941,7 @@ void nbnxn_gpu_launch_cpyback(gmx_nbnxn_ocl_t               *nb,
     {
         /* DtoH fshift */
         if (bCalcFshift)
-        {            
+        {
             ocl_copy_D2H_async(nb->nbst.fshift, adat->fshift, 0,
                                SHIFTS * adat->fshift_elem_size, stream, bDoTime ? &(t->nb_d2h_fshift[iloc]) : NULL);
         }
@@ -972,14 +965,13 @@ void nbnxn_gpu_launch_cpyback(gmx_nbnxn_ocl_t               *nb,
  * transfers to finish.
  */
 void nbnxn_gpu_wait_for_gpu(gmx_nbnxn_ocl_t *nb,
-                            const nbnxn_atomdata_t *nbatom,
+                            const nbnxn_atomdata_t */*nbatom*/,
                             int flags, int aloc,
                             real *e_lj, real *e_el, rvec *fshift)
 {
     /* NOTE:  only implemented for single-precision at this time */
     cl_int gmx_unused      cl_error;
-    int                    i, adat_end, iloc = -1;
-    volatile unsigned int *poll_word;
+    int                    i, iloc = -1;
 
     /* determine interaction locality from atom locality */
     if (LOCAL_A(aloc))
@@ -1017,16 +1009,6 @@ void nbnxn_gpu_wait_for_gpu(gmx_nbnxn_ocl_t *nb,
     if (nb->plist[iloc]->nsci == 0)
     {
         return;
-    }
-
-    /* calculate the atom data index range based on locality */
-    if (LOCAL_A(aloc))
-    {
-        adat_end = nb->atdat->natoms_local;
-    }
-    else
-    {
-        adat_end = nb->atdat->natoms;
     }
 
     /* Actual sync point. Waits for everything to be finished in the command queue. TODO: Find out if a more fine grained solution is needed */

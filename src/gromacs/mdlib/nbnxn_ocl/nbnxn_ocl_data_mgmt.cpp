@@ -41,8 +41,6 @@
  */
 #include "gmxpre.h"
 
-#include "config.h"
-
 #include <assert.h>
 #include <math.h>
 #include <stdarg.h>
@@ -266,14 +264,16 @@ static void init_atomdata_first(cl_atomdata_t *ad, int ntypes, gmx_device_info_t
     /* An element of the shift_vec device buffer has the same size as one element
        of the host side shift_vec buffer. */
     ad->shift_vec_elem_size = sizeof(*(((nbnxn_atomdata_t*)0)->shift_vec));
+
+    // TODO: handle errors, check clCreateBuffer flags
     ad->shift_vec = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, SHIFTS * ad->shift_vec_elem_size, NULL, &cl_error);
     assert(cl_error == CL_SUCCESS);
     ad->bShiftVecUploaded = false;
-    // TODO: handle errors, check clCreateBuffer flags
-    
+
     /* An element of the fshift device buffer has the same size as one element
        of the host side fshift buffer. */
     ad->fshift_elem_size = sizeof(*(((cl_nb_staging_t*)0)->fshift));
+
     ad->fshift = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, SHIFTS * ad->fshift_elem_size, NULL, &cl_error);
     assert(cl_error == CL_SUCCESS);
     // TODO: handle errors, check clCreateBuffer flags
@@ -571,7 +571,6 @@ void nbnxn_gpu_init(FILE gmx_unused      *fplog,
     /* init nbst */
     ocl_pmalloc((void**)&nb->nbst.e_lj, sizeof(*nb->nbst.e_lj));
     ocl_pmalloc((void**)&nb->nbst.e_el, sizeof(*nb->nbst.e_el));
-        
     ocl_pmalloc((void**)&nb->nbst.fshift, SHIFTS * sizeof(*nb->nbst.fshift));
 
     init_plist(nb->plist[eintLocal]);
@@ -632,15 +631,16 @@ nbnxn_ocl_clear_e_fshift(gmx_nbnxn_ocl_t *nb)
     cl_atomdata_t *      adat     = nb->atdat;
     cl_command_queue     ls       = nb->stream[eintLocal];
 
-    size_t               local_work_size[3] = {1, 1, 1};
+    size_t               local_work_size[3]   = {1, 1, 1};
     size_t               global_work_size[3]  = {1, 1, 1};
-    cl_int               shifts       = SHIFTS*3;
+
+    cl_int               shifts   = SHIFTS*3;
 
     cl_int               arg_no;
 
     cl_kernel            zero_e_fshift = nb->kernel_zero_e_fshift;
 
-    local_work_size[0] = 64;
+    local_work_size[0]   = 64;
     global_work_size[0]  = ((shifts/64)*64) + ((shifts%64) ? 64 : 0);
 
     arg_no    = 0;
@@ -665,8 +665,8 @@ static void nbnxn_ocl_clear_f(gmx_nbnxn_ocl_t *nb, int natoms_clear)
     cl_command_queue     ls       = nb->stream[eintLocal];
     cl_float             value    = 0.0f;
 
-    size_t               local_work_size[3] = {1, 1, 1};
-    size_t               global_work_size[3]  = {1, 1, 1};
+    size_t               local_work_size[3]  = {1, 1, 1};
+    size_t               global_work_size[3] = {1, 1, 1};
 
     cl_int               arg_no;
 
@@ -674,8 +674,8 @@ static void nbnxn_ocl_clear_f(gmx_nbnxn_ocl_t *nb, int natoms_clear)
 
     cl_uint              natoms_flat = natoms_clear * (sizeof(rvec)/sizeof(real));
 
-    local_work_size[0] = 64;
-    global_work_size[0]  = ((natoms_flat/local_work_size[0])*local_work_size[0]) + ((natoms_flat%local_work_size[0]) ? local_work_size[0] : 0);
+    local_work_size[0]  = 64;
+    global_work_size[0] = ((natoms_flat/local_work_size[0])*local_work_size[0]) + ((natoms_flat%local_work_size[0]) ? local_work_size[0] : 0);
 
     arg_no    = 0;
     cl_error  = clSetKernelArg(memset_f, arg_no++, sizeof(cl_mem), &(adat->f));
@@ -805,9 +805,10 @@ void nbnxn_gpu_init_atomdata(gmx_nbnxn_ocl_t               *nb,
         }
 
         d_atdat->f_elem_size = sizeof(rvec);
+
+        // TODO: handle errors, check clCreateBuffer flags
         d_atdat->f = clCreateBuffer(nb->dev_info->context, CL_MEM_READ_WRITE, nalloc * d_atdat->f_elem_size, NULL, &cl_error);
         assert(CL_SUCCESS == cl_error);
-        // TODO: handle errors, check clCreateBuffer flags
 
         d_atdat->xq = clCreateBuffer(nb->dev_info->context, CL_MEM_READ_WRITE, nalloc * sizeof(cl_float4), NULL, &cl_error);
         assert(CL_SUCCESS == cl_error);
