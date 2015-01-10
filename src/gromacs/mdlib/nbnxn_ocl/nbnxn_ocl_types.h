@@ -100,9 +100,9 @@ enum evdwOcl {
  */
 typedef struct cl_nb_staging
 {
-    float   *e_lj;           /**< LJ energy                       */
-    float   *e_el;           /**< electrostatic energy            */    
-    float   (*fshift)[3];    /**< float3 buffer with shift forces */    
+    float    *e_lj;           /**< LJ energy                       */
+    float    *e_el;           /**< electrostatic energy            */
+    float   (*fshift)[3];     /**< float3 buffer with shift forces */
 } cl_nb_staging_t;
 
 /*! \internal
@@ -293,10 +293,10 @@ struct gmx_nbnxn_ocl_t
     cl_command_queue    stream[2];      /**< local and non-local GPU queues                             */
 
     /** events used for synchronization */
-    cl_event    nonlocal_done;    /**< event triggered when the non-local non-bonded kernel
-                                        is done (and the local transfer can proceed)                 */
-    cl_event    misc_ops_done;    /**< event triggered when the operations that precede the
-                                          main force calculations are done (e.g. buffer 0-ing)       */
+    cl_event    nonlocal_done;           /**< event triggered when the non-local non-bonded kernel
+                                              is done (and the local transfer can proceed)               */
+    cl_event    misc_ops_done;           /**< event triggered when the operations that precede the
+                                              main force calculations are done (e.g. buffer 0-ing)       */
 
     cl_bool                     bDoTime; /**< True if event-based timing is enabled.                     */
     cl_timers_t                *timers;  /**< OpenCL event-based timers.                                 */

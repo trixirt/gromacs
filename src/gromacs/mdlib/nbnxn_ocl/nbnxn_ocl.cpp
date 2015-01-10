@@ -1068,9 +1068,9 @@ void nbnxn_gpu_wait_for_gpu(gmx_nbnxn_ocl_t *nb,
         {
             for (i = 0; i < SHIFTS; i++)
             {
-                fshift[i][0] += nbst.fshift[i][0];
-                fshift[i][1] += nbst.fshift[i][1];
-                fshift[i][2] += nbst.fshift[i][2];
+                fshift[i][0] += (nbst.fshift)[i][0];
+                fshift[i][1] += (nbst.fshift)[i][1];
+                fshift[i][2] += (nbst.fshift)[i][2];
             }
         }
     }
