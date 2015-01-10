@@ -852,7 +852,7 @@ void debug_dump_cj4_f_fshift(gmx_nbnxn_ocl_t               *nb,
             sprintf(ocl_file_name, "ocl_fshift_%d.txt", DEBUG_RUN_STEP);
             sprintf(cuda_file_name, "cuda_fshift_%d.txt", DEBUG_RUN_STEP);
 
-            dump_compare_results_f(nb->nbst.fshift, SHIFTS * 3,
+            dump_compare_results_f((float*)(nb->nbst.fshift), SHIFTS * 3,
                                    ocl_file_name, cuda_file_name);
         }
 
@@ -959,7 +959,7 @@ void nbnxn_gpu_launch_cpyback(gmx_nbnxn_ocl_t               *nb,
 
     /* DtoH f */
     ocl_copy_D2H_async(nbatom->out[0].f + adat_begin * 3, adat->f, adat_begin*3*sizeof(float),
-                       (adat_len)*sizeof(float) * 3, stream, bDoTime ? &(t->nb_d2h_f[iloc]) : NULL);
+                       (adat_len)* adat->f_elem_size, stream, bDoTime ? &(t->nb_d2h_f[iloc]) : NULL);
 
     /* After the non-local D2H is launched the nonlocal_done event can be
        recorded which signals that the local D2H can proceed. This event is not
@@ -976,10 +976,9 @@ void nbnxn_gpu_launch_cpyback(gmx_nbnxn_ocl_t               *nb,
     {
         /* DtoH fshift */
         if (bCalcFshift)
-        {
-            // TODO: review fshift data type and how its size is computed
+        {            
             ocl_copy_D2H_async(nb->nbst.fshift, adat->fshift, 0,
-                               3 * SHIFTS * sizeof(float), stream, bDoTime ? &(t->nb_d2h_fshift[iloc]) : NULL);
+                               SHIFTS * adat->fshift_elem_size, stream, bDoTime ? &(t->nb_d2h_fshift[iloc]) : NULL);
         }
 
         /* DtoH energies */
@@ -1150,9 +1149,9 @@ void nbnxn_gpu_wait_for_gpu(gmx_nbnxn_ocl_t *nb,
         {
             for (i = 0; i < SHIFTS; i++)
             {
-                fshift[i][0] += nbst.fshift[i*3];
-                fshift[i][1] += nbst.fshift[i*3+1];
-                fshift[i][2] += nbst.fshift[i*3+2 ];
+                fshift[i][0] += nbst.fshift[i][0];
+                fshift[i][1] += nbst.fshift[i][1];
+                fshift[i][2] += nbst.fshift[i][2];
             }
         }
     }

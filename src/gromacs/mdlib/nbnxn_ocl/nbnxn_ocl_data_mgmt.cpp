@@ -261,12 +261,18 @@ static void init_atomdata_first(cl_atomdata_t *ad, int ntypes, gmx_device_info_t
 
     ad->ntypes  = ntypes;
 
-    ad->shift_vec = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, SHIFTS * sizeof(rvec), NULL, &cl_error);
+    /* An element of the shift_vec device buffer has the same size as one element
+       of the host side shift_vec buffer. */
+    ad->shift_vec_elem_size = sizeof(*(((nbnxn_atomdata_t*)0)->shift_vec));
+    ad->shift_vec = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, SHIFTS * ad->shift_vec_elem_size, NULL, &cl_error);
     assert(cl_error == CL_SUCCESS);
     ad->bShiftVecUploaded = false;
     // TODO: handle errors, check clCreateBuffer flags
-
-    ad->fshift = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, SHIFTS * sizeof(rvec), NULL, &cl_error);
+    
+    /* An element of the fshift device buffer has the same size as one element
+       of the host side fshift buffer. */
+    ad->fshift_elem_size = sizeof(*(((cl_nb_staging_t*)0)->fshift));
+    ad->fshift = clCreateBuffer(dev_info->context, CL_MEM_READ_WRITE, SHIFTS * ad->fshift_elem_size, NULL, &cl_error);
     assert(cl_error == CL_SUCCESS);
     // TODO: handle errors, check clCreateBuffer flags
 
@@ -563,9 +569,8 @@ void nbnxn_gpu_init(FILE gmx_unused      *fplog,
     /* init nbst */
     ocl_pmalloc((void**)&nb->nbst.e_lj, sizeof(*nb->nbst.e_lj));
     ocl_pmalloc((void**)&nb->nbst.e_el, sizeof(*nb->nbst.e_el));
-
-    // TODO: review fshift data type and how its size is computed
-    ocl_pmalloc((void**)&nb->nbst.fshift, 3 * SHIFTS * sizeof(*nb->nbst.fshift));
+        
+    ocl_pmalloc((void**)&nb->nbst.fshift, SHIFTS * sizeof(*nb->nbst.fshift));
 
     init_plist(nb->plist[eintLocal]);
 
@@ -882,7 +887,7 @@ void nbnxn_gpu_upload_shiftvec(gmx_nbnxn_ocl_t        *nb,
     if (nbatom->bDynamicBox || !adat->bShiftVecUploaded)
     {
         ocl_copy_H2D_async(adat->shift_vec, nbatom->shift_vec, 0,
-                           SHIFTS * sizeof(rvec), ls, NULL);
+                           SHIFTS * adat->shift_vec_elem_size, ls, NULL);
         adat->bShiftVecUploaded = true;
     }
 }
@@ -916,7 +921,8 @@ void nbnxn_gpu_init_atomdata(gmx_nbnxn_ocl_t               *nb,
             ocl_free_buffered(d_atdat->atom_types, NULL, NULL);
         }
 
-        d_atdat->f = clCreateBuffer(nb->dev_info->context, CL_MEM_READ_WRITE, nalloc * sizeof(rvec), NULL, &cl_error);
+        d_atdat->f_elem_size = sizeof(rvec);
+        d_atdat->f = clCreateBuffer(nb->dev_info->context, CL_MEM_READ_WRITE, nalloc * d_atdat->f_elem_size, NULL, &cl_error);
         assert(CL_SUCCESS == cl_error);
         // TODO: handle errors, check clCreateBuffer flags
 

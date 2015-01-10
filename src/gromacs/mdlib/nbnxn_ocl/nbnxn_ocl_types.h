@@ -100,10 +100,9 @@ enum evdwOcl {
  */
 typedef struct cl_nb_staging
 {
-    float   *e_lj;      /**< LJ energy                       */
-    float   *e_el;      /**< electrostatic energy            */
-    float   *fshift;    /**< float3 buffer with shift forces */
-    // TODO: review fshift data type and how its size is computed
+    float   *e_lj;           /**< LJ energy                       */
+    float   *e_el;           /**< electrostatic energy            */    
+    float   (*fshift)[3];    /**< float3 buffer with shift forces */    
 } cl_nb_staging_t;
 
 /*! \internal
@@ -111,23 +110,28 @@ typedef struct cl_nb_staging
  */
 typedef struct cl_atomdata
 {
-    int         natoms;            /**< number of atoms                              */
-    int         natoms_local;      /**< number of local atoms                        */
-    int         nalloc;            /**< allocation size for the atom data (xq, f)    */
+    int         natoms;              /**< number of atoms                              */
+    int         natoms_local;        /**< number of local atoms                        */
+    int         nalloc;              /**< allocation size for the atom data (xq, f)    */
 
-    cl_mem      xq;                /**< float4 buffer with atom coordinates + charges, size natoms */
-    cl_mem      f;                 /**< float3 buffer with force output array, size natoms         */
+    cl_mem      xq;                  /**< float4 buffer with atom coordinates + charges, size natoms */
 
-    cl_mem      e_lj;              /**< LJ energy output, size 1                       */
-    cl_mem      e_el;              /**< Electrostatics energy input, size 1            */
+    cl_mem      f;                   /**< float3 buffer with force output array, size natoms         */
+    size_t      f_elem_size;         /**< Size in bytes for one element of f buffer      */
 
-    cl_mem      fshift;            /**< float3 buffer with shift forces                */
+    cl_mem      e_lj;                /**< LJ energy output, size 1                       */
+    cl_mem      e_el;                /**< Electrostatics energy input, size 1            */
 
-    int         ntypes;            /**< number of atom types                           */
-    cl_mem      atom_types;        /**< int buffer with atom type indices, size natoms */
+    cl_mem      fshift;              /**< float3 buffer with shift forces                */
+    size_t      fshift_elem_size;    /**< Size in bytes for one element of fshift buffer */
 
-    cl_mem      shift_vec;         /**< float3 buffer with shifts values               */
-    cl_bool     bShiftVecUploaded; /**< true if the shift vector has been uploaded  */
+    int         ntypes;              /**< number of atom types                           */
+    cl_mem      atom_types;          /**< int buffer with atom type indices, size natoms */
+
+    cl_mem      shift_vec;           /**< float3 buffer with shifts values               */
+    size_t      shift_vec_elem_size; /**< Size in bytes for one element of shift_vec buffer */
+
+    cl_bool     bShiftVecUploaded;   /**< true if the shift vector has been uploaded  */
 } cl_atomdata_t;
 
 /*! \internal
