@@ -226,6 +226,9 @@ int detect_gpus(gmx_gpu_info_t *gpu_info, char *err_str)
                     gpu_info->gpu_dev[device_index].compute_units = 0;
                     clGetDeviceInfo(ocl_device_ids[j], CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(gpu_info->gpu_dev[device_index].compute_units), &(gpu_info->gpu_dev[device_index].compute_units), NULL);
 
+                    gpu_info->gpu_dev[device_index].adress_bits = 0;
+                    clGetDeviceInfo(ocl_device_ids[j], CL_DEVICE_ADDRESS_BITS, sizeof(gpu_info->gpu_dev[device_index].adress_bits), &(gpu_info->gpu_dev[device_index].adress_bits), NULL);
+
                     gpu_info->gpu_dev[device_index].vendor_e = get_vendor_id(gpu_info->gpu_dev[device_index].device_vendor);
 
                     gpu_info->gpu_dev[device_index].stat = is_gmx_supported_gpu_id(gpu_info->gpu_dev + device_index);

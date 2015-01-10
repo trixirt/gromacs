@@ -83,6 +83,7 @@ struct gmx_device_info_t
     char                device_version[256];
     char                device_vendor[256];
     int                 compute_units;
+    int                 adress_bits;
     int                 stat;
     ocl_vendor_id_t     vendor_e;
 

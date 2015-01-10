@@ -102,26 +102,44 @@ static bool always_prune = (getenv("GMX_GPU_ALWAYS_PRUNE") != NULL);
  */
 static unsigned int poll_wait_pattern = (0x7FU << 23);
 
-/*! \brief Returns the number of blocks to be used for the nonbonded GPU kernel.
+/*! \brief Validates the input global work size parameter.
  */
-static inline int calc_nb_kernel_nblock(int nwork_units, gmx_device_info_t gmx_unused *dinfo)
+static inline void validate_global_work_size(size_t *global_work_size, int work_dim, gmx_device_info_t *dinfo)
 {
-    //int max_grid_x_size;
+    cl_uint device_size_t_size_bits;
+    cl_uint host_size_t_size_bits;    
 
     assert(dinfo);
 
-    // TODO: fix for OpenCL implementation
-    //max_grid_x_size = dinfo->prop.maxGridSize[0];
+    /* Each component of a global_work_size must not exceed the range given by the
+       sizeof(device size_t) for the device on which the kernel execution will
+       be enqueued. See:
+       https://www.khronos.org/registry/cl/sdk/1.0/docs/man/xhtml/clEnqueueNDRangeKernel.html
+    */
+    device_size_t_size_bits = dinfo->adress_bits;
+    host_size_t_size_bits = (cl_uint)(sizeof(size_t) * 8);
 
-    // /* do we exceed the grid x dimension limit? */
-    //if (nwork_units > max_grid_x_size)
-    //{
-    //    gmx_fatal(FARGS, "Watch out, the input system is too large to simulate!\n"
-    //              "The number of nonbonded work units (=number of super-clusters) exceeds the"
-    //              "maximum grid size in x dimension (%d > %d)!", nwork_units, max_grid_x_size);
-    //}
+    /* If sizeof(host size_t) <= sizeof(device size_t)
+            => global_work_size components will always be valid
+       else
+            => get device limit for global work size and
+            compare it against each component of global_work_size.
+    */
+    if (host_size_t_size_bits > device_size_t_size_bits)
+    {
+        size_t device_limit;
 
-    return nwork_units;
+        device_limit = (((size_t)1) << device_size_t_size_bits) - 1;
+
+        for (int i = 0; i < work_dim; i++)
+            if (global_work_size[i] > device_limit)
+            {
+                gmx_fatal(FARGS, "Watch out, the input system is too large to simulate!\n"
+                    "The number of nonbonded work units (=number of super-clusters) exceeds the"
+                    "device capabilities. Global work size limit exceeded (%d > %d)!",
+                    global_work_size[i], device_limit);
+            }
+    }
 }
 
 /* Constant arrays listing non-bonded kernel function names. The arrays are
@@ -387,8 +405,8 @@ void nbnxn_gpu_launch_kernel(gmx_nbnxn_ocl_t               *nb,
     cl_int               cl_error;
     int                  adat_begin, adat_len; /* local/nonlocal offset and length used for xq and f */
     /* OpenCL kernel launch-related stuff */
-    int                  shmem, nblock;
-    size_t               dim_block[3], dim_grid[3];
+    int                  shmem;
+    size_t               local_work_size[3], global_work_size[3];
     cl_kernel            nb_kernel = NULL; /* fn pointer to the nonbonded kernel */
 
     cl_atomdata_t       *adat    = nb->atdat;
@@ -459,15 +477,16 @@ void nbnxn_gpu_launch_kernel(gmx_nbnxn_ocl_t               *nb,
                                     bCalcEner,
                                     plist->bDoPrune || always_prune);
 
-    /* kernel launch config */
-    nblock       = calc_nb_kernel_nblock(plist->nsci, nb->dev_info);
-    dim_block[0] = CL_SIZE;
-    dim_block[1] = CL_SIZE;
-    dim_block[2] = 1;
+    /* kernel launch config */    
+    local_work_size[0] = CL_SIZE;
+    local_work_size[1] = CL_SIZE;
+    local_work_size[2] = 1;
 
-    dim_grid[0] = nblock * dim_block[0];
-    dim_grid[1] = 1 * dim_block[1];
-    dim_grid[2] = 1 * dim_block[2];
+    global_work_size[0] = plist->nsci * local_work_size[0];
+    global_work_size[1] = 1 * local_work_size[1];
+    global_work_size[2] = 1 * local_work_size[2];
+
+    validate_global_work_size(global_work_size, 3, nb->dev_info);
 
     shmem     = calc_shmem_required();
 
@@ -477,7 +496,7 @@ void nbnxn_gpu_launch_kernel(gmx_nbnxn_ocl_t               *nb,
 
         if (DEBUG_RUN_STEP == run_step)
         {
-            debug_buffer_size = dim_grid[0] * dim_grid[1] * dim_grid[2] * sizeof(float);
+            debug_buffer_size = global_work_size[0] * global_work_size[1] * global_work_size[2] * sizeof(float);
             debug_buffer_h    = (float*)calloc(1, debug_buffer_size);
             assert(NULL != debug_buffer_h);
 
@@ -497,8 +516,8 @@ void nbnxn_gpu_launch_kernel(gmx_nbnxn_ocl_t               *nb,
     {
         fprintf(debug, "GPU launch configuration:\n\tLocal work size: %dx%dx%d\n\t"
                 "Global work size : %dx%d\n\t#Super-clusters/clusters: %d/%d (%d)\n",
-                (int)(dim_block[0]), (int)(dim_block[1]), (int)(dim_block[2]),
-                (int)(dim_grid[0]), (int)(dim_grid[1]), plist->nsci*NCL_PER_SUPERCL,
+                (int)(local_work_size[0]), (int)(local_work_size[1]), (int)(local_work_size[2]),
+                (int)(global_work_size[0]), (int)(global_work_size[1]), plist->nsci*NCL_PER_SUPERCL,
                 NCL_PER_SUPERCL, plist->na_c);
     }
 
@@ -530,7 +549,7 @@ void nbnxn_gpu_launch_kernel(gmx_nbnxn_ocl_t               *nb,
     {
         printf("ClERROR! %d\n", cl_error);
     }
-    cl_error = clEnqueueNDRangeKernel(stream, nb_kernel, 3, NULL, dim_grid, dim_block, 0, NULL, bDoTime ? &(t->nb_k[iloc]) : NULL);
+    cl_error = clEnqueueNDRangeKernel(stream, nb_kernel, 3, NULL, global_work_size, local_work_size, 0, NULL, bDoTime ? &(t->nb_k[iloc]) : NULL);
     assert(cl_error == CL_SUCCESS);
 
 #ifdef DEBUG_OCL
@@ -555,22 +574,22 @@ void nbnxn_gpu_launch_kernel(gmx_nbnxn_ocl_t               *nb,
             assert(pf != NULL);
 
             fprintf(pf, "%20s", "");
-            for (int j = 0; j < dim_grid[0]; j++)
+            for (int j = 0; j < global_work_size[0]; j++)
             {
                 char label[20];
-                sprintf(label, "(wIdx=%2d thIdx=%2d)", j / dim_block[0], j % dim_block[0]);
+                sprintf(label, "(wIdx=%2d thIdx=%2d)", j / local_work_size[0], j % local_work_size[0]);
                 fprintf(pf, "%20s", label);
             }
 
-            for (int i = 0; i < dim_grid[1]; i++)
+            for (int i = 0; i < global_work_size[1]; i++)
             {
                 char label[20];
-                sprintf(label, "(wIdy=%2d thIdy=%2d)", i / dim_block[1], i % dim_block[1]);
+                sprintf(label, "(wIdy=%2d thIdy=%2d)", i / local_work_size[1], i % local_work_size[1]);
                 fprintf(pf, "\n%20s", label);
 
-                for (int j = 0; j < dim_grid[0]; j++)
+                for (int j = 0; j < global_work_size[0]; j++)
                 {
-                    fprintf(pf, "%20.5f", debug_buffer_h[i * dim_grid[0] + j]);
+                    fprintf(pf, "%20.5f", debug_buffer_h[i * global_work_size[0] + j]);
                 }
 
                 //fprintf(pf, "\n");

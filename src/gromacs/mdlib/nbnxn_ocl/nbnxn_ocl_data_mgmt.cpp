@@ -744,16 +744,16 @@ nbnxn_ocl_clear_e_fshift(gmx_nbnxn_ocl_t *nb)
     cl_atomdata_t *      adat     = nb->atdat;
     cl_command_queue     ls       = nb->stream[eintLocal];
 
-    size_t               dim_block[3] = {1, 1, 1};
-    size_t               dim_grid[3]  = {1, 1, 1};
+    size_t               local_work_size[3] = {1, 1, 1};
+    size_t               global_work_size[3]  = {1, 1, 1};
     cl_int               shifts       = SHIFTS*3;
 
     cl_int               arg_no;
 
     cl_kernel            zero_e_fshift = nb->kernel_zero_e_fshift;
 
-    dim_block[0] = 64;
-    dim_grid[0]  = ((shifts/64)*64) + ((shifts%64) ? 64 : 0);
+    local_work_size[0] = 64;
+    global_work_size[0]  = ((shifts/64)*64) + ((shifts%64) ? 64 : 0);
 
     arg_no    = 0;
     cl_error  = clSetKernelArg(zero_e_fshift, arg_no++, sizeof(cl_mem), &(adat->fshift));
@@ -762,7 +762,7 @@ nbnxn_ocl_clear_e_fshift(gmx_nbnxn_ocl_t *nb)
     cl_error |= clSetKernelArg(zero_e_fshift, arg_no++, sizeof(cl_uint), &shifts);
     assert(cl_error == CL_SUCCESS);
 
-    cl_error = clEnqueueNDRangeKernel(ls, zero_e_fshift, 3, NULL, dim_grid, dim_block, 0, NULL, NULL);
+    cl_error = clEnqueueNDRangeKernel(ls, zero_e_fshift, 3, NULL, global_work_size, local_work_size, 0, NULL, NULL);
     assert(cl_error == CL_SUCCESS);
 
 }
@@ -777,8 +777,8 @@ static void nbnxn_ocl_clear_f(gmx_nbnxn_ocl_t *nb, int natoms_clear)
     cl_command_queue     ls       = nb->stream[eintLocal];
     cl_float             value    = 0.0f;
 
-    size_t               dim_block[3] = {1, 1, 1};
-    size_t               dim_grid[3]  = {1, 1, 1};
+    size_t               local_work_size[3] = {1, 1, 1};
+    size_t               global_work_size[3]  = {1, 1, 1};
 
     cl_int               arg_no;
 
@@ -786,8 +786,8 @@ static void nbnxn_ocl_clear_f(gmx_nbnxn_ocl_t *nb, int natoms_clear)
 
     cl_uint              natoms_flat = natoms_clear * (sizeof(rvec)/sizeof(real));
 
-    dim_block[0] = 64;
-    dim_grid[0]  = ((natoms_flat/dim_block[0])*dim_block[0]) + ((natoms_flat%dim_block[0]) ? dim_block[0] : 0);
+    local_work_size[0] = 64;
+    global_work_size[0]  = ((natoms_flat/local_work_size[0])*local_work_size[0]) + ((natoms_flat%local_work_size[0]) ? local_work_size[0] : 0);
 
     arg_no    = 0;
     cl_error  = clSetKernelArg(memset_f, arg_no++, sizeof(cl_mem), &(adat->f));
@@ -795,7 +795,7 @@ static void nbnxn_ocl_clear_f(gmx_nbnxn_ocl_t *nb, int natoms_clear)
     cl_error |= clSetKernelArg(memset_f, arg_no++, sizeof(cl_uint), &natoms_flat);
     assert(cl_error == CL_SUCCESS);
 
-    cl_error = clEnqueueNDRangeKernel(ls, memset_f, 3, NULL, dim_grid, dim_block, 0, NULL, NULL);
+    cl_error = clEnqueueNDRangeKernel(ls, memset_f, 3, NULL, global_work_size, local_work_size, 0, NULL, NULL);
     assert(cl_error == CL_SUCCESS);
 }
 
