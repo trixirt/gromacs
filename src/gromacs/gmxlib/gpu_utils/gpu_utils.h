@@ -46,12 +46,12 @@
 #ifndef GMX_GMXLIB_GPU_UTILS_GPU_UTILS_H
 #define GMX_GMXLIB_GPU_UTILS_GPU_UTILS_H
 
-/* gcc <= 4.6 gets confused about the macro expansion and/or
-   gmx_unused usage in this file, so we suppress warnings about unused
+/* For versions 4.4, 4.5, 4.6 gcc gets confused about the macro expansion
+   and/or gmx_unused usage in this file, so we suppress warnings about unused
    parameters */
-#ifndef __INTEL_COMPILER
+#if !(defined __INTEL_COMPILER) && !(defined __ICC)
 #if (defined __GNUC__) && (defined __GNUC_MINOR__)
-#if ((4 == __GNUC__) && ((4 <= __GNUC_MINOR__) && (6 <= __GNUC_MINOR__)))
+#if ((4 == __GNUC__) && ((4 <= __GNUC_MINOR__) && (6 >= __GNUC_MINOR__)))
     #pragma GCC diagnostic ignored "-Wunused-parameter"
 #endif
 #endif
@@ -246,9 +246,9 @@ void gpu_set_host_malloc_and_free(bool               bUseGpuKernels,
 }
 #endif
 
-#ifndef __INTEL_COMPILER
+#if !(defined __INTEL_COMPILER) && !(defined __ICC)
 #if (defined __GNUC__) && (defined __GNUC_MINOR__)
-#if ((4 == __GNUC__) && ((4 <= __GNUC_MINOR__) && (6 <= __GNUC_MINOR__)))
+#if ((4 == __GNUC__) && ((4 <= __GNUC_MINOR__) && (6 >= __GNUC_MINOR__)))
     #pragma GCC diagnostic warning "-Wunused-parameter"
 #endif
 #endif
