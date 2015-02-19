@@ -131,8 +131,8 @@ compilation of OpenCL kernels, but they are also used on the device selection.
 
 4. KNOWN LIMITATIONS
    =================
-- OpenCL on Intel CPUs are not supported
-- OpenCL on Intel GPUs are not supported
+- OpenCL on Intel CPUs is not supported
+- OpenCL on Intel GPUs is not supported
 - The current implementation is not compatible with OpenCL devices that are
   not using warp/wavefronts or for which the warp/wavefront size is not a
   multiple of 32
