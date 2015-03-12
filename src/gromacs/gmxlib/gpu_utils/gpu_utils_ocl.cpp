@@ -253,11 +253,12 @@ int detect_gpus(gmx_gpu_info_t *gpu_info, char *err_str)
                 {
                     if (OCL_VENDOR_AMD == gpu_info->gpu_dev[i].vendor_e)
                     {
-                        if ((last + 1) < i)
+                        last++;
+
+                        if (last < i)
                         {
                             gmx_device_info_t ocl_gpu_info;
-                            ocl_gpu_info = gpu_info->gpu_dev[i];
-                            last++;
+                            ocl_gpu_info            = gpu_info->gpu_dev[i];
                             gpu_info->gpu_dev[i]    = gpu_info->gpu_dev[last];
                             gpu_info->gpu_dev[last] = ocl_gpu_info;
                         }
@@ -271,11 +272,12 @@ int detect_gpus(gmx_gpu_info_t *gpu_info, char *err_str)
                     {
                         if (OCL_VENDOR_NVIDIA == gpu_info->gpu_dev[i].vendor_e)
                         {
-                            if ((last + 1) < i)
+                            last++;
+
+                            if (last < i)
                             {
                                 gmx_device_info_t ocl_gpu_info;
-                                ocl_gpu_info = gpu_info->gpu_dev[i];
-                                last++;
+                                ocl_gpu_info            = gpu_info->gpu_dev[i];
                                 gpu_info->gpu_dev[i]    = gpu_info->gpu_dev[last];
                                 gpu_info->gpu_dev[last] = ocl_gpu_info;
                             }

@@ -410,7 +410,7 @@ void nbnxn_gpu_launch_kernel(gmx_nbnxn_ocl_t               *nb,
     cl_timers_t         *t       = nb->timers;
     cl_command_queue     stream  = nb->stream[iloc];
 
-    bool                 bCalcEner   = flags & GMX_FORCE_VIRIAL;
+    bool                 bCalcEner   = flags & GMX_FORCE_ENERGY;
     bool                 bCalcFshift = flags & GMX_FORCE_VIRIAL;
     bool                 bDoTime     = nb->bDoTime;
     cl_uint              arg_no;
@@ -892,7 +892,7 @@ void nbnxn_gpu_launch_cpyback(gmx_nbnxn_ocl_t               *nb,
     bool             bDoTime = nb->bDoTime;
     cl_command_queue stream  = nb->stream[iloc];
 
-    bool             bCalcEner   = flags & GMX_FORCE_VIRIAL;
+    bool             bCalcEner   = flags & GMX_FORCE_ENERGY;
     bool             bCalcFshift = flags & GMX_FORCE_VIRIAL;
 
     /* don't launch copy-back if there was no work to do */
@@ -995,7 +995,7 @@ void nbnxn_gpu_wait_for_gpu(gmx_nbnxn_ocl_t *nb,
     struct gmx_wallclock_gpu_t *timings  = nb->timings;
     cl_nb_staging               nbst     = nb->nbst;
 
-    bool                        bCalcEner   = flags & GMX_FORCE_VIRIAL;
+    bool                        bCalcEner   = flags & GMX_FORCE_ENERGY;
     bool                        bCalcFshift = flags & GMX_FORCE_VIRIAL;
 
     /* turn energy calculation always on/off (for debugging/testing only) */
