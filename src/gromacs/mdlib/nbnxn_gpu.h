@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2012,2013,2014, by the GROMACS development team, led by
+ * Copyright (c) 2012,2013,2014,2015, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -66,8 +66,8 @@ struct nbnxn_atomdata_t;
 GPU_FUNC_QUALIFIER
 void nbnxn_gpu_launch_kernel(gmx_nbnxn_gpu_t gmx_unused               *nb,
                              const struct nbnxn_atomdata_t gmx_unused *nbdata,
-                             int                    gmx_unused         flags,
-                             int                    gmx_unused         iloc) GPU_FUNC_TERM
+                             int gmx_unused                            flags,
+                             int gmx_unused                            iloc) GPU_FUNC_TERM
 
 /*! \brief
  * Launch asynchronously the download of nonbonded forces from the GPU

@@ -1,7 +1,7 @@
 /*
  * This file is part of the GROMACS molecular simulation package.
  *
- * Copyright (c) 2012,2013,2014, by the GROMACS development team, led by
+ * Copyright (c) 2012,2013,2014,2015, by the GROMACS development team, led by
  * Mark Abraham, David van der Spoel, Berk Hess, and Erik Lindahl,
  * and including many others, as listed in the AUTHORS file in the
  * top-level source directory and at http://www.gromacs.org.
@@ -439,12 +439,6 @@ void nbnxn_gpu_launch_kernel(gmx_nbnxn_cuda_t       *nb,
         stat = cudaEventRecord(t->stop_nb_k[iloc], stream);
         CU_RET_ERR(stat, "cudaEventRecord failed");
     }
-
-#if (defined(WIN32) || defined( _WIN32 ))
-    /* Windows: force flushing WDDM queue */
-    stat = cudaStreamQuery(stream);
-#endif
-
 }
 
 void nbnxn_gpu_launch_cpyback(gmx_nbnxn_cuda_t       *nb,

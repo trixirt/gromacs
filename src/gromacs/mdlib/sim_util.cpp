@@ -76,6 +76,7 @@
 #include "gromacs/math/vec.h"
 #include "gromacs/mdlib/nb_verlet.h"
 #include "gromacs/mdlib/nbnxn_atomdata.h"
+#include "gromacs/mdlib/nbnxn_gpu.h"
 #include "gromacs/mdlib/nbnxn_gpu_data_mgmt.h"
 #include "gromacs/mdlib/nbnxn_search.h"
 #include "gromacs/mdlib/nbnxn_kernels/nbnxn_kernel_gpu_ref.h"
@@ -96,7 +97,6 @@
 #include "gromacs/utility/sysinfo.h"
 
 #include "adress.h"
-#include "nbnxn_gpu.h"
 
 void print_time(FILE                     *out,
                 gmx_walltime_accounting_t walltime_accounting,

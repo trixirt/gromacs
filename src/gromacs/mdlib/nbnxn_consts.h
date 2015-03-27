@@ -82,6 +82,7 @@ extern "C" {
    parameters in the texture cache. */
 #define GPU_EWALD_COULOMB_FORCE_TABLE_SIZE 1536
 
+
 /* Strides for x/f with xyz and xyzq coordinate (and charge) storage */
 #define STRIDE_XYZ   3
 #define STRIDE_XYZQ  4
@@ -95,6 +96,7 @@ extern "C" {
 /* Index of atom a into the SSE/AVX coordinate/force array */
 #define X4_IND_A(a)  (STRIDE_P4*((a) >> 2) + ((a) & (PACK_X4 - 1)))
 #define X8_IND_A(a)  (STRIDE_P8*((a) >> 3) + ((a) & (PACK_X8 - 1)))
+
 
 /* Cluster-pair Interaction masks for 4xN and 2xNN kernels.
  * Bit i*CJ_SIZE + j tells if atom i and j interact.

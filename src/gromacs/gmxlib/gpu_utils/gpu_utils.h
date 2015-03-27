@@ -98,7 +98,7 @@ int detect_gpus(struct gmx_gpu_info_t gmx_unused *gpu_info, char gmx_unused *err
  */
 GPU_FUNC_QUALIFIER
 void pick_compatible_gpus(const struct gmx_gpu_info_t gmx_unused *gpu_info,
-                          gmx_gpu_opt_t gmx_unused        *gpu_opt) GPU_FUNC_TERM
+                          gmx_gpu_opt_t gmx_unused               *gpu_opt) GPU_FUNC_TERM
 
 /*! \brief Check the existence/compatibility of a set of GPUs specified by their device IDs.
  *
@@ -113,9 +113,9 @@ void pick_compatible_gpus(const struct gmx_gpu_info_t gmx_unused *gpu_info,
  * \returns                 TRUE if every the requested GPUs are compatible
  */
 GPU_FUNC_QUALIFIER
-gmx_bool check_selected_gpus(int gmx_unused                  *checkres,
+gmx_bool check_selected_gpus(int gmx_unused                         *checkres,
                              const struct gmx_gpu_info_t gmx_unused *gpu_info,
-                             gmx_gpu_opt_t gmx_unused        *gpu_opt) GPU_FUNC_TERM_WITH_RETURN(-1)
+                             gmx_gpu_opt_t gmx_unused               *gpu_opt) GPU_FUNC_TERM_WITH_RETURN(-1)
 
 /*! \brief Frees the gpu_dev and dev_use array fields of \p gpu_info.
  *
@@ -138,9 +138,11 @@ void free_gpu_info(const struct gmx_gpu_info_t gmx_unused *gpu_info) GPU_FUNC_TE
  * \returns                 true if no error occurs during initialization.
  */
 GPU_FUNC_QUALIFIER
-gmx_bool init_gpu(FILE gmx_unused *fplog, int gmx_unused mygpu, char gmx_unused *result_str,
+gmx_bool init_gpu(FILE gmx_unused                        *fplog,
+                  int gmx_unused                          mygpu,
+                  char gmx_unused                        *result_str,
                   const struct gmx_gpu_info_t gmx_unused *gpu_info,
-                  const gmx_gpu_opt_t gmx_unused *gpu_opt) GPU_FUNC_TERM_WITH_RETURN(-1)
+                  const gmx_gpu_opt_t gmx_unused         *gpu_opt) GPU_FUNC_TERM_WITH_RETURN(-1)
 
 /*! \brief Frees up the CUDA GPU used by the active context at the time of calling.
  *
@@ -155,9 +157,10 @@ gmx_bool init_gpu(FILE gmx_unused *fplog, int gmx_unused mygpu, char gmx_unused 
  * \returns                 true if no error occurs during the freeing.
  */
 CUDA_FUNC_QUALIFIER
-gmx_bool free_cuda_gpu(int gmx_unused mygpu, char gmx_unused *result_str,
+gmx_bool free_cuda_gpu(int gmx_unused                   mygpu,
+                       char gmx_unused                 *result_str,
                        const gmx_gpu_info_t gmx_unused *gpu_info,
-                       const gmx_gpu_opt_t gmx_unused *gpu_opt) CUDA_FUNC_TERM_WITH_RETURN(-1)
+                       const gmx_gpu_opt_t gmx_unused  *gpu_opt) CUDA_FUNC_TERM_WITH_RETURN(-1)
 
 /*! \brief Returns the device ID of the CUDA GPU currently in use.
  *
@@ -181,8 +184,8 @@ int get_current_cuda_gpu_device_id(void) CUDA_FUNC_TERM_WITH_RETURN(-1)
  */
 CUDA_FUNC_QUALIFIER
 int get_cuda_gpu_device_id(const struct gmx_gpu_info_t gmx_unused *gpu_info,
-                           const gmx_gpu_opt_t gmx_unused  *gpu_opt,
-                           int gmx_unused                   index) CUDA_FUNC_TERM_WITH_RETURN(-1)
+                           const gmx_gpu_opt_t gmx_unused         *gpu_opt,
+                           int gmx_unused                          index) CUDA_FUNC_TERM_WITH_RETURN(-1)
 
 /*! \brief Returns the name for the OpenCL GPU with a given index into the array of used GPUs.
  *
@@ -211,9 +214,9 @@ char* get_ocl_gpu_device_name(const gmx_gpu_info_t gmx_unused *gpu_info,
  * \param[in]   index       an index *directly* into the array of available GPUs
  */
 GPU_FUNC_QUALIFIER
-void get_gpu_device_info_string(char gmx_unused *s,
+void get_gpu_device_info_string(char gmx_unused                        *s,
                                 const struct gmx_gpu_info_t gmx_unused *gpu_info,
-                                int gmx_unused index) GPU_FUNC_TERM
+                                int gmx_unused                          index) GPU_FUNC_TERM
 
 /*! \brief Returns the size of the gpu_dev_info struct.
  *
@@ -224,20 +227,21 @@ void get_gpu_device_info_string(char gmx_unused *s,
 GPU_FUNC_QUALIFIER
 size_t sizeof_gpu_dev_info(void) GPU_FUNC_TERM_WITH_RETURN(0)
 
-/*! \brief Function that should return a pointer *ptr to memory
- * of size nbytes.
+/*! \brief Returns a pointer *ptr to page-locked memory of size nbytes.
  *
+ * The allocated memory is suitable to be used for data transfers between host
+ * and GPU.
  * Error handling should be done within this function.
  */
 typedef void gmx_host_alloc_t (void **ptr, size_t nbytes);
 
-/*! \brief Function that should free the memory pointed to by *ptr.
+/*! \brief Frees page-locked memory pointed to by *ptr.
  *
  * NULL should not be passed to this function.
  */
 typedef void gmx_host_free_t (void *ptr);
 
-/*! \brief Set allocation functions used by the GPU host */
+/*! \brief Set page-locked memory allocation functions used by the GPU host. */
 void gpu_set_host_malloc_and_free(bool               bUseGpuKernels,
                                   gmx_host_alloc_t **nb_alloc,
                                   gmx_host_free_t  **nb_free);
