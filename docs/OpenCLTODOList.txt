@@ -67,6 +67,17 @@ TABLE OF CONTENTS
 - Update ocl_pmalloc to allocate page locked memory
   See also Issue #90: https://github.com/StreamComputing/gromacs/issues/90
 
+- Update kernel for 256threads/block
+  See also Issue #92: https://github.com/StreamComputing/gromacs/issues/92
+
+- Update the kernels to use OpenCL 2.0 workgroup level functions if they prove
+  to bring a significant speedup.
+  See also Issue #93: https://github.com/StreamComputing/gromacs/issues/93
+
+- Update the kernels to use fixed precision accumulation for force and energy
+  values, if this implementation is faster and does not affect precision.
+  See also Issue #94: https://github.com/StreamComputing/gromacs/issues/94
+
 5. OTHER NOTES
    ===========
 - NVIDIA GPUs are not handled differently depending on compute capability
