@@ -417,10 +417,10 @@ void get_gpu_device_info_string(char gmx_unused *s, const gmx_gpu_info_t gmx_unu
     }
     else
     {
-        sprintf(s, "#%d: name: %s, vendor: %s device version: %s, comp. units: %d, stat: %s",
+        sprintf(s, "#%d: name: %s, vendor: %s, device version: %s, stat: %s",
                 index, dinfo->device_name, dinfo->device_vendor,
                 dinfo->device_version,
-                dinfo->compute_units, gpu_detect_res_str[dinfo->stat]);
+                gpu_detect_res_str[dinfo->stat]);
     }
 }
 

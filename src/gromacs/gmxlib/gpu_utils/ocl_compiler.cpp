@@ -639,7 +639,9 @@ static kernel_vendor_spec_t
 ocl_autoselect_kernel_from_vendor(ocl_vendor_id_t vendor_id)
 {
     kernel_vendor_spec_t kernel_vendor;
+#ifndef NDEBUG
     printf("Selecting kernel source automatically\n");
+#endif
     switch (vendor_id)
     {
         case OCL_VENDOR_AMD:
@@ -648,7 +650,7 @@ ocl_autoselect_kernel_from_vendor(ocl_vendor_id_t vendor_id)
             break;
         case OCL_VENDOR_NVIDIA:
             kernel_vendor = nvidia_vendor_kernels;
-            printf("Selecting kernel for Nvidia\n");
+            printf("Selecting kernel for NVIDIA\n");
             break;
         default:
             kernel_vendor = generic_vendor_kernels;
@@ -667,7 +669,9 @@ static const char *
 ocl_get_vendor_specific_define(kernel_vendor_spec_t kernel_spec)
 {
     assert(kernel_spec < auto_vendor_kernels );
+#ifndef NDEBUG
     printf("Setting up kernel vendor spec definitions:  %s \n", kernel_vendor_spec_definitions[kernel_spec]);
+#endif
     return kernel_vendor_spec_definitions[kernel_spec];
 }
 
@@ -691,12 +695,16 @@ ocl_get_fastgen_define(
         gmx_algo_family_t * p_gmx_algo_family,
         char *              p_algo_defines)
 {
+#ifndef NDEBUG
     printf("Setting up kernel fastgen definitions: ");
+#endif
     sprintf(p_algo_defines, "-D_OCL_FASTGEN_ %s %s ",
             kernel_electrostatic_family_definitions[p_gmx_algo_family->eeltype],
             kernel_VdW_family_definitions[p_gmx_algo_family->vdwtype]
             );
+#ifndef NDEBUG
     printf(" %s \n", p_algo_defines);
+#endif
 }
 
 /*! \brief TODO */
