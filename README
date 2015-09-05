@@ -1,3 +1,8 @@
+## This repository is out of date.
+You can find the latest version of GROMACS with OpenCL support here: http://www.gromacs.org/Downloads
+Check the manual for how to build GROMACS with OpenCL support enabled: http://manual.gromacs.org/documentation/5.1/install-guide/index.html#opencl-gpu-acceleration
+##
+
 This is a modified version of GROMACS 5.0 adding OpenCL support.
 All CUDA accelerated features have been ported to OpenCL 1.1.
 
