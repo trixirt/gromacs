@@ -338,7 +338,7 @@ static std::string makeKernelIncludePathOption(const std::string& unescapedKerne
      * OpenCL implementations are happy with. Since the standard still says
      * it should be quoted, we handle Apple as a special case.
      */
-#ifdef __APPLE__
+#if 1 // def __APPLE__
     includePathOption += "-I";
 
     // Prepend all the spaces with a backslash
