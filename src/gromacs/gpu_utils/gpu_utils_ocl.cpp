@@ -233,16 +233,25 @@ static int isDeviceSupported(const DeviceInformation* deviceInfo)
         return egpuIncompatible;
     }
 
-    /* Only AMD, Intel, and NVIDIA GPUs are supported for now */
-    switch (deviceInfo->deviceVendor)
+    if (CL_DEVICE_TYPE_GPU == deviceInfo->device_type)
     {
-        case DeviceVendor::Nvidia: return egpuCompatible;
-        case DeviceVendor::Amd:
-            return runningOnCompatibleOSForAmd() ? egpuCompatible : egpuIncompatible;
-        case DeviceVendor::Intel:
-            return GMX_OPENCL_NB_CLUSTER_SIZE == 4 ? egpuCompatible : egpuIncompatibleClusterSize;
-        default: return egpuIncompatible;
+        /* Only AMD, Intel, and NVIDIA GPUs are supported for now */
+        switch (deviceInfo->deviceVendor)
+        {
+            case DeviceVendor::Nvidia: return egpuCompatible;
+            case DeviceVendor::Amd:
+                return runningOnCompatibleOSForAmd() ? egpuCompatible : egpuIncompatible;
+            case DeviceVendor::Intel:
+                return GMX_OPENCL_NB_CLUSTER_SIZE == 4 ? egpuCompatible : egpuIncompatibleClusterSize;
+            default: return egpuIncompatible;
+        }
     }
+    else if (CL_DEVICE_TYPE_CPU == deviceInfo->device_type)
+    {
+        if (getenv("GMX_OCL_FORCE_CPU") != NULL)
+            return egpuCompatible;
+    }
+    return egpuIncompatible;
 }
 
 
@@ -337,14 +346,9 @@ void findGpus(gmx_gpu_info_t* gpu_info)
 {
     cl_uint         ocl_platform_count;
     cl_platform_id* ocl_platform_ids;
-    cl_device_type  req_dev_type = CL_DEVICE_TYPE_GPU;
+    cl_device_type  req_dev_type = CL_DEVICE_TYPE_ALL;
 
     ocl_platform_ids = nullptr;
-
-    if (getenv("GMX_OCL_FORCE_CPU") != nullptr)
-    {
-        req_dev_type = CL_DEVICE_TYPE_CPU;
-    }
 
     while (true)
     {
@@ -457,6 +461,10 @@ void findGpus(gmx_gpu_info_t* gpu_info)
 
                     clGetDeviceInfo(ocl_device_ids[j], CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(size_t),
                                     &gpu_info->deviceInfo[device_index].maxWorkGroupSize, nullptr);
+
+		    clGetDeviceInfo(ocl_device_ids[j], CL_DEVICE_TYPE,
+				    sizeof(gpu_info->deviceInfo[device_index].device_type),
+				    &gpu_info->deviceInfo[device_index].device_type, nullptr);
 
                     gpu_info->deviceInfo[device_index].stat =
                             gmx::checkGpu(device_index, gpu_info->deviceInfo + device_index);
